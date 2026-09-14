@@ -22,6 +22,22 @@
 
 using Shape = CCollision::DebugSettings::ShapeShapeCollision::Shape;
 
+namespace {
+// Keep cancellation-sensitive scalar expressions wider than the stored vectors.
+// MSVC's long double is also 64-bit; neither type promises bit-exact x87 emulation.
+double CollisionDot(const CVector& a, const CVector& b) {
+    return double(a.y) * b.y + double(a.z) * b.z + double(a.x) * b.x;
+}
+
+double DiskContactHeight(const CColDisk& disk, const CVector& point) {
+    const double dx = double(point.x) - disk.m_vecCenter.x;
+    const double dy = double(point.y) - disk.m_vecCenter.y;
+    // The order and the unclamped radicand match Windows ProcessColModels.
+    // An invalid projection must fail the subsequent ordered comparison.
+    return std::sqrt(double(disk.m_fRadius) * disk.m_fRadius - dy * dy - dx * dx) + point.z;
+}
+} // namespace
+
 /*!
 * @addr 0x416260
 */
@@ -115,7 +131,7 @@ void CalculateColPointInsideBox(CBox const& box, CVector const& point, CColPoint
         return a <= 0.f ? -1.f : 1.f;
     };
 
-    colPoint = {};
+    colPoint.m_vecNormal = {};
     colPoint.m_vecPoint = point;
 
     // Original (0x411EC0): pick the axis with the SMALLEST distance to a face (shallowest exit)
@@ -126,7 +142,7 @@ void CalculateColPointInsideBox(CBox const& box, CVector const& point, CColPoint
         colPoint.m_vecNormal.y = CalcNormal(pointToCenter.y);
         colPoint.m_fDepth = pointToClosest.y;
     } else {
-        // Ties go to x first, then y (matching binary's chained comparisons)
+        // Neither x nor y is a strict minimum: Windows falls back to z, including ties.
         colPoint.m_vecNormal.z = CalcNormal(pointToCenter.z);
         colPoint.m_fDepth = pointToClosest.z;
     }
@@ -140,8 +156,8 @@ bool CCollision::TestSphereBox(CSphere const& sphere, CBox const& box) {
     ZoneScoped;
 
     for (auto i = 0u; i < 3u; i++) {
-        if (sphere.m_vecCenter[i] + sphere.m_fRadius < box.m_vecMin[i] ||
-            sphere.m_vecCenter[i] - sphere.m_fRadius > box.m_vecMax[i]
+        if (double(sphere.m_vecCenter[i]) + sphere.m_fRadius < box.m_vecMin[i] ||
+            double(sphere.m_vecCenter[i]) - sphere.m_fRadius > box.m_vecMax[i]
         ) {
             return false;
         }
@@ -282,8 +298,10 @@ bool CCollision::ProcessSphereBox(CColSphere const& sph, CColBox const& box, CCo
         colp.m_fDepth        = boxCP.m_fDepth + sph.m_fRadius;
 
         colp.m_nSurfaceTypeA = sph.m_Surface.m_nMaterial;
+        colp.m_nPieceTypeA   = sph.m_Surface.m_nPiece;
         colp.m_nLightingA    = sph.m_Surface.m_nLighting;
         colp.m_nSurfaceTypeB = box.m_Surface.m_nMaterial;
+        colp.m_nPieceTypeB   = box.m_Surface.m_nPiece;
         colp.m_nLightingB    = box.m_Surface.m_nLighting;
 
         minDistSq            = 0.f; // Original sets it to 0 for inside hits
@@ -303,10 +321,10 @@ bool CCollision::ProcessSphereBox(CColSphere const& sph, CColBox const& box, CCo
         };
 
         const auto dir    = sph.m_vecCenter - p;
-        const auto distSq = dir.SquaredMagnitude();
+        const auto distSq = CollisionDot(dir, dir);
         if (distSq < minDistSq) {
-            const auto dist = std::sqrt(distSq);
-            if (dist >= sph.m_fRadius) {
+            const float dist = std::sqrt(static_cast<float>(distSq));
+            if (dist > sph.m_fRadius) {
                 return false;
             }
 
@@ -315,9 +333,11 @@ bool CCollision::ProcessSphereBox(CColSphere const& sph, CColBox const& box, CCo
             colp.m_fDepth        = sph.m_fRadius - dist;
 
             colp.m_nSurfaceTypeA = sph.m_Surface.m_nMaterial;
+            colp.m_nPieceTypeA   = sph.m_Surface.m_nPiece;
             colp.m_nLightingA    = sph.m_Surface.m_nLighting;
 
             colp.m_nSurfaceTypeB = box.m_Surface.m_nMaterial;
+            colp.m_nPieceTypeB   = box.m_Surface.m_nPiece;
             colp.m_nLightingB    = box.m_Surface.m_nLighting;
 
             minDistSq            = distSq;
@@ -921,18 +941,49 @@ NOTSA_FORCEINLINE bool ProcessLineSphere_Internal(
 bool CCollision::ProcessLineSphere(CColLine const& line, CColSphere const& sphere, CColPoint& colPoint, float& depth) {
     ZoneScoped;
 
-    if (!ProcessLineSphere_Internal(line, sphere, &colPoint.m_vecPoint, &depth)) {
+    if (!s_DebugSettings.ShapeShapeCollision.IsEnabled(Shape::SSPHERE, Shape::SLINE)) {
         return false;
     }
 
-    colPoint.m_vecNormal = (colPoint.m_vecPoint - sphere.m_vecCenter).Normalized(); // A little different from the original, but same effect
+    // 0x412AA0 stores a and the centre offset as floats, but keeps b and the
+    // discriminant in x87 registers until after the square root and division.
+    const double dx = double(line.m_vecEnd.x) - line.m_vecStart.x;
+    const double dy = double(line.m_vecEnd.y) - line.m_vecStart.y;
+    const double dz = double(line.m_vecEnd.z) - line.m_vecStart.z;
+    const float a = dz * dz + dx * dx + dy * dy;
+    const auto m = sphere.m_vecCenter - line.m_vecStart;
+    const double b = -(double(m.z) * dz + double(m.y) * dy + double(m.x) * dx);
+    const double c = double(m.z) * m.z + double(m.y) * m.y + double(m.x) * m.x
+        - double(sphere.m_fRadius) * sphere.m_fRadius;
+    const double discriminant = b * b - c * a;
+    if (!(discriminant >= 0.0)) {
+        return false;
+    }
+
+    const double root = (-b - std::sqrt(discriminant)) / a;
+    const float t = static_cast<float>(root);
+    if (!(root >= 0.0) || t > 1.0f || !(t < depth)) {
+        return false;
+    }
+
+    // The x product is spilled before adding the origin; y remains in x87.
+    const float tx = dx * t;
+    const float storedDz = dz;
+    colPoint.m_vecPoint = {
+        tx + line.m_vecStart.x,
+        static_cast<float>(dy * t + line.m_vecStart.y),
+        static_cast<float>(double(storedDz) * t + line.m_vecStart.z),
+    };
+    colPoint.m_vecNormal = (colPoint.m_vecPoint - sphere.m_vecCenter).Normalized();
 
     colPoint.m_nSurfaceTypeA = {};
-    colPoint.m_nLightingA    = {};
+    colPoint.m_nPieceTypeA   = 0;
 
     colPoint.m_nSurfaceTypeB = sphere.m_Surface.m_nMaterial;
+    colPoint.m_nPieceTypeB   = sphere.m_Surface.m_nPiece;
     colPoint.m_nLightingB    = sphere.m_Surface.m_nLighting;
 
+    depth = t;
     ms_iProcessLineNumCrossings += 2;
 
     return true;
@@ -1075,6 +1126,24 @@ bool CCollision::TestVerticalLineBox(CColLine const& line, CBox const& box) {
 bool CCollision::ProcessLineBox(CColLine const& line, CColBox const& box, CColPoint& colPoint, float& maxTouchDistance) {
     ZoneScoped;
 
+    const auto endInside = line.m_vecEnd.x >= box.m_vecMin.x && line.m_vecEnd.x <= box.m_vecMax.x
+        && line.m_vecEnd.y >= box.m_vecMin.y && line.m_vecEnd.y <= box.m_vecMax.y
+        && line.m_vecEnd.z >= box.m_vecMin.z && line.m_vecEnd.z <= box.m_vecMax.z;
+    if (line.m_vecStart.x > box.m_vecMin.x && line.m_vecStart.x < box.m_vecMax.x
+        && line.m_vecStart.y > box.m_vecMin.y && line.m_vecStart.y < box.m_vecMax.y
+        && line.m_vecStart.z > box.m_vecMin.z && line.m_vecStart.z < box.m_vecMax.z
+    ) {
+        CalculateColPointInsideBox(box, line.m_vecStart, colPoint);
+        colPoint.m_nSurfaceTypeA = SURFACE_DEFAULT;
+        colPoint.m_nPieceTypeA = 0;
+        colPoint.m_nSurfaceTypeB = box.m_Surface.m_nMaterial;
+        colPoint.m_nPieceTypeB = box.m_Surface.m_nPiece;
+        colPoint.m_nLightingB = box.m_Surface.m_nLighting;
+        maxTouchDistance = 0.0f;
+        ms_iProcessLineNumCrossings += !endInside;
+        return true;
+    }
+
     float mint, t, x, y, z;
     CVector normal;
     CVector p;
@@ -1180,12 +1249,14 @@ bool CCollision::ProcessLineBox(CColLine const& line, CColBox const& box, CColPo
     colPoint.m_vecNormal = normal;
 
     colPoint.m_nSurfaceTypeA = eSurfaceType::SURFACE_DEFAULT;
-    colPoint.m_nLightingA = tColLighting(0);
+    colPoint.m_nPieceTypeA = 0;
 
     colPoint.m_nSurfaceTypeB = box.m_Surface.m_nMaterial;
+    colPoint.m_nPieceTypeB = box.m_Surface.m_nPiece;
     colPoint.m_nLightingB = box.m_Surface.m_nLighting;
 
     maxTouchDistance = mint;
+    ms_iProcessLineNumCrossings += endInside ? 1 : 2;
 
     return true;
 }
@@ -1231,8 +1302,8 @@ bool CCollision::ProcessDiscCollision(
     const auto cp       = matBA.TransformPoint(tempTriCol.m_vecPoint);
     const auto cpNormal = matBA.TransformVector(tempTriCol.m_vecNormal);
     
-    if (std::abs((cpNormal * disk.m_vThickness).ComponentwiseSum()) >= 0.77f ||
-        std::abs(((cp - disk.m_vecCenter) * disk.m_vThickness).ComponentwiseSum()) >= disk.m_fThickness
+    if (!(std::abs(CollisionDot(cpNormal, disk.m_vThickness)) < 0.77f) ||
+        !(std::abs(CollisionDot(cp - disk.m_vecCenter, disk.m_vThickness)) < disk.m_fThickness)
     ) {
         if (disk.m_Surface.m_nPiece < 17 && tempTriCol.m_fDepth > diskColPoint.m_fDepth) {
             diskColPoint = tempTriCol;
@@ -1241,10 +1312,10 @@ bool CCollision::ProcessDiscCollision(
             return true;
         }
     } else {
-        // Original (0x413960): hitK = sqrt(radius² - dx² - dy²) + cp.z
-        const auto dx = cp.x - disk.m_vecCenter.x;
-        const auto dy = cp.y - disk.m_vecCenter.y;
-        const auto lineRatioNow = std::sqrt(std::max(0.0f, sq(disk.m_fRadius) - dx * dx - dy * dy)) + cp.z;
+        // This callee spills dx/dy before the projection; ProcessColModels does not.
+        const float dx = cp.x - disk.m_vecCenter.x;
+        const float dy = cp.y - disk.m_vecCenter.y;
+        const auto lineRatioNow = std::sqrt(double(disk.m_fRadius) * disk.m_fRadius - double(dy) * dy - double(dx) * dx) + cp.z;
         if (lineRatioNow >= lineRatio) {
             lineCollision = true;
             lineRatio     = lineRatioNow;
@@ -1280,46 +1351,37 @@ bool NOTSA_FORCEINLINE ProcessLineTriangle_Internal(
                &vc = poly.verts[2];
 
 #ifdef NOTSA_VANILLA_COLLISIONS
-    // If the line is vertical, we can do some quick bound checks
-    if (line.IsVertical() && !CColTriangle::GetBoundingRect(va, vb, vc).IsPointInside(line.m_vecStart)) {
-        return false;
-    }
-
     const auto plNorm = plane.GetNormal();
     if constexpr (!TestOnly) {
         *outPlNorm = plNorm;
     }
 
-    // Origin of line on the plane
-    const auto plNormDotLnOrigin = plane.GetPtDotNormal(line.m_vecStart);
-
-    // Check if both points are above or below the plane, if so, no chance of intersection
-    if (std::signbit(plNormDotLnOrigin) == std::signbit(plane.GetPtDotNormal(line.m_vecEnd))) {
-return false;
-    }
-
-    // Magnitude of line on plane
-    const auto plLnMag = -(line.m_vecEnd - line.m_vecStart).Dot(plNorm);
-
-#ifdef FIX_BUGS
-    // Line is (near-)parallel to the plane, no intersection.
-    // `plLnMag ~ 0` makes `t = plNormDotLnOrigin / plLnMag` explode to NaN/Inf, which then
-    // slips past the `t >= maxTouchDist` compare (NaN compares false) and corrupts the
-    // wheel contact / touch distance downstream. Reject near-parallel lines outright.
-    if (std::abs(plLnMag) < 1e-6f) {
+    const auto& start = line.m_vecStart;
+    const auto& end = line.m_vecEnd;
+    const double nx = double(plNorm.x) * start.x;
+    const double ny = double(plNorm.y) * start.y;
+    const double nz = double(plNorm.z) * start.z;
+    const double offset = float(plane.m_normalOffset);
+    const double startDistance = nx + ny + nz - offset;
+    const double endDistance = double(plNorm.x) * end.x + double(plNorm.y) * end.y + double(plNorm.z) * end.z - offset;
+    // Both binaries accept a zero endpoint distance. signbit incorrectly rejects
+    // a line starting on the plane and makes +0 and -0 behave differently.
+    if (!(startDistance * endDistance <= 0.0)) {
         return false;
     }
-#endif
 
-    const auto t = plNormDotLnOrigin / plLnMag;
+    const double denominator = (double(end.x) - start.x) * plNorm.x
+        + (double(end.y) - start.y) * plNorm.y + (double(end.z) - start.z) * plNorm.z;
+    // Preserve the original subtraction order; -(dot - offset) loses different bits.
+    const float t = (offset - nx - ny - nz) / denominator;
     if constexpr (!TestOnly) {
-        if (t >= *inOutMaxTouchDist) {
+        if (!(t < *inOutMaxTouchDist)) {
             return false;
         }
     }
 
 	// Find point of intersection
-    const auto ip = lerp(line.m_vecStart, line.m_vecEnd, t);
+    const auto ip = line.m_vecStart + (line.m_vecEnd - line.m_vecStart) * t;
     if constexpr (!TestOnly) {
         *outIP = ip;
     }
@@ -1380,8 +1442,10 @@ return false;
 	//     pl_va
 	// We can use the "2v2 cross product" to check on which side
 	// a vector is of another. Test is true if point is inside of all edges.
-    const auto pl_ip_a = pl_ip - pl_va;
-    if ((pl_vb - pl_va).Cross(pl_ip_a) >= 0.0f && (pl_vc - pl_va).Cross(pl_ip_a) <= 0.0f && (pl_vc - pl_vb).Cross(pl_ip - pl_vb) >= 0.0f) {
+    const auto Side = [](const CVector2D& a, const CVector2D& b, const CVector2D& p) {
+        return (double(b.x) - a.x) * (double(p.y) - a.y) - (double(b.y) - a.y) * (double(p.x) - a.x);
+    };
+    if (Side(pl_va, pl_vb, pl_ip) >= 0.0 && Side(pl_va, pl_vc, pl_ip) <= 0.0 && Side(pl_vb, pl_vc, pl_ip) >= 0.0) {
         if (inOutMaxTouchDist) {
             *inOutMaxTouchDist = t;
         }
@@ -1503,21 +1567,18 @@ bool CCollision::ProcessSphereSphere(const CColSphere& spA, const CColSphere& sp
     ZoneScoped;
 
     const auto spBToA = spA.m_vecCenter - spB.m_vecCenter;
-    const auto distSq = spBToA.SquaredMagnitude();
-
-    if (distSq >= sq(spA.m_fRadius + spB.m_fRadius)) { // Original code did it differently (This way sqrt is only used when there's a collision)
-        return false;
-    }
-
-    const auto touchDistUnclamped = std::sqrt(distSq) - spB.m_fRadius;
+    // Windows subtracts B's radius before rounding the distance to float.
+    // Squaring the sum of radii is not equivalent at the contact boundary.
+    const double distSq = double(spBToA.z) * spBToA.z + double(spBToA.x) * spBToA.x + double(spBToA.y) * spBToA.y;
+    const float touchDistUnclamped = std::sqrt(distSq) - spB.m_fRadius;
     const auto touchDist          = std::max(touchDistUnclamped, 0.f);
-    const auto touchDistSq        = sq(touchDist);
+    const double touchDistSq      = double(touchDist) * touchDist;
 
-    if (touchDistSq >= maxTouchDistance) {
+    if (!(touchDistSq < maxTouchDistance)) {
         return false;
     }
 
-    if (touchDist >= spA.m_fRadius) {
+    if (!(touchDist < spA.m_fRadius)) {
         return false;
     }
 
@@ -1539,11 +1600,127 @@ bool CCollision::ProcessSphereSphere(const CColSphere& spA, const CColSphere& sp
     return true;
 }
 
-/*!
-* See: https://realtimecollisiondetection.net/blog/?p=103
-* 
-* @addr 0x4165B0
-*/
+namespace {
+// Windows 0x4165B0/0x416BA0 use the stored plane to build a 2D basis.
+// Recomputing a geometric closest point changes contacts because the normal and
+// offset are independently quantised. Android's TestSphereTriangle uses a
+// different separating-axis algorithm; its ProcessSphereTriangle still uses this basis.
+template<bool TestOnly>
+bool SphereTriangleContact(
+    const CColSphere& sphere,
+    const CompressedVector* verts,
+    const CColTriangle& tri,
+    const CColTrianglePlane& plane,
+    CVector& point,
+    float& distance,
+    float maxDistanceSq
+) {
+    const auto normal = plane.GetNormal();
+    const auto& center = sphere.m_vecCenter;
+    const double planeDistanceWide = TestOnly
+        ? CollisionDot(center, normal) - float(plane.m_normalOffset)
+        : double(normal.z) * center.z + double(normal.y) * center.y + double(normal.x) * center.x - float(plane.m_normalOffset);
+    const float planeDistance = planeDistanceWide;
+    if (std::abs(planeDistanceWide) > sphere.m_fRadius) {
+        return false;
+    }
+    const double planeDistanceSqWide = double(planeDistance) * planeDistance;
+    const float planeDistanceSq = planeDistanceSqWide;
+    if constexpr (!TestOnly) {
+        if (planeDistanceSqWide > maxDistanceSq) {
+            return false;
+        }
+    }
+
+    const CVector a = verts[tri.vA], b = verts[tri.vB], c = verts[tri.vC];
+    const auto ab = b - a;
+    const auto ac = c - a;
+    const auto ap = center - a;
+    const float abLength = std::sqrt(CollisionDot(ab, ab));
+    const float recipLength = 1.0f / abLength;
+    const auto axisX = ab * recipLength;
+    const auto axisY = axisX.Cross(normal);
+    const float cx = CollisionDot(ac, axisX);
+    const float cy = CollisionDot(ac, axisY);
+    const float px = CollisionDot(ap, axisX);
+    const float py = CollisionDot(ap, axisY);
+
+    const double sideAB = double(py) * abLength - double(px) * 0.0f;
+    // These two products really are stored separately in Windows.
+    const float pxcy = double(px) * cy;
+    const float pycx = double(py) * cx;
+    const double sideAC = double(pxcy) - pycx;
+    const float cxFromB = cx - abLength;
+    const float pxFromB = px - abLength;
+    const double sideBC = double(cxFromB) * py - double(pxFromB) * cy;
+    const bool insideAB = sideAB >= 0.0;
+    const bool insideAC = sideAC >= 0.0;
+    const bool insideBC = sideBC >= 0.0;
+    const auto numInside = int(insideAB) + int(insideAC) + int(insideBC);
+
+    double distanceWide{};
+    const auto AtVertex = [&](const CVector& vertex) {
+        point = vertex;
+        const auto delta = center - vertex;
+        distanceWide = std::sqrt(CollisionDot(delta, delta));
+    };
+    const auto OnEdge = [&](const CVector& from, const CVector& to, double numerator, float lengthSq, double cross) {
+        const double fraction = numerator / lengthSq;
+        const float t = fraction; // Windows spills the fraction before the upper bound check.
+        if (fraction <= 0.0) {
+            AtVertex(from);
+        } else if (t >= 1.0f) {
+            AtVertex(to);
+        } else {
+            const double edgeDistance = cross / std::sqrt(double(lengthSq));
+            distanceWide = std::sqrt(edgeDistance * edgeDistance + (TestOnly ? double(planeDistance) * planeDistance : planeDistanceSq));
+            point = from + (to - from) * t;
+        }
+    };
+
+    switch (numInside) {
+    case 1:
+        AtVertex(insideAB ? c : insideAC ? b : a);
+        break;
+    case 2:
+        if (!insideAB) {
+            const float lengthSq = double(abLength) * abLength;
+            const float storedSideAB = sideAB;
+            OnEdge(a, b, double(px) * abLength + double(py) * 0.0f, lengthSq, storedSideAB);
+        } else if (!insideAC) {
+            const float lengthSq = double(cy) * cy + double(cx) * cx;
+            OnEdge(a, c, double(py) * cy + double(px) * cx, lengthSq, double(pycx) - pxcy);
+        } else {
+            const float lengthSq = double(cy) * cy + double(cxFromB) * cxFromB;
+            OnEdge(b, c, double(pxFromB) * cxFromB + double(py) * cy, lengthSq, double(py) * cxFromB - double(pxFromB) * cy);
+        }
+        break;
+    case 3: {
+        distanceWide = static_cast<float>(std::abs(planeDistanceWide));
+        const float zOffset = double(normal.z) * planeDistance;
+        point = {
+            static_cast<float>(double(center.x) - double(normal.x) * planeDistance),
+            static_cast<float>(double(center.y) - double(normal.y) * planeDistance),
+            center.z - zOffset,
+        };
+        break;
+    }
+    default:
+        return false;
+    }
+
+    if constexpr (TestOnly) {
+        return distanceWide < sphere.m_fRadius;
+    } else {
+        // 0x417396 reloads the stored float before checking radius and squared distance.
+        distance = static_cast<float>(distanceWide);
+        const float distanceSq = double(distance) * distance;
+        return distance < sphere.m_fRadius && distanceSq < maxDistanceSq;
+    }
+}
+} // namespace
+
+// 0x4165B0
 bool CCollision::TestSphereTriangle(
     const CColSphere& sphere,
     const CompressedVector* verts,
@@ -1551,49 +1728,12 @@ bool CCollision::TestSphereTriangle(
     const CColTrianglePlane& plane
 ) {
     ZoneScoped;
-
-    if (!CCollision::s_DebugSettings.ShapeShapeCollision.IsEnabled(Shape::SSPHERE, Shape::STRI)) {
+    if (!s_DebugSettings.ShapeShapeCollision.IsEnabled(Shape::SSPHERE, Shape::STRI)) {
         return false;
     }
-
-    const auto P = sphere.m_vecCenter;
-    const auto r = sphere.m_fRadius;
-
-    const auto A  = verts[tri.vA] - P;
-    const auto B  = verts[tri.vB] - P;
-    const auto C  = verts[tri.vC] - P;
-    const auto rr = r * r;
-    const auto N  = plane.GetNormal();
-    const int  s1 = std::abs(A.Dot(N)) > r;
-    const auto aa = A.Dot(A);
-    const auto ab = A.Dot(B);
-    const auto ac = A.Dot(C);
-    const auto bb = B.Dot(B);
-    const auto bc = B.Dot(C);
-    const auto cc = C.Dot(C);
-    const int  s2 = (aa > rr) & (ab > aa) & (ac > aa);
-    const int  s3 = (bb > rr) & (ab > bb) & (bc > bb);
-    const int  s4 = (cc > rr) & (ac > cc) & (bc > cc);
-    const auto AB = B - A;
-    const auto BC = C - B;
-    const auto CA = A - C;
-    const auto d1 = ab - aa;
-    const auto d2 = bc - bb;
-    const auto d3 = ac - cc;
-    const auto e1 = AB.Dot(AB);
-    const auto e2 = BC.Dot(BC);
-    const auto e3 = CA.Dot(CA);
-    const auto Q1 = A * e1 - d1 * AB;
-    const auto Q2 = B * e2 - d2 * BC;
-    const auto Q3 = C * e3 - d3 * CA;
-    const auto QC = C * e1 - Q1;
-    const auto QA = A * e2 - Q2;
-    const auto QB = B * e3 - Q3;
-    const int  s5 = (Q1.Dot(Q1) > rr * e1 * e1) & (Q1.Dot(QC) > 0);
-    const int  s6 = (Q2.Dot(Q2) > rr * e2 * e2) & (Q2.Dot(QA) > 0);
-    const int  s7 = (Q3.Dot(Q3) > rr * e3 * e3) & (Q3.Dot(QB) > 0);
-
-    return (s1 | s2 | s3 | s4 | s5 | s6 | s7) == 0;
+    CVector point;
+    float distance;
+    return SphereTriangleContact<true>(sphere, verts, tri, plane, point, distance, 0.0f);
 }
 
 // 0x416BA0
@@ -1606,55 +1746,28 @@ bool CCollision::ProcessSphereTriangle(
     float& maxTouchDistance
 ) {
     ZoneScoped;
-
-    if (!CCollision::s_DebugSettings.ShapeShapeCollision.IsEnabled(Shape::SSPHERE, Shape::STRI)) {
+    if (!s_DebugSettings.ShapeShapeCollision.IsEnabled(Shape::SSPHERE, Shape::STRI)) {
+        return false;
+    }
+    CVector point;
+    float distance;
+    if (!SphereTriangleContact<false>(sphere, verts, tri, plane, point, distance, maxTouchDistance)) {
         return false;
     }
 
-    // Find closest point on triangle to sphere
-    const auto ip = ClosestPtPointTriangle(
-        verts[tri.vA],
-        verts[tri.vB],
-        verts[tri.vC],
-        sphere.m_vecCenter
-    );
-
-    const auto spToIp      = sphere.m_vecCenter - ip;
-    const auto touchDistSq = spToIp.SquaredMagnitude();
-
-    // Check touch distance first
-    if (touchDistSq >= maxTouchDistance) {
-        return false;
-    }
-
-    // Check if it's within the sphere
-    if (touchDistSq >= sq(sphere.m_fRadius)) {
-        return false;
-    }
-
-    // Original: guard against touching exactly at the surface (touchDist == 0 leads to NaN normal)
-    if (touchDistSq <= 0.f) {
-        return false;
-    }
-
-    maxTouchDistance = touchDistSq;
-
-    const auto touchDist = std::sqrt(touchDistSq);
-    colPoint.m_vecNormal = spToIp / touchDist; // Normalize
-    colPoint.m_fDepth    = sphere.m_fRadius - touchDist;
-    colPoint.m_vecPoint  = ip;
-
+    colPoint.m_vecPoint = point;
+    // A zero-distance contact is valid: CVector::Normalise supplies the original fallback.
+    colPoint.m_vecNormal = (sphere.m_vecCenter - point).Normalized();
+    colPoint.m_fDepth = sphere.m_fRadius - distance;
     colPoint.m_nSurfaceTypeA = sphere.m_Surface.m_nMaterial;
-    colPoint.m_nPieceTypeA   = sphere.m_Surface.m_nPiece;
-    colPoint.m_nLightingA    = sphere.m_Surface.m_nLighting;
-
-
+    colPoint.m_nPieceTypeA = sphere.m_Surface.m_nPiece;
+    colPoint.m_nLightingA = sphere.m_Surface.m_nLighting;
     colPoint.m_nSurfaceTypeB = tri.m_nMaterial;
-    colPoint.m_nPieceTypeB   = 0;
-    colPoint.m_nLightingB    = tri.m_nLight;
-
+    colPoint.m_nPieceTypeB = 0;
+    // Windows and Android leave B's lighting untouched in this particular routine.
+    maxTouchDistance = distance * distance;
     return true;
-} 
+}
 
 // 0x417730
 bool CCollision::TestLineOfSight(
@@ -1900,13 +2013,12 @@ void CCollision::RemoveTrianglePlanes(CColModel* colModel) {
  * Box       +
  * Lines +   +   +
  *
- * Note: Originally the game calculated some disk stuff as well, but SA doesn'maxTouchDist use disks (they're disabled when loadedin CFileLoader)
- * thus I omitted the code for it (it would've made the already messy code even worse)
+ * Disk collision models use the wheel-contact path below.
  *
  * @param         transformA           Transformation matrix of model A - Usually owning entity's matrix.
  * @param         cmA                  Col model A
  * @param         transformB           Transformation matrix of model B - Usually owning entity's matrix.
- * @param         cmA                  Col model B
+ * @param         cmB                  Col model B
  * @param[out]    lineCPs              Line collision points (At most 16 - It can be null if you're sure the model has no lines)
  * @param[out]    sphereCPs            Sphere collision points (At most 32)
  * @param[in,out] maxTouchDistances    Only used if model has lines - If you're sure it has none it can be null. It has to be an array of the same size as the number of lines .
@@ -1961,7 +2073,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
     // TODO: Should probably move these out somewhere..
     constexpr auto MAX_SPHERES{ 128u }; // Max no. of spheres colliding with other model's bounding sphere. - If more - Possible crash
     constexpr auto MAX_BOXES{ 64u };    // Same, but for boxes      - If more, all following are ignored.
-    constexpr auto MAX_TRIS{ 600u };    // Same, but for triangles  - If more, all following are ignored.
+    constexpr auto MAX_TRIS{ 599u };    // Windows stops after incrementing the count past 598.
     constexpr auto MAX_LINES{ 16u };    // Game didn't originally check for this, so I assume no models ever have more than 16 lines.
 
     // Transform `spheres` center position using `transform` and store them in `outSpheres`
@@ -2012,17 +2124,12 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
         return 0;
     }
 
-    // Number of B's REAL colliding spheres, before B's disk pseudo-spheres are appended below.
-    // The first block and the A-disk path use the FULL list (they decode disk indices), but the
-    // trailing "B-spheres vs A-tris/boxes" block must iterate only the real spheres - the original
-    // caps that loop at `numCollSphB - <appended disk count>` (0x419BA9: `v210 - v212`). Testing B's
-    // wheel pseudo-spheres against A's triangles otherwise yields phantom collision points.
     const uint32 numRealCollSphB = numCollSphB;
 
     // 0x418902
-    // Transform B's disks into A's space and append them to the colliding sphere list
-    // (MS/Bump mapped disks as spheres + extra data onto the same pseudo-sphere list)
+    // Transform B's disks into A's space and append them to the colliding sphere list.
     if (cdB.bUsesDisks && cdB.m_nNumLines) {
+        assert(cdB.m_nNumSpheres + cdB.m_nNumLines <= MAX_SPHERES);
         for (auto diskIdx = 0u; diskIdx < cdB.m_nNumLines; diskIdx++) {
             const auto& disk{ cdB.m_pDisks[diskIdx] };
 
@@ -2032,7 +2139,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
             sph.m_Surface   = disk.m_Surface;
 
             if (TestSphereBox(sph, cmA.GetBoundingBox())) {
-                assert(numCollSphB < MAX_SPHERES); // Same bounds as regular spheres
+                assert(numCollSphB < MAX_SPHERES);
                 collSphB[numCollSphB++] = cdB.m_nNumSpheres + diskIdx;
             }
         }
@@ -2070,6 +2177,9 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
         if (cdB.bHasFaceGroups) { // Test by using face groups - Thanks to those who helped me figure this out :)
             // 0x418B23
             for (auto&& group : cdB.GetFaceGroups()) {
+                if (numCollTrisB >= MAX_TRIS) {
+                    break;
+                }
                 if (TestSphereBox(colABoundSphereSpaceB, group.bb)) {      // Quick BB check
                     for (auto triIdx{ group.first }; triIdx <= group.last; triIdx++) { // Check all triangles in this group
                         ProcessOneTri(triIdx);
@@ -2163,19 +2273,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
             }
         }
 
-        // 0x41996E
-        // Transform all colpoints into world space (Originally not here)
-        for (auto&& cp : std::span{ sphereCPs.data(), nNumSphereCPs }) {
-            cp.m_vecPoint  = transformB.TransformPoint(cp.m_vecPoint);
-            cp.m_vecNormal = transformB.TransformVector(cp.m_vecNormal);
-        }
     }
-
-    // Track how many sphere CPs existed BEFORE the disk/line loop starts, so we can
-    // post-transform any CPs the DISK path (via `emitCP`) appends afterwards. The
-    // original performs world-transforms inline during the disk loop's emit handling;
-    // our impl mirrors that with a single post-pass over the disk-only tail.
-    const auto diskPhaseCPBegin = nNumSphereCPs;
 
     // 0x418F4C (disk path) / 0x4196B9 (line path)
     // Test all of A's lines (or disks) against all of B's colliding spheres, boxes and triangles,
@@ -2202,14 +2300,11 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
                 cdA.m_pDisks[diskIdx].m_vecCenter.z = maxTouchDistances[diskIdx];
             }
 
-            // Append each disk's sphere (transformed to B's space) to the tail of `sphA` after the regular spheres.
-            // NOTE: `disk.m_vecCenter.z` is already poisoned above, so `sphereAinB` is placed at the
-            // caller's seed height - exactly as the binary does it.
-            assert(cdA.m_nNumSpheres + cdA.m_nNumLines <= MAX_SPHERES);
+            // The regular spheres have already been processed; reuse their scratch storage.
             for (auto diskIdx = 0u; diskIdx < cdA.m_nNumLines; diskIdx++) {
                 const auto& disk{ cdA.m_pDisks[diskIdx] };
 
-                auto& sph{ sphA[cdA.m_nNumSpheres + diskIdx] };
+                auto& sph{ sphA[diskIdx] };
                 sph.m_vecCenter = transformAtoB.TransformPoint(disk.m_vecCenter);
                 sph.m_fRadius   = disk.m_fRadius;
                 sph.m_Surface   = disk.m_Surface;
@@ -2217,7 +2312,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
 
             for (auto diskIdx = 0u; diskIdx < cdA.m_nNumLines; diskIdx++) {
                 const auto& disk{ cdA.m_pDisks[diskIdx] };
-                const auto& sphereAinB{ sphA[cdA.m_nNumSpheres + diskIdx] };
+                const auto& sphereAinB{ sphA[diskIdx] };
 
                 auto& thisLineCP{ lineCPs[diskIdx] };
                 auto& cp{ sphereCPs[nNumSphereCPs] };
@@ -2240,7 +2335,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
                         float minTouchDist{ 1e24f };
                         if (ProcessSphereSphere(sphereAinB, sphereB, cp, minTouchDist)) {
                             const auto cpInA{ transformBtoA.TransformPoint(cp.m_vecPoint) };
-                            const auto hitK = std::sqrt(std::max(0.0f, sq(disk.m_fRadius) - sq(cpInA.y - disk.m_vecCenter.y) - sq(cpInA.x - disk.m_vecCenter.x))) + cpInA.z;
+                            const auto hitK = DiskContactHeight(disk, cpInA);
                             if (maxTouchDistances[diskIdx] <= hitK) { // Original: strict <=, no epsilon
                                 maxTouchDistances[diskIdx] = hitK;
                                 thisLineCP                 = cp;
@@ -2269,12 +2364,10 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
                                 }
                             } else {
                                 // Below the disk's plane & normal mostly vertical: project onto the disk plane & treat as line (wheel) hit
-                                const auto dx{ cpInA.x - disk.m_vecCenter.x };
-                                const auto dy{ cpInA.y - disk.m_vecCenter.y };
-                                const auto hitK = std::sqrt(std::max(0.0f, sq(disk.m_fRadius) - sq(dy) - sq(dx))) + cpInA.z;
+                                const auto hitK = DiskContactHeight(disk, cpInA);
 
                                 if (maxTouchDistances[diskIdx] <= hitK) { // Original: strict <=
-                                    if (hitK - maxTouchDistances[diskIdx] > 0.35f * disk.m_fRadius) {
+                                    if (hitK - maxTouchDistances[diskIdx] > double(0.35f) * disk.m_fRadius) {
                                         emitCP      = true;
                                         bestBoxDist = minTouchDist;
                                     }
@@ -2343,14 +2436,6 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
 
             // NOTE: we intentionally do NOT restore disk.center.z the original leaks it.
 
-            // 0x418F5B (disk emitCPs are left in B's local space the first-wave
-            // world-transform ran BEFORE this loop, so the disk-emitted tail must be
-            // transformed here. The original performs equivalent transforms inline
-            // during the disk loop's emit handling.)
-            for (auto& cp : std::span{ sphereCPs.data() + diskPhaseCPBegin, nNumSphereCPs - diskPhaseCPBegin }) {
-                cp.m_vecPoint  = transformB.TransformPoint(cp.m_vecPoint);
-                cp.m_vecNormal = transformB.TransformVector(cp.m_vecNormal);
-            }
         } else { // 0x4196B9
             for (auto lineIdx = 0u; lineIdx < cdA.m_nNumLines; lineIdx++) {
                 const CColLine lineA{
@@ -2396,8 +2481,11 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
         }
     }
 
-    // 0x4185C0
-    // Originally game transformed all sphereCPs to world space here, but I've moved that into the above `if` stuff
+    // 0x41996E: Keep the working contacts in B's space until the disk/line phase ends.
+    for (auto& cp : std::span{ sphereCPs.data(), nNumSphereCPs }) {
+        cp.m_vecPoint  = transformB.TransformPoint(cp.m_vecPoint);
+        cp.m_vecNormal = transformB.TransformVector(cp.m_vecNormal);
+    }
 
     // 0x4199E5
     // Find all A's triangles and boxes colliding with B's b.sphere
@@ -2419,6 +2507,9 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
             for (auto triIdx = 0; triIdx < cdA.m_nNumTriangles; triIdx++) {
                 if (TestSphereTriangle(colBSphereInASpace, cdA.m_pVertices, cdA.m_pTriangles[triIdx], cdA.m_pTrianglePlanes[triIdx])) {
                     collTriA[numCollTriA++] = triIdx;
+                    if (numCollTriA >= MAX_TRIS) {
+                        break;
+                    }
                 }
             }
         }
@@ -2441,7 +2532,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
         // Original (0x419B71): resets the working CP's depth sentinel to -1 here, BEFORE the loop.
         // We must do it explicitly: when `numCollSphA == 0` the first block never ran, so
         // `sphereCPs[nNumSphereCPs].m_fDepth` would otherwise be stale entering this block.
-        // NOTE: only REAL B spheres here - B's appended disk pseudo-spheres are excluded (see numRealCollSphB).
+        // Only real B spheres participate in the reverse pass.
         sphereCPs[nNumSphereCPs].m_fDepth = -1.f;
         for (auto sphereIdx : std::span{ collSphB, numRealCollSphB }) {
             auto minTouchDist{ 1e24f };
@@ -2469,18 +2560,11 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
 
         // 0x419CC4
         // Process all of B's colliding spheres against all of A's colliding boxes
-        // Only REAL B spheres (B's appended disk pseudo-spheres excluded) - see numRealCollSphB.
         for (auto sphereIdx : std::span{ collSphB, numRealCollSphB }) {
             const auto& sphere{ sphB[sphereIdx] }; // B's sphere in A's space
 
             float minTouchDist{ 1e24f };
             for (auto boxIdx : std::span{ collBoxA, numCollBoxA }) {
-                // Original: `if (v200 >= 31) break;` caps total at 31 CPs (`maxSphereCPs`).
-                // `nNumSphereCPs < maxSphereCPs` keeps the trailing index in-bounds for the
-                // forward depth-sentinel write (`sphereCPs[nNumSphereCPs + 1].m_fDepth = -1.f`).
-                if (nNumSphereCPs >= maxSphereCPs) {
-                    break;
-                }
                 const auto& bb{ cdA.m_pBoxes[boxIdx] };
                 auto&       cp = sphereCPs[nNumSphereCPs];
                 if (ProcessSphereBox(sphere, bb, cp, minTouchDist)) {
