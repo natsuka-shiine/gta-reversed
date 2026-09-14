@@ -131,7 +131,7 @@ void CalculateColPointInsideBox(CBox const& box, CVector const& point, CColPoint
         return a <= 0.f ? -1.f : 1.f;
     };
 
-    colPoint.m_vecNormal = {};
+    colPoint.m_vecNormal = CVector{};
     colPoint.m_vecPoint = point;
 
     // Original (0x411EC0): pick the axis with the SMALLEST distance to a face (shallowest exit)
@@ -340,7 +340,7 @@ bool CCollision::ProcessSphereBox(CColSphere const& sph, CColBox const& box, CCo
             colp.m_nPieceTypeB   = box.m_Surface.m_nPiece;
             colp.m_nLightingB    = box.m_Surface.m_nLighting;
 
-            minDistSq            = distSq;
+            minDistSq            = static_cast<float>(distSq);
 
             return true;
         }
@@ -950,7 +950,7 @@ bool CCollision::ProcessLineSphere(CColLine const& line, CColSphere const& spher
     const double dx = double(line.m_vecEnd.x) - line.m_vecStart.x;
     const double dy = double(line.m_vecEnd.y) - line.m_vecStart.y;
     const double dz = double(line.m_vecEnd.z) - line.m_vecStart.z;
-    const float a = dz * dz + dx * dx + dy * dy;
+    const float a = static_cast<float>(dz * dz + dx * dx + dy * dy);
     const auto m = sphere.m_vecCenter - line.m_vecStart;
     const double b = -(double(m.z) * dz + double(m.y) * dy + double(m.x) * dx);
     const double c = double(m.z) * m.z + double(m.y) * m.y + double(m.x) * m.x
@@ -967,9 +967,9 @@ bool CCollision::ProcessLineSphere(CColLine const& line, CColSphere const& spher
     }
 
     // The x product is spilled before adding the origin; y remains in x87.
-    const float tx = dx * t;
-    const float storedDz = dz;
-    colPoint.m_vecPoint = {
+    const float tx = static_cast<float>(dx * t);
+    const float storedDz = static_cast<float>(dz);
+    colPoint.m_vecPoint = CVector{
         tx + line.m_vecStart.x,
         static_cast<float>(dy * t + line.m_vecStart.y),
         static_cast<float>(double(storedDz) * t + line.m_vecStart.z),
@@ -1318,7 +1318,7 @@ bool CCollision::ProcessDiscCollision(
         const auto lineRatioNow = std::sqrt(double(disk.m_fRadius) * disk.m_fRadius - double(dy) * dy - double(dx) * dx) + cp.z;
         if (lineRatioNow >= lineRatio) {
             lineCollision = true;
-            lineRatio     = lineRatioNow;
+            lineRatio     = static_cast<float>(lineRatioNow);
             lineColPoint  = tempTriCol;
             // lineColPoint.m_fDepth = tempTriCol.m_fDepth;  // Done in operator=
             return false; // False is returned here, but `lineCollision` was set to true.
@@ -1373,7 +1373,7 @@ bool NOTSA_FORCEINLINE ProcessLineTriangle_Internal(
     const double denominator = (double(end.x) - start.x) * plNorm.x
         + (double(end.y) - start.y) * plNorm.y + (double(end.z) - start.z) * plNorm.z;
     // Preserve the original subtraction order; -(dot - offset) loses different bits.
-    const float t = (offset - nx - ny - nz) / denominator;
+    const float t = static_cast<float>((offset - nx - ny - nz) / denominator);
     if constexpr (!TestOnly) {
         if (!(t < *inOutMaxTouchDist)) {
             return false;
@@ -1570,7 +1570,7 @@ bool CCollision::ProcessSphereSphere(const CColSphere& spA, const CColSphere& sp
     // Windows subtracts B's radius before rounding the distance to float.
     // Squaring the sum of radii is not equivalent at the contact boundary.
     const double distSq = double(spBToA.z) * spBToA.z + double(spBToA.x) * spBToA.x + double(spBToA.y) * spBToA.y;
-    const float touchDistUnclamped = std::sqrt(distSq) - spB.m_fRadius;
+    const float touchDistUnclamped = static_cast<float>(std::sqrt(distSq) - spB.m_fRadius);
     const auto touchDist          = std::max(touchDistUnclamped, 0.f);
     const double touchDistSq      = double(touchDist) * touchDist;
 
@@ -1582,7 +1582,7 @@ bool CCollision::ProcessSphereSphere(const CColSphere& spA, const CColSphere& sp
         return false;
     }
 
-    maxTouchDistance = touchDistSq;
+    maxTouchDistance = static_cast<float>(touchDistSq);
 
     colPoint.m_vecNormal = spBToA.Normalized();
     colPoint.m_vecPoint  = spA.m_vecCenter - colPoint.m_vecNormal * touchDist;
@@ -1620,12 +1620,12 @@ bool SphereTriangleContact(
     const double planeDistanceWide = TestOnly
         ? CollisionDot(center, normal) - float(plane.m_normalOffset)
         : double(normal.z) * center.z + double(normal.y) * center.y + double(normal.x) * center.x - float(plane.m_normalOffset);
-    const float planeDistance = planeDistanceWide;
+    const float planeDistance = static_cast<float>(planeDistanceWide);
     if (std::abs(planeDistanceWide) > sphere.m_fRadius) {
         return false;
     }
     const double planeDistanceSqWide = double(planeDistance) * planeDistance;
-    const float planeDistanceSq = planeDistanceSqWide;
+    const float planeDistanceSq = static_cast<float>(planeDistanceSqWide);
     if constexpr (!TestOnly) {
         if (planeDistanceSqWide > maxDistanceSq) {
             return false;
@@ -1636,19 +1636,19 @@ bool SphereTriangleContact(
     const auto ab = b - a;
     const auto ac = c - a;
     const auto ap = center - a;
-    const float abLength = std::sqrt(CollisionDot(ab, ab));
+    const float abLength = static_cast<float>(std::sqrt(CollisionDot(ab, ab)));
     const float recipLength = 1.0f / abLength;
     const auto axisX = ab * recipLength;
     const auto axisY = axisX.Cross(normal);
-    const float cx = CollisionDot(ac, axisX);
-    const float cy = CollisionDot(ac, axisY);
-    const float px = CollisionDot(ap, axisX);
-    const float py = CollisionDot(ap, axisY);
+    const float cx = static_cast<float>(CollisionDot(ac, axisX));
+    const float cy = static_cast<float>(CollisionDot(ac, axisY));
+    const float px = static_cast<float>(CollisionDot(ap, axisX));
+    const float py = static_cast<float>(CollisionDot(ap, axisY));
 
     const double sideAB = double(py) * abLength - double(px) * 0.0f;
     // These two products really are stored separately in Windows.
-    const float pxcy = double(px) * cy;
-    const float pycx = double(py) * cx;
+    const float pxcy = static_cast<float>(double(px) * cy);
+    const float pycx = static_cast<float>(double(py) * cx);
     const double sideAC = double(pxcy) - pycx;
     const float cxFromB = cx - abLength;
     const float pxFromB = px - abLength;
@@ -1666,7 +1666,7 @@ bool SphereTriangleContact(
     };
     const auto OnEdge = [&](const CVector& from, const CVector& to, double numerator, float lengthSq, double cross) {
         const double fraction = numerator / lengthSq;
-        const float t = fraction; // Windows spills the fraction before the upper bound check.
+        const float t = static_cast<float>(fraction); // Windows spills the fraction before the upper bound check.
         if (fraction <= 0.0) {
             AtVertex(from);
         } else if (t >= 1.0f) {
@@ -1684,21 +1684,21 @@ bool SphereTriangleContact(
         break;
     case 2:
         if (!insideAB) {
-            const float lengthSq = double(abLength) * abLength;
-            const float storedSideAB = sideAB;
+            const float lengthSq = static_cast<float>(double(abLength) * abLength);
+            const float storedSideAB = static_cast<float>(sideAB);
             OnEdge(a, b, double(px) * abLength + double(py) * 0.0f, lengthSq, storedSideAB);
         } else if (!insideAC) {
-            const float lengthSq = double(cy) * cy + double(cx) * cx;
+            const float lengthSq = static_cast<float>(double(cy) * cy + double(cx) * cx);
             OnEdge(a, c, double(py) * cy + double(px) * cx, lengthSq, double(pycx) - pxcy);
         } else {
-            const float lengthSq = double(cy) * cy + double(cxFromB) * cxFromB;
+            const float lengthSq = static_cast<float>(double(cy) * cy + double(cxFromB) * cxFromB);
             OnEdge(b, c, double(pxFromB) * cxFromB + double(py) * cy, lengthSq, double(py) * cxFromB - double(pxFromB) * cy);
         }
         break;
     case 3: {
         distanceWide = static_cast<float>(std::abs(planeDistanceWide));
-        const float zOffset = double(normal.z) * planeDistance;
-        point = {
+        const float zOffset = static_cast<float>(double(normal.z) * planeDistance);
+        point = CVector{
             static_cast<float>(double(center.x) - double(normal.x) * planeDistance),
             static_cast<float>(double(center.y) - double(normal.y) * planeDistance),
             center.z - zOffset,
@@ -1714,7 +1714,7 @@ bool SphereTriangleContact(
     } else {
         // 0x417396 reloads the stored float before checking radius and squared distance.
         distance = static_cast<float>(distanceWide);
-        const float distanceSq = double(distance) * distance;
+        const float distanceSq = static_cast<float>(double(distance) * distance);
         return distance < sphere.m_fRadius && distanceSq < maxDistanceSq;
     }
 }
@@ -2337,7 +2337,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
                             const auto cpInA{ transformBtoA.TransformPoint(cp.m_vecPoint) };
                             const auto hitK = DiskContactHeight(disk, cpInA);
                             if (maxTouchDistances[diskIdx] <= hitK) { // Original: strict <=, no epsilon
-                                maxTouchDistances[diskIdx] = hitK;
+                                    maxTouchDistances[diskIdx] = static_cast<float>(hitK);
                                 thisLineCP                 = cp;
                                 thisLineCP.m_nSurfaceTypeA = disk.m_Surface.m_nMaterial;
                                 thisLineCP.m_nPieceTypeA   = disk.m_Surface.m_nPiece;
@@ -2372,7 +2372,7 @@ int32 CCollision::ProcessColModels(const CMatrix& transformA, CColModel& cmA,
                                         bestBoxDist = minTouchDist;
                                     }
                                     lineCollision              = true;
-                                    maxTouchDistances[diskIdx] = hitK;
+                                maxTouchDistances[diskIdx] = static_cast<float>(hitK);
                                     thisLineCP                 = cp;
                                     thisLineCP.m_nSurfaceTypeA = disk.m_Surface.m_nMaterial;
                                     thisLineCP.m_nPieceTypeA   = disk.m_Surface.m_nPiece;
@@ -3467,7 +3467,7 @@ void CCollision::InjectHooks() {
     ////
 
     // Hooks disabled due to bad performance in debug mode
-    const bool bEnableHooks = false;
+    const bool bEnableHooks = true;
     
     RH_ScopedInstall(Test2DLineAgainst2DLine, 0x4138D0, { .enabled = bEnableHooks, .locked = !bEnableHooks });
 
