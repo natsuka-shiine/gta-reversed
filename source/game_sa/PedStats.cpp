@@ -14,6 +14,7 @@ void CPedStats::InjectHooks() {
     RH_ScopedInstall(Shutdown, 0x608850);
     RH_ScopedInstall(LoadPedStats, 0x5BB890);
     RH_ScopedInstall(GetPedStatType, 0x6088D0);
+    RH_ScopedInstall(FindIndexWithPedStat, 0x608940);
 }
 
 // 0x5BF9D0
@@ -30,7 +31,7 @@ void CPedStats::Initialise() {
         ms_apPedStats[statIndex].m_fAttackStrength = 1.0f;
         ms_apPedStats[statIndex].m_fDefendWeakness = 1.0f;
         ms_apPedStats[statIndex].m_flags = 0;
-        ms_apPedStats[statIndex].m_nDefaultDecisionMaker = 0;
+        ms_apPedStats[statIndex].m_nDefaultDecisionMaker = eDecisionMakerType::PED_GROUPMEMBER;
     }
     LoadPedStats();
     CDecisionMakerTypesFileLoader::LoadDefaultDecisionMaker();
@@ -89,7 +90,7 @@ void CPedStats::LoadPedStats() {
         ms_apPedStats[statIndex].m_fAttackStrength = attackStrength;
         ms_apPedStats[statIndex].m_fDefendWeakness = defendWeakness;
         ms_apPedStats[statIndex].m_flags = shootingRate;
-        ms_apPedStats[statIndex].m_nDefaultDecisionMaker = defaultDecisionMaker;
+        ms_apPedStats[statIndex].m_nDefaultDecisionMaker = (eDecisionMakerType)(defaultDecisionMaker);
 
         statIndex++;
     }
@@ -125,6 +126,11 @@ CPedStat* CPedStats::GetPedStatByArrayIndex(uint32 statIndex) {
 
 // unused
 // 0x608940
-void CPedStats::FindIndexWithPedStat(void* a1) {
-    plugin::Call<0x608940>();
+int32 CPedStats::FindIndexWithPedStat(const CPedStat* stat) {
+    for (int32 statIndex = 0; statIndex < PED_STATS_COUNT; statIndex++) {
+        if (&ms_apPedStats[statIndex] == stat) {
+            return statIndex;
+        }
+    }
+    return 0;
 }
