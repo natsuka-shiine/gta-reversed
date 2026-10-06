@@ -34,7 +34,133 @@ void CAEPoliceScannerAudioEntity::Reset() {
 
 // 0x4E71E0
 void CAEPoliceScannerAudioEntity::AddAudioEvent(eAudioEvents event, eCrimeType crimeType, const CVector& point) {
-    plugin::CallMethod<0x4E71E0, CAEPoliceScannerAudioEntity*, eAudioEvents, eCrimeType, const CVector&>(this, event, crimeType, point);
+    constexpr auto NUM_CRIME_AREAS = 194u;
+
+    // Lookup tables (const data in the original binary)
+    static auto& s_CrimeInstructions           = StaticRef<int16[4]>(0x8C8160);
+    static auto& s_CrimeNumberLookup           = StaticRef<int16[MAX_CRIMES]>(0x8C8168);
+    static auto& s_CrimeAreaNames              = StaticRef<char[NUM_CRIME_AREAS][8]>(0x8C8198);
+    static auto& s_CrimeAreaSoundLookup        = StaticRef<int16[NUM_CRIME_AREAS]>(0x8C87A8);
+    static auto& s_CrimeAreaWithDirections     = StaticRef<bool[NUM_CRIME_AREAS]>(0x8C8930);
+    static auto& s_PlayerVehicleTypeLookup     = StaticRef<int16[AE_VAT_END]>(0x8C89F8);
+    static auto& s_PlayerVehicleTypeUsesColour = StaticRef<bool[AE_VAT_END]>(0x8C8A54);
+    static auto& s_PlayerVehicleColourLookup   = StaticRef<int16[127]>(0x8C8A88);
+
+    enum eDirection : eSoundID {
+        DIR_CENTRAL = 0,
+        DIR_EAST    = 1,
+        DIR_NORTH   = 2,
+        DIR_SOUTH   = 3,
+        DIR_WEST    = 4,
+    };
+
+    if (event != AE_CRIME_COMMITTED || crimeType <= CRIME_FIRE_WEAPON || crimeType >= MAX_CRIMES) {
+        return;
+    }
+
+    // Crime + location
+    tScannerSlot first[NUM_POLICE_SCANNER_SLOTS]{};
+    // Suspect
+    tScannerSlot second[NUM_POLICE_SCANNER_SLOTS]{};
+    for (auto& slot : first) {
+        slot = { static_cast<eSoundBank>(-1), -1 };
+    }
+    for (auto& slot : second) {
+        slot = { static_cast<eSoundBank>(-1), -1 };
+    }
+
+    first[0] = { SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS, s_CrimeInstructions[CAEAudioUtility::GetRandomNumberInRange(0, 3)] };
+    first[1] = { SND_BANK_SCRIPT_SCANNER_NUMBERS, s_CrimeNumberLookup[crimeType] };
+
+    const auto zone = CTheZones::FindSmallestZoneForPosition(point, true);
+    if (!zone) {
+        return;
+    }
+
+    for (auto area = 0u; area < NUM_CRIME_AREAS; area++) {
+        if (memcmp(zone->m_TextLabel, s_CrimeAreaNames[area], 8) != 0 || s_CrimeAreaSoundLookup[area] < 0) {
+            continue;
+        }
+
+        if (s_CrimeAreaWithDirections[area]) {
+            const auto sizeX   = static_cast<float>(zone->m_fX2 - zone->m_fX1);
+            const auto sizeY   = static_cast<float>(zone->m_fY2 - zone->m_fY1);
+            const auto centerX = sizeX * 0.5f + static_cast<float>(zone->m_fX1);
+            const auto centerY = sizeY * 0.5f + static_cast<float>(zone->m_fY1);
+            const auto marginX = sizeX * 0.25f;
+            const auto marginY = sizeY * 0.25f;
+
+            bool hasNorthSouth = false;
+            if (point.y > centerY + marginY) {
+                first[2]      = { SND_BANK_SCRIPT_SCANNER_DIRECTIONS, DIR_NORTH };
+                hasNorthSouth = true;
+            } else if (point.y < centerY - marginY) {
+                first[2]      = { SND_BANK_SCRIPT_SCANNER_DIRECTIONS, DIR_SOUTH };
+                hasNorthSouth = true;
+            }
+
+            if (point.x > centerX + marginX) {
+                first[3] = { SND_BANK_SCRIPT_SCANNER_DIRECTIONS, DIR_EAST };
+            } else if (point.x < centerX - marginX) {
+                first[3] = { SND_BANK_SCRIPT_SCANNER_DIRECTIONS, DIR_WEST };
+            } else if (!hasNorthSouth) {
+                first[3] = { SND_BANK_SCRIPT_SCANNER_DIRECTIONS, DIR_CENTRAL };
+            }
+        }
+
+        first[4] = { SND_BANK_SCRIPT_SCANNER_AREAS, s_CrimeAreaSoundLookup[area] };
+
+        // Find the player this scanner belongs to
+        CPlayerPed* player = nullptr;
+        for (auto i = 0; i < MAX_PLAYERS; i++) {
+            if (&FindPlayerWanted(i)->m_PoliceScannerAudioEntity == this) {
+                player = FindPlayerPed(i);
+            }
+        }
+
+        if (player) {
+            if (player->bInVehicle) {
+                if (const auto veh = player->m_pVehicle) {
+                    const auto vehType = veh->m_vehicleAudio.m_AuSettings.VehicleAudioTypeForName;
+                    if (vehType >= 0 && vehType < AE_VAT_END && s_PlayerVehicleTypeLookup[vehType] >= 0) {
+                        // "Suspect last seen..."
+                        second[0] = { SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS, 7 };
+
+                        // "...in a" / "...on a"
+                        second[1] = {
+                            SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS,
+                            notsa::contains({ AE_VAT_MOPED, AE_VAT_BIKE, AE_VAT_QUADBIKE, AE_VAT_MOWER, AE_VAT_BICYCLE, AE_VAT_TRACTOR }, vehType)
+                                ? eSoundID{ 3 }
+                                : eSoundID{ 1 }
+                        };
+
+                        // Colour
+                        if (s_PlayerVehicleTypeUsesColour[vehType]) {
+                            if (veh->GetRemapIndex() != -1) {
+                                second[3] = { SND_BANK_SCRIPT_SCANNER_COLOURS, 4 };
+                            } else if (const auto color = veh->m_nPrimaryColor; color > 0 && color < 127) {
+                                if (const auto colorSound = s_PlayerVehicleColourLookup[color]; colorSound >= 0) {
+                                    second[3] = { SND_BANK_SCRIPT_SCANNER_COLOURS, colorSound };
+                                }
+                            }
+                        }
+
+                        // Vehicle type
+                        second[4] = { SND_BANK_SCRIPT_SCANNER_VEHICLES, s_PlayerVehicleTypeLookup[vehType] };
+                    }
+                }
+            } else if (player->m_pIntelligence->GetTaskSwim()) {
+                second[0] = { SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS, 7 };
+                second[4] = { SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS, 2 };
+            } else if (!player->m_pIntelligence->GetTaskJetPack()) {
+                second[0] = { SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS, 7 };
+                second[4] = { SND_BANK_SCRIPT_SCANNER_INSTRUCTIONS, 4 };
+            }
+        }
+
+        PlayPoliceScannerDialogue(first, second);
+        return;
+    }
 }
 
 // 0x4E6BC0
@@ -128,62 +254,52 @@ void CAEPoliceScannerAudioEntity::FinishedPlayingScannerDialogue() {
 
 // 0x4E6F60
 void CAEPoliceScannerAudioEntity::PlayLoadedDialogue() {
-    return plugin::CallMethod<0x4E6F60, CAEPoliceScannerAudioEntity*>(this);
-
-    int16 i;
-    for (i = 0; i < NUM_POLICE_SCANNER_SLOTS; ++i) {
+    int16 i = 0;
+    for (; i < NUM_POLICE_SCANNER_SLOTS; i++) {
         if (s_SlotState[i] == FIVE) {
             break;
         }
     }
-
     if (i == NUM_POLICE_SCANNER_SLOTS) {
         i = 0;
-        goto LABEL_7;
+    } else if (i >= NUM_POLICE_SCANNER_SLOTS) {
+        goto NoMoreSlotsToPlay;
     }
-
-    if (i >= NUM_POLICE_SCANNER_SLOTS) {
-    LABEL_9:
-        auto volumeChange = s_fVolumeOffset /* + flt_B61D54 */;
-        AudioEngine.ReportFrontendAudioEvent(AE_FRONTEND_SCANNER_CLICK, volumeChange);
-        AudioEngine.ReportFrontendAudioEvent(AE_FRONTEND_SCANNER_NOISE_STOP);
-        if (s_nSectionPlaying) {
-            FinishedPlayingScannerDialogue();
-        } else {
-            auto v2 = (int16*)s_ScannerSlotSecond;
-            s_pCurrentSlots = s_ScannerSlotSecond;
-            s_nSectionPlaying = 1;
-            auto v3 = s_SlotState;
-            auto v4 = 5;
-            do {
-                *v3 = *v2 < 0 || v2[1] < 0;
-                v2 += 2;
-                ++v3;
-                --v4;
-            } while (v4);
-            s_nPlaybackStartTime = 0;
-            // s_nAbortPlaybackTime = *(_DWORD*)&gSpeechContextLookup[366][0] + CTimer::GetTimeInMS();
-            s_nScannerPlaybackState = TWO;
+    for (; i < NUM_POLICE_SCANNER_SLOTS; i++) {
+        if (s_SlotState[i] != THREE) {
+            continue;
         }
-    } else {
-    LABEL_7:
-        while (s_SlotState[i] != 3) {
-            if (++i >= 5)
-                goto LABEL_9;
+        if (i >= NUM_POLICE_SCANNER_SLOTS) {
+            break;
         }
-
-        auto volume = GetDefaultVolume(AE_CRIME_COMMITTED) + s_fVolumeOffset;
+        const auto volume = GetDefaultVolume(AE_CRIME_COMMITTED) + s_fVolumeOffset;
         CAESound sound;
-        sound.Initialise((eSoundBankSlot)(SND_BANK_SLOT_SCANNER_FIRST + i), s_pCurrentSlots[i].SoundID, this, { 0.0, 1.0f, 0.0f }, volume, 1.0f, 1.0f, 1.0f, 0, SOUND_DEFAULT, 0.0f, 0);
-        sound.m_ClientVariable = (float)i;
+        sound.Initialise((eSoundBankSlot)(SND_BANK_SLOT_SCANNER_FIRST + i), s_pCurrentSlots[i].SoundID, this, { 0.0f, 1.0f, 0.0f }, volume, 1.0f, 1.0f, 1.0f, 0, SOUND_DEFAULT, 0.0f, 0);
+        sound.m_ClientVariable = static_cast<float>(i);
         sound.m_Flags = SOUND_FRONT_END | SOUND_IS_CANCELLABLE | SOUND_REQUEST_UPDATES | SOUND_IS_DUCKABLE;
         sound.m_Event = AE_CRIME_COMMITTED;
-
         s_pSound = AESoundManager.RequestNewSound(&sound);
         if (s_pSound) {
-            s_SlotState[i] = 5;
+            s_SlotState[i] = FIVE;
             s_nScannerPlaybackState = SEVEN;
         }
+        return;
+    }
+NoMoreSlotsToPlay:
+    const auto volumeChange = s_fVolumeOffset; // + flt_B61D54;
+    AudioEngine.ReportFrontendAudioEvent(AE_FRONTEND_SCANNER_CLICK, volumeChange);
+    AudioEngine.ReportFrontendAudioEvent(AE_FRONTEND_SCANNER_NOISE_STOP);
+    if (s_nSectionPlaying) {
+        FinishedPlayingScannerDialogue();
+    } else {
+        s_pCurrentSlots = s_ScannerSlotSecond;
+        s_nSectionPlaying = 1;
+        for (auto slotIndex = 0; slotIndex < NUM_POLICE_SCANNER_SLOTS; slotIndex++) {
+            s_SlotState[slotIndex] = s_ScannerSlotSecond[slotIndex].Bank < 0 || s_ScannerSlotSecond[slotIndex].SoundID < 0;
+        }
+        s_nPlaybackStartTime = 0;
+        s_nAbortPlaybackTime = CTimer::GetTimeInMS() + 5000; // gSpeechContextLookup[366][0]
+        s_nScannerPlaybackState = TWO;
     }
 }
 
@@ -320,19 +436,19 @@ void CAEPoliceScannerAudioEntity::InjectHooks() {
     RH_ScopedInstall(Destructor, 0x4E6E00);
     RH_ScopedInstall(StaticInitialise, 0x5B9C30);
     RH_ScopedInstall(Reset, 0x4E6E90);
-    RH_ScopedInstall(AddAudioEvent, 0x4E71E0, { .Reversed = false });
+    RH_ScopedInstall(AddAudioEvent, 0x4E71E0);
     RH_ScopedInstall(PrepSlots, 0x4E6BC0);
-    RH_ScopedInstall(LoadSlots, 0x4E6CD0, { .Reversed = false });
+    RH_ScopedInstall(LoadSlots, 0x4E6CD0);
     RH_ScopedInstall(EnableScanner, 0x4E6DB0);
     RH_ScopedInstall(DisableScanner, 0x4E71B0);
     RH_ScopedInstall(StopScanner, 0x4E6DC0);
     RH_ScopedInstall(FinishedPlayingScannerDialogue, 0x4E6C30);
-    RH_ScopedInstall(PlayLoadedDialogue, 0x4E6F60, { .Reversed = false });
+    RH_ScopedInstall(PlayLoadedDialogue, 0x4E6F60);
     RH_ScopedInstall(PopulateScannerDialogueLists, 0x4E6B60);
     RH_ScopedInstall(CanWePlayNewScannerDialogue, 0x4E6C00);
     RH_ScopedInstall(PlayPoliceScannerDialogue, 0x4E6ED0);
     RH_ScopedVMTInstall(UpdateParameters, 0x4E7590);
-    RH_ScopedInstall(Service, 0x4E7630, { .Reversed = false });
+    RH_ScopedInstall(Service, 0x4E7630);
 }
 
 CAEPoliceScannerAudioEntity* CAEPoliceScannerAudioEntity::Constructor() {
