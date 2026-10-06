@@ -51,10 +51,7 @@ bool CTaskComplexFallToDeath::MakeAbortable(CPed* ped, eAbortPriority priority, 
 }
 
 // 0x679510
-
-
 CTask* CTaskComplexFallToDeath::ControlSubTask(CPed* ped) {
-    // return plugin::CallMethodAndReturn<CTask*, 0x679510, CTaskComplexFallToDeath*, CPed*>(this, ped);
 
     if (ped->physicalFlags.bSubmergedInWater) {
         if (!b0x2) {
@@ -112,10 +109,7 @@ CTask* CTaskComplexFallToDeath::CreateFirstSubTask(CPed* ped) {
 }
 
 // 0x679270
-
-// 0x0
 CTask* CTaskComplexFallToDeath::CreateNextSubTask(CPed* ped) {
-    // return plugin::CallMethodAndReturn<CTask*, 0x679270, CTaskComplexFallToDeath*, CPed*>(this, ped);
 
     const auto& z = ped->GetMoveSpeed().z;
     switch (m_pSubTask->GetTaskType()) {
