@@ -9,6 +9,8 @@
 #include "Vector.h"
 #include "RGBA.h"
 
+class CPad;
+
 typedef int32 CrossHairId;
 
 enum eWeaponEffectsLockTexture {
@@ -23,10 +25,10 @@ public:
     CVector m_vecPosn;
     CRGBA   m_color;
     float   m_fSize;
-    int32   field_1C;
-    int32   field_20;
-    float   m_fRotation;
-    bool    m_bClearImmediately;
+    float   m_fTargetRotation;   // Rotation of the (triangle) target marker [in radians]
+    float   m_fFlightOffsetDist; // Distance of the 2nd flight (lock-on) crosshair from the 1st one, the target is locked on once this reaches 0
+    float   m_fRotation;         // TODO: Bad name, it's really `1.f` if locked on, `0.f` otherwise - See `IsLockedOn`
+    bool    m_bClearImmediately; // TODO: Bad name, if set the flight (lock-on) crosshair is rendered instead of the regular target marker
 
 public:
     static void InjectHooks();
@@ -46,6 +48,22 @@ public:
 };
 
 VALIDATE_SIZE(CWeaponEffects, 0x2C);
+
+/*!
+ * @brief The player's crosshair in screen space (Used for the heli/plane guns, etc)
+ * @brief Embedded in `CPlayerInfo` (As `m_nCrosshairActivated` + `m_vecCrosshairTarget`)
+ */
+struct CPlayerCrossHair {
+    bool      m_bActivated;
+    CVector2D m_vecTarget; // -1 ... 1 on screen
+
+public:
+    static void InjectHooks();
+
+    void Update(int32 playerId, CPad* pad);
+    void Render(int32 playerId);
+};
+VALIDATE_SIZE(CPlayerCrossHair, 0xC);
 
 constexpr auto MAX_NUM_WEAPON_CROSSHAIRS{ 2u };
 static inline auto& gCrossHair = StaticRef<std::array<CWeaponEffects, MAX_NUM_WEAPON_CROSSHAIRS>>(0xC8A838);
