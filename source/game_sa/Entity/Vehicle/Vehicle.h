@@ -134,13 +134,15 @@ typedef int32 eOrdnanceType;
 typedef int32 eBikeWheelSpecial;
 
 enum eFlightModel : int32 {
-    FLIGHT_MODEL_UNK = 0,
-    FLIGHT_MODEL_BARON = 1,
-    FLIGHT_MODEL_RC = 2,
+    FLIGHT_MODEL_CRAPPY = 0,
+    FLIGHT_MODEL_RCPLANE = 1,
+    FLIGHT_MODEL_RCHELI = 2,
     FLIGHT_MODEL_PLANE = 3, // also used for cars
-    FLIGHT_MODEL_UNK2 = 4,
+    FLIGHT_MODEL_UNK4 = 4,
     FLIGHT_MODEL_BOAT = 5,
     FLIGHT_MODEL_HELI = 6, // also used for hydra
+    FLIGHT_MODEL_UNK7 = 7,
+    FLIGHT_MODEL_AUTOGYRO = 8
 };
 
 enum tWheelState : int32 {
@@ -491,7 +493,7 @@ public:
     virtual bool SetUpWheelColModel(CColModel* wheelCol) { return false; }
     // returns false if it's not possible to burst vehicle's tyre or it is already damaged. bPhysicalEffect=true applies random moving force to vehicle
     virtual bool BurstTyre(uint8 tyreComponentId, bool bPhysicalEffect) { return false; }
-    virtual bool IsRoomForPedToLeaveCar(uint32 doorId, CVector* arg1) { return false; }
+    virtual bool IsRoomForPedToLeaveCar(uint32 doorId, CVector* arg1 = nullptr) { return false; }
     virtual void ProcessDrivingAnims(CPed* driver, bool bBlend);
     // get special ride anim data for bile or quad
     virtual CRideAnimData* GetRideAnimData() { return nullptr; }
@@ -640,7 +642,7 @@ public:
     void DoSunGlare();
     void AddWaterSplashParticles();
     void AddExhaustParticles();
-    bool AddSingleWheelParticles(tWheelState wheelState, uint32 arg1, float arg2, float arg3, CColPoint* arg4, CVector* arg5, float arg6, int32 arg7, uint32 surfaceType, bool* bloodState, uint32 arg10);
+    bool AddSingleWheelParticles(tWheelState wheelState, uint32 wheelStatus, float susRatio, float speed, CColPoint* colPoint, CVector* pos, float outsideVec, int32 wheelIndex, uint32 skidmarkType, bool* bloodState, uint32 optionFlags);
     bool GetSpecialColModel();
     void RemoveVehicleUpgrade(int32 upgradeModelIndex);
     void AddUpgrade(int32 modelIndex, int32 upgradeIndex);
@@ -649,7 +651,7 @@ public:
     CEntity* ScanAndMarkTargetForHeatSeekingMissile(CEntity* entity);
     void FireHeatSeakingMissile(CEntity* targetEntity, eOrdnanceType ordnanceType, bool arg2);
     void PossiblyDropFreeFallBombForPlayer(eOrdnanceType ordnanceType, bool arg1);
-    void ProcessSirenAndHorn(bool arg0);
+    void ProcessSirenAndHorn(bool bCanUseHorn);
 
     bool DoHeadLightEffect(eVehicleLightId lightId, CMatrix& vehicleMatrix, bool isRight, bool disabledOrAlarm);
     void DoHeadLightBeam(eVehicleLightId lightId, CMatrix& vehicleMatrix, bool isRight);
@@ -665,7 +667,7 @@ public:
     bool DoBladeCollision(CVector pos, CMatrix& matrix, int16 rotorType, float radius, float damageMult);
     void AddVehicleUpgrade(int32 modelId);
     void SetupUpgradesAfterLoad();
-    void GetPlaneWeaponFiringStatus(bool& status, eOrdnanceType& ordnanceType);
+    CEntity* GetPlaneWeaponFiringStatus(bool& status, eOrdnanceType& ordnanceType);
     void ProcessWeapons();
     void DoFixedMachineGuns();
     void FireFixedMachineGuns();
