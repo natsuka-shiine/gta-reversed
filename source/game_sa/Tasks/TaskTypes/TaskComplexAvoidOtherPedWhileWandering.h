@@ -45,6 +45,7 @@ public:
     bool       ComputeDetourTarget(CPed* ped);
 
     auto GetPedToAvoid() const { return m_PedToAvoid; }
+    void SetWantsToQuit(bool v) { m_WantsToQuit = v; } // NOTSA
 
 private:
     friend void InjectHooksMain();
