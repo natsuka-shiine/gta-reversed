@@ -28,9 +28,12 @@ public:
     CTask*         CreateSubTask(eTaskType type, CPed* ped);
     CVector        GetTargetPos() const;
     CVehicle*      GetCameraAvoidVehicle();
+    void           GetCameraStickModifier(CPed* ped, float distance, float& vertAngle, float& horzAngle, float& vertStick, float& horzStick);
 
     auto GetTargetCar() const { return m_Car; }
+    auto GetEnterCarStartTime() const { return m_EnterCarStartTime; }
     void SetMoveState(eMoveState ms) { m_MoveState = ms; }
+    bool ShouldQuitAfterDraggingPedOut() const noexcept { return m_bQuitAfterDraggingPedOut; }
 protected:
     virtual CTask* CreateNextSubTask_AfterSimpleCarAlign(CPed* ped);
 
