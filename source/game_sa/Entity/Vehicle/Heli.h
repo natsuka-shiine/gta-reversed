@@ -65,8 +65,8 @@ public:
     float        m_fSteeringLeftRight;
     float        m_fAccelerationBreakStatus;
     int32        field_99C;
-    int32        m_fRotorZ;
-    int32        m_fSecondRotorZ;
+    float        m_fRotorZ;       // 0x9A0 - Main rotor angle (radians)
+    float        m_fSecondRotorZ; // 0x9A4 - Rear rotor angle (radians)
     float        m_fMaxAltitude;
     float        field_9AC;
     float        m_fMinAltitude;
@@ -114,11 +114,16 @@ public:
     void PreRender() override;
     void ProcessControl() override;
 
+    // NOTSA: The game actually has 2 arrays of 6 floats at 0x9C0 and 0x9D8 (History of the search light's target).
+    // The members above (`field_9C0` ... `m_aSearchLightHistoryY`) don't describe this correctly, but they're used elsewhere, so we can't change them.
+    auto& GetSearchLightHistoryX() { return *reinterpret_cast<std::array<float, 6>*>(&field_9C0); }              // 0x9C0
+    auto& GetSearchLightHistoryY() { return *reinterpret_cast<std::array<float, 6>*>(&m_aSearchLightHistoryX); } // 0x9D8
+
     void PreRenderAlways();
     CVector FindSwatPositionRelativeToHeli(int32 swatNumber);
     bool SendDownSwat();
 
-    inline uint32 GetRopeId() { return reinterpret_cast<int32>(this + m_nNumSwatOccupants - 1); }
+    inline uint32 GetRopeId() { return reinterpret_cast<uint32>(this) + m_nNumSwatOccupants - 1; } // NOTE: Byte-wise arithmetic (as in the original code)
 
     static void InitHelis();
     static void AddHeliSearchLight(const CVector& origin, const CVector& target, float targetRadius, float power, uint32 coronaIndex, uint8 unknownFlag, uint8 drawShadow);
