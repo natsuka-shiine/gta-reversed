@@ -56,16 +56,277 @@ void CRenderer::InjectHooks()
     RH_ScopedInstall(RequestObjectsInFrustum, 0x555960);
     RH_ScopedInstall(RequestObjectsInDirection, 0x555CB0);
 
+    RH_ScopedGlobalInstall(CWorldScan::ScanWorld, 0x72CAE0);
+    RH_ScopedGlobalInstall(CWorldScan::SetExtraRectangleToScan, 0x72D5E0);
+
 }
 
+// Extra blocks (sectors) to scan, see `CWorldScan::SetExtraRectangleToScan`
+static inline auto& s_ExtraBlocksY   = StaticRef<int32[4]>(0xC81598);
+static inline auto& s_ExtraBlocksX   = StaticRef<int32[4]>(0xC815A8);
+static inline auto& s_NumExtraBlocks = StaticRef<int32>(0xC815B8);
+
+// 0x72CAE0
 void CWorldScan::ScanWorld(CVector2D *points, int32 pointsCount, tScanFunction scanFunction)
 {
-    plugin::Call<0x72CAE0,CVector2D*, int32, tScanFunction>(points,pointsCount, scanFunction);
+    constexpr auto MAX_POINTS = 5; // The original has stack space for this many points only
+    assert(pointsCount <= MAX_POINTS);
+
+    const auto ToInt = [](float v) { return static_cast<int32>(std::floor(v)); };
+
+    // Remove duplicate points (In place, as originally)
+    for (auto i = 0; i < pointsCount - 1; i++) {
+        for (auto j = i + 1; j < pointsCount; j++) {
+            if (points[i].x != points[j].x || points[i].y != points[j].y) {
+                continue;
+            }
+            for (auto k = j; k < pointsCount - 1; k++) {
+                points[k] = points[k + 1];
+            }
+            pointsCount--;
+            j--;
+        }
+    }
+
+    // Find the point with the lowest `y`
+    auto current = 0;
+    {
+        auto minY = points[0].y;
+        for (auto i = 1; i < pointsCount; i++) {
+            if (minY > points[i].y) {
+                minY    = points[i].y;
+                current = i;
+            }
+        }
+    }
+
+    // Build the convex hull by gift wrapping, starting from the lowest point
+    bool      visited[MAX_POINTS]{};
+    CVector2D poly[MAX_POINTS];
+    auto      numVertices = 1;
+    visited[current]      = true;
+    poly[0]               = points[current];
+    for (auto angleBase = 0.f;;) {
+        auto minAngle = 99999.9f;
+        auto best     = current; // NOTSA: Uninitialized originally (Only matters if there's a single point, the result is the same - nothing is scanned)
+        for (auto i = 0; i < pointsCount; i++) {
+            if (i == current) {
+                continue;
+            }
+            auto angle = CGeneral::GetATanOfXY(points[i].x - points[current].x, points[i].y - points[current].y) - angleBase;
+            while (angle < 0.f) {
+                angle += 6.2831855f;
+            }
+            while (angle >= 6.2831855f) {
+                angle -= 6.2831855f;
+            }
+            if (angle < minAngle) {
+                minAngle = angle;
+                best     = i;
+            }
+        }
+        if (visited[best]) {
+            break;
+        }
+        poly[numVertices++] = points[best];
+        angleBase          += minAngle;
+        visited[best]       = true;
+        current             = best;
+    }
+
+    if (numVertices < 3) {
+        return; // NOTE: The extra blocks are neither scanned nor cleared in this case
+    }
+
+    // Scan convert the hull (Same algorithm as VC's `CRenderer::ScanSectorPoly`, but without the sector bounds checks)
+    auto  minY = poly[0].y, maxY = poly[0].y;
+    int32 a2     = 0;
+    int32 xStart = 9999, xEnd = -9999;
+    for (auto i = 1; i < numVertices; i++) {
+        if (minY > poly[i].y) {
+            minY = poly[i].y;
+            a2   = i;
+        } else if (poly[i].y > maxY) {
+            maxY = poly[i].y;
+        }
+    }
+    auto       y    = ToInt(minY);
+    const auto yEnd = ToInt(maxY);
+
+    const auto CalcNewDelta = [&](int32 from, int32 to) {
+        return (poly[to].x - poly[from].x) / (poly[to].y - poly[from].y);
+    };
+    const auto PrestepX = [&](int32 from, float delta) { // Prestep `x` to the next integer `y`
+        return (std::ceil(poly[from].y) - poly[from].y) * delta + poly[from].x;
+    };
+
+    // Go left in the poly to find the first edge b
+    int32 a1, b1, b2 = a2;
+    for (auto i = 0; i < numVertices; i++) {
+        b1 = b2--;
+        if (b2 < 0) {
+            b2 = numVertices - 1;
+        }
+        if ((float)xStart > poly[b1].x) {
+            xStart = ToInt(poly[b1].x);
+        }
+        if (ToInt(poly[b1].y) != ToInt(poly[b2].y)) {
+            break;
+        }
+    }
+
+    // Go right to find the first edge a
+    for (auto i = 0; i < numVertices; i++) {
+        a1 = a2++;
+        if (a2 == numVertices) {
+            a2 = 0;
+        }
+        if ((float)xEnd < poly[a1].x) {
+            xEnd = ToInt(poly[a1].x);
+        }
+        if (ToInt(poly[a1].y) != ToInt(poly[a2].y)) {
+            break;
+        }
+    }
+
+    auto deltaA = CalcNewDelta(a1, a2);
+    auto xA     = PrestepX(a1, deltaA);
+    auto deltaB = CalcNewDelta(b1, b2);
+    auto xB     = PrestepX(b1, deltaB);
+
+    if (y != yEnd) {
+        if (deltaB < 0.f && xStart > ToInt(xB)) {
+            xStart = ToInt(xB);
+        }
+        if (deltaA >= 0.f && xEnd < ToInt(xA)) {
+            xEnd = ToInt(xA);
+        }
+    }
+
+    while (y <= yEnd) {
+        // Scan one x-line
+        for (auto x = xStart; x <= xEnd; x++) {
+            scanFunction(x, y);
+
+            // This block is done, so remove it from the extra blocks
+            for (auto i = 0; i < s_NumExtraBlocks; i++) {
+                if (s_ExtraBlocksX[i] != x || s_ExtraBlocksY[i] != y) {
+                    continue;
+                }
+                for (auto k = i; k < s_NumExtraBlocks - 1; k++) {
+                    s_ExtraBlocksY[k] = s_ExtraBlocksY[k + 1];
+                    s_ExtraBlocksX[k] = s_ExtraBlocksX[k + 1];
+                }
+                s_NumExtraBlocks--;
+                break;
+            }
+        }
+
+        // Advance one scan line
+        y++;
+        xA += deltaA;
+        xB += deltaB;
+
+        // Update left side
+        if (y == ToInt(poly[b2].y)) {
+            // Reached end of edge
+            if (y == yEnd) {
+                if (deltaB < 0.f) {
+                    do {
+                        xStart = ToInt(poly[b2--].x);
+                        if (b2 < 0) {
+                            b2 = numVertices - 1;
+                        }
+                    } while (xStart > ToInt(poly[b2].x));
+                } else {
+                    xStart = ToInt(xB - deltaB);
+                }
+            } else {
+                // Switch edges
+                xStart = deltaB < 0.f
+                    ? ToInt(poly[b2].x)
+                    : ToInt(xB - deltaB);
+                do {
+                    b1 = b2--;
+                    if (b2 < 0) {
+                        b2 = numVertices - 1;
+                    }
+                    if (xStart > ToInt(poly[b1].x)) {
+                        xStart = ToInt(poly[b1].x);
+                    }
+                } while (y == ToInt(poly[b2].y));
+                deltaB = CalcNewDelta(b1, b2);
+                xB     = PrestepX(b1, deltaB);
+                if (deltaB < 0.f && xStart > ToInt(xB)) {
+                    xStart = ToInt(xB);
+                }
+            }
+        } else {
+            xStart = deltaB < 0.f
+                ? ToInt(xB)
+                : ToInt(xB - deltaB);
+        }
+
+        // Update right side
+        if (y == ToInt(poly[a2].y)) {
+            // Reached end of edge
+            if (y == yEnd) {
+                if (deltaA < 0.f) {
+                    xEnd = ToInt(xA - deltaA);
+                } else {
+                    do {
+                        xEnd = ToInt(poly[a2++].x);
+                        if (a2 == numVertices) {
+                            a2 = 0;
+                        }
+                    } while (xEnd < ToInt(poly[a2].x));
+                }
+            } else {
+                // Switch edges
+                xEnd = deltaA < 0.f
+                    ? ToInt(xA - deltaA)
+                    : ToInt(poly[a2].x);
+                do {
+                    a1 = a2++;
+                    if (a2 == numVertices) {
+                        a2 = 0;
+                    }
+                    if (xEnd < ToInt(poly[a1].x)) {
+                        xEnd = ToInt(poly[a1].x);
+                    }
+                } while (y == ToInt(poly[a2].y));
+                deltaA = CalcNewDelta(a1, a2);
+                xA     = PrestepX(a1, deltaA);
+                if (deltaA >= 0.f && xEnd < ToInt(xA)) {
+                    xEnd = ToInt(xA);
+                }
+            }
+        } else {
+            xEnd = deltaA < 0.f
+                ? ToInt(xA - deltaA)
+                : ToInt(xA);
+        }
+    }
+
+    // Scan the extra blocks that weren't covered by the poly
+    for (auto i = 0; i < s_NumExtraBlocks; i++) {
+        scanFunction(s_ExtraBlocksX[i], s_ExtraBlocksY[i]);
+    }
+    s_NumExtraBlocks = 0;
 }
 
+// 0x72D5E0
 void CWorldScan::SetExtraRectangleToScan(float minX, float maxX, float minY, float maxY)
 {
-    plugin::Call<0x72D5E0, float, float, float, float>(minX, maxX, minY, maxY);
+    for (auto x = static_cast<int32>(std::floor(minX)); x < static_cast<int32>(std::ceil(maxX)); x++) {
+        for (auto y = static_cast<int32>(std::floor(minY)); y < static_cast<int32>(std::ceil(maxY)); y++) {
+            // NOTE: Original code doesn't do bounds checking either (The arrays have space for 4 blocks only)
+            assert(s_NumExtraBlocks < (int32)std::size(s_ExtraBlocksX));
+            s_ExtraBlocksY[s_NumExtraBlocks] = y;
+            s_ExtraBlocksX[s_NumExtraBlocks] = x;
+            s_NumExtraBlocks++;
+        }
+    }
 }
 
 void CRenderer::Init() {
