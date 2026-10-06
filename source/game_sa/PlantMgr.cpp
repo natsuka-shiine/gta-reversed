@@ -9,8 +9,43 @@
 #include "ProcObjectMan.h"
 
 // 0x5DD100 (todo: move)
-static void AtomicCreatePrelitIfNeeded(RpAtomic* atomic) {
-    plugin::Call<0x5DD100, RpAtomic*>(atomic);
+static RpAtomic* AtomicCreatePrelitIfNeeded(RpAtomic* atomic) {
+    const auto oldGeo = RpAtomicGetGeometry(atomic);
+    if (RpGeometryGetFlags(oldGeo) & rpGEOMETRYPRELIT) {
+        return atomic;
+    }
+
+    const auto numTris  = RpGeometryGetNumTriangles(oldGeo);
+    const auto numVerts = RpGeometryGetNumVertices(oldGeo);
+
+    const auto newGeo = RpGeometryCreate(numVerts, numTris, rpGEOMETRYTRISTRIP | rpGEOMETRYTEXTURED | rpGEOMETRYPRELIT);
+
+    // Vertices
+    memcpy(
+        RpMorphTargetGetVertices(RpGeometryGetMorphTarget(newGeo, 0)),
+        RpMorphTargetGetVertices(RpGeometryGetMorphTarget(oldGeo, 0)),
+        numVerts * sizeof(RwV3d)
+    );
+
+    // Texture coordinates
+    memcpy(
+        RpGeometryGetVertexTexCoords(newGeo, rwTEXTURECOORDINATEINDEX0),
+        RpGeometryGetVertexTexCoords(oldGeo, rwTEXTURECOORDINATEINDEX0),
+        numVerts * sizeof(RwTexCoords)
+    );
+
+    // Triangles
+    const auto oldTris = RpGeometryGetTriangles(oldGeo);
+    const auto newTris = RpGeometryGetTriangles(newGeo);
+    memcpy(newTris, oldTris, numTris * sizeof(RpTriangle));
+    for (auto i = 0; i < numTris; i++) {
+        RpGeometryTriangleSetMaterial(newGeo, &newTris[i], RpGeometryTriangleGetMaterial(oldGeo, &oldTris[i]));
+    }
+
+    RpGeometryUnlock(newGeo);
+    RpGeometryGetFlags(newGeo) |= rpGEOMETRYPOSITIONS;
+    RpAtomicSetGeometry(atomic, newGeo, rpATOMICSAMEBOUNDINGSPHERE);
+    return atomic;
 }
 
 // 0x5DD1E0 (do not hook! it has retarded calling conv)
@@ -95,6 +130,7 @@ void CPlantMgr::InjectHooks() {
     RH_ScopedInstall(_ProcessEntryCollisionDataSections_RemoveLocTris, 0x5DBF20);
     RH_ScopedInstall(_UpdateLocTris, 0x5DCF00);
     RH_ScopedInstall(Render, 0x5DBAE0);
+    RH_ScopedGlobalInstall(AtomicCreatePrelitIfNeeded, 0x5DD100);
     //RH_ScopedGlobalInstall(LoadModels, 0x5DD220); // uses `__usercall`, can't hook
 
     // Do not uncomment!
