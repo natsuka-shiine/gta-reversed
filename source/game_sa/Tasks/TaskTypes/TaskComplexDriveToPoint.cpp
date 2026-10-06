@@ -3,6 +3,15 @@
 #include "TaskComplexDriveToPoint.h"
 #include "TaskComplexGoToPointAnyMeans.h"
 
+void CTaskComplexDriveToPoint::InjectHooks() {
+    RH_ScopedVirtualClass(CTaskComplexDriveToPoint, 0x86E9DC, 14);
+    RH_ScopedCategory("Tasks/TaskTypes");
+
+    RH_ScopedOverloadedInstall(IsTargetBlocked, "Entities", 0x6432A0, bool (CTaskComplexDriveToPoint::*)(CPed*, CEntity**, int32) const);
+    RH_ScopedOverloadedInstall(IsTargetBlocked, "Ped", 0x6452C0, bool (CTaskComplexDriveToPoint::*)(CPed*) const);
+    RH_ScopedVMTInstall(Drive, 0x645420);
+}
+
 // 0x63CE00
 CTaskComplexDriveToPoint::CTaskComplexDriveToPoint(CVehicle* vehicle, const CVector& point, float speed, int32 arg4, eModelID carModelIndexToCreate, float radius, eCarDrivingStyle drivingStyle) :
       CTaskComplexCarDrive(vehicle, speed, carModelIndexToCreate, drivingStyle),
@@ -37,75 +46,75 @@ void CTaskComplexDriveToPoint::SetUpCar() {
 
 // 0x645420
 CTask* CTaskComplexDriveToPoint::Drive(CPed* ped) {
-    return plugin::CallMethodAndReturn<CTask*, 0x645420, CTaskComplexDriveToPoint*, CPed*>(this, ped); // untested
+    const auto subTask = m_pSubTask;
+    auto&      ap      = m_Veh->m_autoPilot;
 
-    auto dist = DistanceBetweenPoints(m_Veh->GetPosition(), m_Point);
+    const auto dist = DistanceBetweenPoints(m_Point, m_Veh->GetPosition());
     if (dist < m_Radius) {
-        m_Veh->m_autoPilot.SetCarMission(MISSION_NONE);
+        ap.SetCarMission(MISSION_NONE);
         field_38 = true;
         return CTaskComplexCarDrive::CreateSubTask(TASK_FINISHED, ped);
     }
 
-    if (dist >= 3.0f || m_Veh->m_autoPilot.m_nCarMission) {
-        if (!m_Veh->m_autoPilot.m_nCruiseSpeed) {
-            assert(m_CruiseSpeed < 255.0f);
-            m_Veh->m_autoPilot.SetCruiseSpeed((uint8)m_CruiseSpeed);
-        }
-
-        if (IsTargetBlocked(ped)) {
-            field_38 = true;
-            return CTaskComplexCarDrive::CreateSubTask(TASK_FINISHED, ped);
-        }
-
-        switch (field_30) {
-        case field_30_enum::DEFAULT:       CCarAI::GetCarToGoToCoors(m_Veh, m_Point, m_CarDrivingStyle, false); break;
-        case field_30_enum::ACCURATE:      CCarAI::GetCarToGoToCoorsAccurate(m_Veh, m_Point, m_CarDrivingStyle, false); break;
-        case field_30_enum::STRAIGHT_LINE: CCarAI::GetCarToGoToCoorsStraightLine(m_Veh, m_Point, m_CarDrivingStyle, false); break;
-        case field_30_enum::RACING:        CCarAI::GetCarToGoToCoorsRacing(m_Veh, m_Point, m_CarDrivingStyle, false); break;
-        default:                           NOTSA_UNREACHABLE();
-        }
-        return m_pSubTask;
+    if (dist < 3.0f && ap.m_nCarMission == MISSION_NONE) {
+        field_38 = true;
+        return CTaskComplexCarDrive::CreateSubTask(TASK_FINISHED, ped);
     }
 
-    field_38 = true;
-    return CTaskComplexCarDrive::CreateSubTask(TASK_FINISHED, ped);
+    if (!ap.m_nCruiseSpeed) {
+        ap.m_nCruiseSpeed = static_cast<uint8>(static_cast<int32>(m_CruiseSpeed));
+    }
+
+    if (IsTargetBlocked(ped)) {
+        field_38 = true;
+        return CTaskComplexCarDrive::CreateSubTask(TASK_FINISHED, ped);
+    }
+
+    switch (field_30) {
+    case field_30_enum::DEFAULT:       CCarAI::GetCarToGoToCoors(m_Veh, m_Point, m_CarDrivingStyle, false); break;
+    case field_30_enum::ACCURATE:      CCarAI::GetCarToGoToCoorsAccurate(m_Veh, m_Point, m_CarDrivingStyle, false); break;
+    case field_30_enum::STRAIGHT_LINE: CCarAI::GetCarToGoToCoorsStraightLine(m_Veh, m_Point, m_CarDrivingStyle, false); break;
+    case field_30_enum::RACING:        CCarAI::GetCarToGoToCoorsRacing(m_Veh, m_Point, m_CarDrivingStyle, false); break;
+    default:                           break; // Original does nothing for other values
+    }
+    return subTask;
 }
 
 // 0x6452C0
 bool CTaskComplexDriveToPoint::IsTargetBlocked(CPed* ped) const {
-    return plugin::CallMethodAndReturn<bool, 0x6452C0, const CTaskComplexDriveToPoint*, CPed*>(this, ped); // untested
-
     if (DistanceBetweenPointsSquared(ped->GetPosition(), m_Point) > sq(6.0f)) {
         return false;
     }
 
-    auto intel = ped->GetIntelligence();
-    return IsTargetBlocked(ped, intel->GetPedEntities(), 16) || IsTargetBlocked(ped, intel->GetVehicleEntities(), 16);
+    const auto intel = ped->GetIntelligence();
+    return IsTargetBlocked(ped, intel->GetPedEntities(), 16)
+        || IsTargetBlocked(ped, intel->GetVehicleEntities(), 16);
 }
 
 // 0x6432A0
 bool CTaskComplexDriveToPoint::IsTargetBlocked(CPed* ped, CEntity** entities, int32 numEntities) const {
-    return plugin::CallMethodAndReturn<bool, 0x6432A0, const CTaskComplexDriveToPoint*, CPed*, CEntity**, int32>(this, ped, entities, numEntities); // untested
-
-    if (!ped->m_pVehicle)
+    const auto veh = ped->m_pVehicle;
+    if (!veh) {
         return false;
+    }
 
-    const auto& vehPos = ped->m_pVehicle->GetPosition();
-    auto dist = vehPos - m_Point;
+    const auto vehRadius        = veh->GetModelInfo()->GetColModel()->GetBoundRadius();
+    const auto vehDistToPointSq = (veh->GetPosition() - m_Point).SquaredMagnitude();
 
     for (auto i = 0; i < numEntities; ++i) {
-        CEntity* entity = entities[i];
-        if (!entity || entity == ped->m_pVehicle) {
+        const auto entity = entities[i];
+        if (!entity || entity == veh) {
             continue;
         }
 
-        const auto& vehicleRadius = ped->m_pVehicle->GetModelInfo()->GetColModel()->GetBoundRadius();
-        if (DistanceBetweenPointsSquared(vehPos, entity->GetPosition()) > sq(vehicleRadius)) {
+        // Is the target point inside the entity's bounding sphere?
+        const auto entityRadius = entity->GetModelInfo()->GetColModel()->GetBoundRadius();
+        if (sq(entityRadius) <= (entity->GetPosition() - m_Point).SquaredMagnitude()) {
             continue;
         }
 
-        const auto& entityRadius = entity->GetModelInfo()->GetColModel()->GetBoundRadius();
-        if ((entityRadius + vehicleRadius) * (entityRadius + vehicleRadius) * 1.5f > dist.SquaredMagnitude()) {
+        // And are we close enough to it?
+        if (static_cast<float>(static_cast<double>(sq(entityRadius + vehRadius)) * 1.5) > vehDistToPointSq) {
             return true;
         }
     }
