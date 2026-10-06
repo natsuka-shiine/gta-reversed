@@ -169,8 +169,36 @@ void CAnimBlendHierarchy::RemoveUncompressedData() {
 }
 
 // 0x4CF800
-void CAnimBlendHierarchy::MoveMemory() {
-    NOTSA_UNREACHABLE("Unused Function"); //plugin::CallMethod<0x4CF800, CAnimBlendHierarchy*>(this);
+bool CAnimBlendHierarchy::MoveMemory() {
+    if (!m_pSequences) {
+        return false;
+    }
+
+    // Each sequence owns its own frame data, move them one by one
+    if (!m_pSequences->m_bUsingExternalMemory) {
+        bool hasMoved = false;
+        for (auto& sequence : GetSequences()) {
+            if (sequence.MoveMemory()) {
+                hasMoved = true;
+            }
+        }
+        return hasMoved;
+    }
+
+    // All sequences share one block (owned by the first sequence), move it and fix-up the pointers
+    const auto oldBlock = static_cast<uint8*>(m_pSequences->m_Frames);
+    if (!oldBlock) {
+        return false;
+    }
+    const auto newBlock = static_cast<uint8*>(CMemoryMgr::MoveMemory(oldBlock));
+    if (newBlock == oldBlock) {
+        return false;
+    }
+    const auto offset = newBlock - oldBlock;
+    for (auto& sequence : GetSequences()) {
+        sequence.m_Frames = static_cast<uint8*>(sequence.m_Frames) + offset;
+    }
+    return true;
 }
 
 // 0x4CF8A0
