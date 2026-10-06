@@ -8,6 +8,7 @@
 #include "StdInc.h"
 
 #include "Fx.h"
+#include "Shadows.h"
 
 static auto& TempVertexBuffer = StaticRef<std::array<RxObjSpace3DVertex, 4>>(0xC4D958);
 
@@ -30,26 +31,26 @@ void Fx_c::InjectHooks() {
     // + RH_ScopedInstall(DestroyEntityFx, 0x4A1280);
     // + RH_ScopedInstall(Update, 0x49E640);
     // + RH_ScopedInstall(Render, 0x49E650);
-    // RH_ScopedInstall(CreateMatFromVec, 0x49E950);
+    RH_ScopedInstall(CreateMatFromVec, 0x49E950);
     // + RH_ScopedInstall(SetFxQuality, 0x49EA40);
     // + RH_ScopedInstall(GetFxQuality, 0x49EA50);
-    // RH_ScopedInstall(AddBlood, 0x49EB00);
-    // RH_ScopedInstall(AddWood, 0x49EE10);
-    // RH_ScopedInstall(AddSparks, 0x49F040);
-    // RH_ScopedInstall(AddTyreBurst, 0x49F300);
-    // RH_ScopedInstall(AddBulletImpact, 0x49F3D0);
-    // RH_ScopedInstall(AddPunchImpact, 0x49F670);
-    // RH_ScopedInstall(AddDebris, 0x49F750);
-    // RH_ScopedInstall(AddGlass, 0x49F970);
-    // RH_ScopedInstall(AddWheelSpray, 0x49FB30);
-    // RH_ScopedInstall(AddWheelGrass, 0x49FF20);
-    // RH_ScopedInstall(AddWheelGravel, 0x4A0170);
-    // RH_ScopedInstall(AddWheelMud, 0x4A03C0);
-    // RH_ScopedInstall(AddWheelSand, 0x4A0610);
-    // RH_ScopedInstall(AddWheelDust, 0x4A09C0);
-    // RH_ScopedInstall(TriggerWaterHydrant, 0x4A0D70);
-    // RH_ScopedInstall(TriggerGunshot, 0x4A0DE0);
-    // RH_ScopedInstall(TriggerTankFire, 0x4A0FA0);
+    RH_ScopedInstall(AddBlood, 0x49EB00);
+    RH_ScopedInstall(AddWood, 0x49EE10);
+    RH_ScopedInstall(AddSparks, 0x49F040);
+    RH_ScopedInstall(AddTyreBurst, 0x49F300);
+    RH_ScopedInstall(AddBulletImpact, 0x49F3D0);
+    RH_ScopedInstall(AddPunchImpact, 0x49F670);
+    RH_ScopedInstall(AddDebris, 0x49F750);
+    RH_ScopedInstall(AddGlass, 0x49F970);
+    RH_ScopedInstall(AddWheelSpray, 0x49FB30);
+    RH_ScopedInstall(AddWheelGrass, 0x49FF20);
+    RH_ScopedInstall(AddWheelGravel, 0x4A0170);
+    RH_ScopedInstall(AddWheelMud, 0x4A03C0);
+    RH_ScopedInstall(AddWheelSand, 0x4A0610);
+    RH_ScopedInstall(AddWheelDust, 0x4A09C0);
+    RH_ScopedInstall(TriggerWaterHydrant, 0x4A0D70);
+    RH_ScopedInstall(TriggerGunshot, 0x4A0DE0);
+    RH_ScopedInstall(TriggerTankFire, 0x4A0FA0);
     RH_ScopedInstall(TriggerWaterSplash, 0x4A1070);
     RH_ScopedInstall(TriggerBulletSplash, 0x4A10E0);
     RH_ScopedInstall(TriggerFootSplash, 0x4A1150);
@@ -118,6 +119,38 @@ static void CreateFxWithinCameraRange(const char* name, const CVector& pos, floa
             fxSystem->PlayAndKill();
         }
     }
+}
+
+// NOTSA - `rand() * (1 / RAND_MAX)` => [0, 1]
+static float RandomUnit() {
+    return static_cast<float>(CGeneral::GetRandomNumber()) * RAND_MAX_FLOAT_RECIPROCAL;
+}
+
+// NOTSA - `(rand() % 10000) * 0.0001` => [0, 1)
+static float RandomUnitMod() {
+    return static_cast<float>(CGeneral::GetRandomNumber() % 10'000) * 0.0001f;
+}
+
+// NOTSA
+static float GetDistSqToCamera(const CVector& pos) {
+    return DistanceBetweenPointsSquared(TheCamera.GetPosition(), pos);
+}
+
+// NOTSA - Common culling code of AddWheelSpray/Grass/Gravel/Mud
+static bool ShouldAddWheelFxThisFrame(const CVehicle* vehicle, const CVector& pos) {
+    const auto playerVeh = FindPlayerVehicle();
+    const auto distSq    = GetDistSqToCamera(pos);
+    const auto frame     = CTimer::m_FrameCounter + vehicle->m_nModelIndex;
+    if (distSq > sq(25.0f)) {
+        return false;
+    }
+    if (distSq > sq(20.0f)) {
+        return (frame & 3) == 0;
+    }
+    if (distSq <= sq(8.0f) && playerVeh) {
+        return true;
+    }
+    return (frame & 1) == 0;
 }
 
 // 0x4A12D0
@@ -198,24 +231,20 @@ void Fx_c::Render(RwCamera* camera, bool heatHaze) {
 
 // 0x49E950
 void Fx_c::CreateMatFromVec(RwMatrix* out, const CVector* origin, const CVector* direction) {
-    ((void(__thiscall*)(Fx_c*, RwMatrix*, const CVector*, const CVector*))0x49E950)(this, out, origin, direction);
-    return;
-
-    /*
     RwMatrixSetIdentity(out);
-    RwV3dAssign(RwMatrixGetPos(out), origin);
-    RwV3dAssign(RwMatrixGetUp(out), direction);
-    RwV3dNormalize(&out->up, RwMatrixGetUp(out));
+    *RwMatrixGetPos(out) = *origin;
+    *RwMatrixGetUp(out)  = *direction;
+    RwV3dNormalize(RwMatrixGetUp(out), RwMatrixGetUp(out));
 
-    out->right.x = out->up.z * 0.0f  - out->up.y * -1.0f;
-    out->right.y = out->up.x * -1.0f - out->up.z * 0.0f;
-    out->right.z = out->up.y * 0.0f  - out->up.x * 0.0f;
+    // NOTE: Android special-cases `direction == (0, 0, -1)` (and uses the Y axis instead), the PC version doesn't
+    const CVector up    = *RwMatrixGetUp(out);
+    const CVector right = CVector{ 0.0f, 0.0f, -1.0f }.Cross(up);
+    const CVector at    = right.Cross(up);
 
-    out->at.x = out->up.x * -1.0f        - out->up.z * 0.0f * out->up.z - out->up.y * 0.0f  - out->up.x * 0.0f * out->up.y;
-    out->at.y = out->up.y * 0.0f         - out->up.x * 0.0f * out->up.x - out->right.x                         * out->up.z;
-    out->at.z = out->right.x * out->up.y - out->up.x * -1.0f            - out->up.z * 0.0f                     * out->up.x;
+    *RwMatrixGetRight(out) = right;
+    *RwMatrixGetAt(out)    = at;
 
-    RwMatrixUpdate(out);*/
+    RwMatrixUpdate(out);
 }
 
 // 0x49EA40
@@ -230,87 +259,470 @@ FxQuality_e Fx_c::GetFxQuality() const {
 
 // 0x49EB00
 void Fx_c::AddBlood(const CVector& pos, const CVector& direction, int32 amount, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&, int32, float))0x49EB00)(this, pos, direction, amount, lightMult);
+    if (!CLocalisation::Blood()) {
+        return;
+    }
+    if (GetDistSqToCamera(pos) > sq(25.0f)) {
+        return;
+    }
+
+    FxPrtMult_c fxMults{ 0.5f, 0.0f, 0.0f, 1.0f, 0.8f, 0.0f, 0.8f };
+    for (auto i = amount; i > 0; i--) {
+        fxMults.m_fSize = RandomUnitMod() * 0.3f + 0.7f;
+
+        CVector vel = direction * 1.5f;
+        vel.x += RandomUnitMod() * 2.0f - 1.0f;
+        vel.y += RandomUnitMod() * 2.0f - 1.0f;
+        vel.z += RandomUnitMod() * 2.0f - 1.0f;
+
+        m_Blood->AddParticle(pos, vel, 0.0f, fxMults, -1.0f, lightMult, 0.6f, false);
+    }
+
+    // Blood pool on the ground
+    CVector shadowPos = pos + direction * 0.5f;
+    shadowPos.x += RandomUnitMod() * 0.2f - 0.1f;
+    shadowPos.y += RandomUnitMod() * 0.2f - 0.1f;
+    shadowPos.z += 1.0f;
+
+    m_Randomizer++;
+    switch (m_Randomizer & 7) {
+    case 5: {
+        const auto time = (CGeneral::GetRandomNumber() & 0xFFF) + 2000;
+        CShadows::AddPermanentShadow(SHADOW_DEFAULT, gpBloodPoolTex, &shadowPos, 0.1f, 0.0f, 0.0f, -0.1f, 255, 200, 0, 0, 4.0f, time, 1.0f);
+        break;
+    }
+    case 2: {
+        const auto time = (CGeneral::GetRandomNumber() & 0xFFF) + 8000;
+        CShadows::AddPermanentShadow(SHADOW_DEFAULT, gpBloodPoolTex, &shadowPos, 0.2f, 0.0f, 0.0f, -0.2f, 255, 200, 0, 0, 4.0f, time, 1.0f);
+        break;
+    }
+    }
 }
 
 // 0x49EE10
 void Fx_c::AddWood(const CVector& pos, const CVector& direction, int32 amount, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&, int32, float))0x49EE10)(this, pos, direction, amount, lightMult);
+    if (GetDistSqToCamera(pos) > sq(25.0f)) {
+        return;
+    }
+
+    FxPrtMult_c fxMults{ 0.5f, 0.25f, 0.0f, 1.0f, 0.3f, 0.0f, 1.0f };
+    for (auto i = amount; i > 0; i--) {
+        fxMults.m_Color.red   = RandomUnitMod() * 0.12f + 0.13f;
+        fxMults.m_Color.green = RandomUnitMod() * 0.03f + 0.12f;
+        fxMults.m_Color.blue  = RandomUnitMod() * 0.03f + 0.04f;
+        fxMults.m_fSize       = RandomUnitMod() * 0.3f + 0.7f;
+
+        CVector vel = direction * 4.0f;
+        vel.x += RandomUnitMod() * 4.0f - 2.0f;
+        vel.y += RandomUnitMod() * 4.0f - 2.0f;
+        vel.z += RandomUnitMod() * 4.0f - 2.0f;
+
+        // NOTE: Yes, the blood system is used here
+        m_Blood->AddParticle(pos, vel, 0.0f, fxMults, -1.0f, lightMult, 0.6f, false);
+    }
 }
 
 // 0x49F040
 void Fx_c::AddSparks(const CVector& origin, const CVector& direction, float force, int32 amount, CVector across, eSparkType sparksType, float spread, float life) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&, float, int32, CVector, uint8, float, float))0x49F040)(this, origin, direction, force, amount, across, sparksType, spread, life);
+    const auto distSq = GetDistSqToCamera(origin);
+    if (distSq > sq(150.0f)) {
+        return;
+    }
+    if (distSq > sq(15.0f) && (CTimer::m_FrameCounter & 1) != 0) {
+        return;
+    }
+
+    const FxPrtMult_c fxMults{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, life * 0.8f };
+    const CVector     acrossStep = across * CTimer::ms_fTimeStep;
+
+    for (auto i = 0; i < amount; i++) {
+        const auto t = 1.0f - static_cast<float>(i) / static_cast<float>(amount);
+
+        CVector vel = direction;
+        vel.x += RandomUnit() * (spread - -spread) + -spread;
+        vel.y += RandomUnit() * (spread - -spread) + -spread;
+        vel.z += RandomUnit() * (spread - -spread) + -spread;
+        vel *= force;
+
+        const CVector pos = origin - acrossStep * t;
+
+        const auto system = sparksType != SPARK_PARTICLE_SPARK2 ? m_Spark : m_Spark2;
+        system->AddParticle(pos, vel, t * 0.05f, fxMults, -1.0f, 1.2f, 0.6f, false);
+    }
 }
 
 // 0x49F300
 void Fx_c::AddTyreBurst(const CVector& posn, const CVector& velocity) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&))0x49F300)(this, posn, velocity);
+    if (GetDistSqToCamera(posn) > sq(25.0f)) {
+        return;
+    }
+
+    const FxPrtMult_c fxMults{ 1.0f, 1.0f, 1.0f, 0.4f, 0.12f, 0.0f, 0.1f };
+    for (auto i = 0; i < 4; i++) {
+        m_SmokeII3expand->AddParticle(posn, velocity, static_cast<float>(i) * 0.05f, fxMults, -1.0f, 1.2f, 0.6f, false);
+    }
 }
 
 // 0x49F3D0
 void Fx_c::AddBulletImpact(const CVector& posn, const CVector& direction, int32 bulletFxType, int32 amount, float arg4) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&, int32, int32, float))0x49F3D0)(this, posn, direction, bulletFxType, amount, arg4);
+    // NOTE: `bulletFxType` is actually a surface id, and `arg4` is the light multiplier
+    const auto fxType    = g_surfaceInfos.GetBulletFx(static_cast<SurfaceId>(bulletFxType));
+    const auto lightMult = arg4;
+
+    if (GetDistSqToCamera(posn) > sq(150.0f)) {
+        return;
+    }
+
+    switch (fxType) {
+    case BULLET_FX_SPARKS: {
+        AddSparks(posn, direction, 3.0f, amount, CVector{ 0.0f, 0.0f, 0.0f }, SPARK_PARTICLE_SPARK, 0.4f, 1.0f);
+
+        FxPrtMult_c fxMults{ 1.0f, 1.0f, 1.0f, 0.15f, 0.4f, 0.0f, 0.075f };
+        auto        count = 2;
+        if (amount >= 8) {
+            count = 1;
+            fxMults.m_Color.alpha *= 2.0f;
+        }
+        for (auto i = 0; i < count; i++) {
+            m_SmokeII3expand->AddParticle(posn, direction, static_cast<float>(i) * 0.05f, fxMults, -1.0f, lightMult, 0.6f, false);
+        }
+        break;
+    }
+    case BULLET_FX_SAND:
+    case BULLET_FX_DUST: {
+        FxPrtMult_c fxMults{ 0.81f, 0.67f, 0.57f, 0.15f, 0.4f, 0.0f, 0.3f };
+        if (fxType == BULLET_FX_DUST) {
+            fxMults.m_Color.red   = 0.6f;
+            fxMults.m_Color.green = 0.6f;
+            fxMults.m_Color.blue  = 0.6f;
+        }
+        auto count = 4;
+        if (amount >= 8) {
+            count = 2;
+            fxMults.m_Color.alpha *= 2.0f;
+        }
+        for (auto i = 0; i < count; i++) {
+            const CVector vel = direction * 0.3f;
+            m_Sand->AddParticle(posn, vel, static_cast<float>(i) * 0.05f, fxMults, -1.0f, lightMult, 0.6f, false);
+        }
+        break;
+    }
+    case BULLET_FX_WOOD: {
+        AddWood(posn, direction, static_cast<int32>(static_cast<float>(amount) * 0.5f), 1.0f);
+        break;
+    }
+    }
 }
 
 // 0x49F670
 void Fx_c::AddPunchImpact(const CVector& pos, const CVector& velocity, int32 num) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&, int32))0x49F670)(this, pos, velocity, num);
+    if (GetDistSqToCamera(pos) > sq(25.0f)) {
+        return;
+    }
+
+    const FxPrtMult_c fxMults{ 1.0f, 1.0f, 1.0f, 0.4f, 0.1f, 0.0f, 0.1f };
+    m_SmokeII3expand->AddParticle(pos, velocity, 0.0f, fxMults, -1.0f, 1.2f, 0.6f, false);
+    m_SmokeII3expand->AddParticle(pos, velocity, 0.05f, fxMults, -1.0f, 1.2f, 0.6f, false);
 }
 
 // 0x49F750
 void Fx_c::AddDebris(const CVector& pos, const RwRGBA& color, float scale, int32 amount) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const RwRGBA&, float, int32))0x49F750)(this, pos, color, scale, amount);
+    static auto& s_DebrisPrimIdx = StaticRef<int32>(0xA9ADE4);
+
+    if (GetDistSqToCamera(pos) > sq(25.0f)) {
+        return;
+    }
+
+    FxPrtMult_c fxMults{};
+    fxMults.m_Color.red   = static_cast<float>(color.red) / 255.0f;
+    fxMults.m_Color.green = static_cast<float>(color.green) / 255.0f;
+    fxMults.m_Color.blue  = static_cast<float>(color.blue) / 255.0f;
+    fxMults.m_Color.alpha = static_cast<float>(color.alpha) / 255.0f;
+    fxMults.m_fSize       = scale;
+    fxMults.m_fLife       = 0.2f;
+    fxMults.m_Rot         = (RandomUnitMod() + 1.0f) * 0.5f;
+
+    for (auto i = amount; i > 0; i--) {
+        CVector vel;
+        vel.x = RandomUnit() * 0.5f * 20.0f - 5.0f;
+        vel.y = RandomUnit() * 0.5f * 20.0f - 5.0f;
+        vel.z = RandomUnit() * 0.15f * 20.0f + 2.0f;
+
+        // Only one of the 4 debris primitives is used for each particle
+        m_Cardebris->EnablePrim(0, false);
+        m_Cardebris->EnablePrim(1, false);
+        m_Cardebris->EnablePrim(2, false);
+        m_Cardebris->EnablePrim(3, false);
+        m_Cardebris->EnablePrim(s_DebrisPrimIdx, true);
+
+        m_Cardebris->AddParticle(pos, vel, 0.0f, fxMults, -1.0f, 1.2f, 0.6f, false);
+
+        s_DebrisPrimIdx = (s_DebrisPrimIdx + 1) & 3;
+    }
 }
 
 // 0x49F970
 void Fx_c::AddGlass(const CVector& pos, const RwRGBA& color, float scale, int32 amount) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const RwRGBA&, float, int32))0x49F970)(this, pos, color, scale, amount);
+    if (GetDistSqToCamera(pos) > sq(25.0f)) {
+        return;
+    }
+
+    FxPrtMult_c fxMults{};
+    fxMults.m_Color.red   = static_cast<float>(color.red) / 255.0f;
+    fxMults.m_Color.green = static_cast<float>(color.green) / 255.0f;
+    fxMults.m_Color.blue  = static_cast<float>(color.blue) / 255.0f;
+    fxMults.m_Color.alpha = static_cast<float>(color.alpha) / 255.0f;
+    fxMults.m_fSize       = scale;
+    fxMults.m_fLife       = 0.2f;
+    fxMults.m_Rot         = (RandomUnitMod() + 1.0f) * 0.5f;
+
+    for (auto i = amount; i > 0; i--) {
+        CVector vel;
+        vel.x = RandomUnit() * 0.5f * 20.0f - 5.0f;
+        vel.y = RandomUnit() * 0.5f * 20.0f - 5.0f;
+        vel.z = RandomUnit() * 0.15f * 20.0f + 2.0f;
+
+        m_Glass->AddParticle(pos, vel, 0.0f, fxMults, -1.0f, 1.2f, 0.6f, false);
+    }
 }
 
 // 0x49FB30
 void Fx_c::AddWheelSpray(CVehicle* vehicle, CVector pos, bool bWheelsSpinning, bool bInWater, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, CVehicle*, CVector, uint8, uint8, float))0x49FB30)(this, vehicle, pos, bWheelsSpinning, bInWater, lightMult);
+    if (!ShouldAddWheelFxThisFrame(vehicle, pos)) {
+        return;
+    }
+
+    const auto& moveSpeed = vehicle->GetMoveSpeed();
+    if (std::abs(moveSpeed.Magnitude()) <= 0.01f && !bWheelsSpinning) {
+        return;
+    }
+
+    FxPrtMult_c fxMults{ 1.0f, 1.0f, 1.0f, 0.05f, 0.0f, 1.0f, 0.0f };
+
+    const auto speedMult = bWheelsSpinning
+        ? 1.0f
+        : std::min(moveSpeed.Magnitude() * 2.0f, 1.0f);
+
+    fxMults.m_Color.alpha = (speedMult + 1.0f) * (bInWater ? 0.2f : 0.15f);
+    fxMults.m_fLife       = 0.08f;
+    fxMults.m_fSize       = (speedMult + 1.0f) * 0.2f;
+
+    const auto velRange = (speedMult + 1.0f) * 10.0f;
+    const auto velMin   = 30.0f - velRange;
+    const auto velMult  = RandomUnit() * (velRange + 30.0f - velMin) + velMin;
+    const CVector baseVel = moveSpeed * velMult;
+
+    const auto count = std::max(1, static_cast<int32>((moveSpeed * CTimer::ms_fTimeStep).Magnitude()));
+    for (auto i = 0; i < count; i++) {
+        const auto    step   = 1.0f / static_cast<float>(count);
+        const CVector offset = moveSpeed * step * static_cast<float>(i) * CTimer::ms_fTimeStep;
+
+        CVector prtPos = pos - offset;
+        prtPos.z += 0.25f;
+
+        CVector vel = baseVel;
+        vel.z += (RandomUnit() + 1.0f) * speedMult;
+
+        m_BoatSplash->AddParticle(prtPos, vel, 0.0f, fxMults, -1.0f, lightMult, 0.6f, false);
+    }
+}
+
+// NOTSA - Common code of AddWheelGrass/Gravel/Mud (They only differ in the color)
+static void AddWheelDirt(FxSystem_c* system, CVehicle* vehicle, const CVector& pos, float lightMult, float red, float green, float blue) {
+    // Only for vehicles driven by one of the players
+    if (vehicle->m_pDriver != FindPlayerPed(0) && vehicle->m_pDriver != FindPlayerPed(1)) {
+        return;
+    }
+    if (!ShouldAddWheelFxThisFrame(vehicle, pos)) {
+        return;
+    }
+
+    FxPrtMult_c fxMults{ red, green, blue, 1.0f, 0.0f, 0.0f, 0.05f };
+    for (auto i = 0; i < 3; i++) {
+        fxMults.m_fSize = RandomUnit() * 0.03f + 0.03f;
+
+        const auto& moveSpeed = vehicle->GetMoveSpeed();
+
+        CVector vel;
+        vel.x = RandomUnit() * (moveSpeed.x * -1.5f);
+        vel.y = RandomUnit() * (moveSpeed.y * -1.5f);
+        vel.z = RandomUnit() * 1.5f + 2.0f;
+
+        CVector prtPos = pos;
+        prtPos.x = RandomUnit() * 0.4f + prtPos.x - 0.2f;
+        prtPos.y = RandomUnit() * 0.4f + prtPos.y - 0.2f;
+
+        system->AddParticle(prtPos, vel, 0.0f, fxMults, -1.0f, lightMult, 0.6f, false);
+    }
 }
 
 // 0x49FF20
 void Fx_c::AddWheelGrass(CVehicle* vehicle, CVector pos, bool bWheelsSpinning, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, CVehicle*, CVector, uint8, float))0x49FF20)(this, vehicle, pos, bWheelsSpinning, lightMult);
+    AddWheelDirt(m_WheelDirt, vehicle, pos, lightMult, 0.03f, 0.09f, 0.03f);
 }
 
 // 0x4A0170
 void Fx_c::AddWheelGravel(CVehicle* vehicle, CVector pos, bool bWheelsSpinning, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, CVehicle*, CVector, uint8, float))0x4A0170)(this, vehicle, pos, bWheelsSpinning, lightMult);
+    AddWheelDirt(m_WheelDirt, vehicle, pos, lightMult, 0.25f, 0.25f, 0.25f);
 }
 
 // 0x4A03C0
 void Fx_c::AddWheelMud(CVehicle* vehicle, CVector pos, bool bWheelsSpinning, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, CVehicle*, CVector, uint8, float))0x4A03C0)(this, vehicle, pos, bWheelsSpinning, lightMult);
+    AddWheelDirt(m_WheelDirt, vehicle, pos, lightMult, 0.25f, 0.12f, 0.06f);
+}
+
+// NOTSA - Common code of AddWheelSand/Dust (They only differ in the color, and how the life is calculated)
+static void AddWheelSandOrDust(Fx_c& fx, CVehicle* vehicle, const CVector& pos, bool bWheelsSpinning, float lightMult, bool isDust) {
+    const auto playerVeh = FindPlayerVehicle();
+    const auto distSq    = GetDistSqToCamera(pos);
+    if (distSq > sq(25.0f)) {
+        return;
+    }
+
+    const auto frame        = CTimer::m_FrameCounter + vehicle->m_nModelIndex;
+    const auto isNearPlayer = distSq <= sq(8.0f) && playerVeh;
+    if (fx.m_FxQuality >= FX_QUALITY_MEDIUM) {
+        if ((frame & 1) != 0) {
+            return;
+        }
+        if (!isNearPlayer && (frame & 3) != 0) {
+            return;
+        }
+    } else if (fx.m_FxQuality == FX_QUALITY_LOW) {
+        if ((frame & 3) != 0) {
+            return;
+        }
+        if (!isNearPlayer && (frame & 7) != 0) {
+            return;
+        }
+    }
+
+    auto fxMults = isDust
+        ? FxPrtMult_c{ 0.51f, 0.44f, 0.31f, 0.5f, 1.0f, 0.0f, 0.0f }
+        : FxPrtMult_c{ 0.81f, 0.67f, 0.57f, 0.5f, 1.0f, 0.0f, 0.0f };
+
+    const auto  gasPedal  = std::abs(vehicle->m_GasPedal);
+    const auto& moveSpeed = vehicle->GetMoveSpeed();
+    const auto  speedMult = bWheelsSpinning
+        ? 1.0f
+        : std::min(moveSpeed.Magnitude() * 2.0f, 1.0f);
+
+    fxMults.m_fLife = isDust
+        ? speedMult * 0.05f + 0.1f
+        : (speedMult + 1.0f) * 0.1f;
+    fxMults.m_fSize = speedMult * 0.9f + 0.1f;
+
+    float countMult;
+    switch (vehicle->m_nVehicleSubType) {
+    case VEHICLE_TYPE_BMX:
+        countMult = 2.0f;
+        fxMults.m_fSize *= 0.25f;
+        break;
+    case VEHICLE_TYPE_BIKE:
+    case VEHICLE_TYPE_QUAD:
+        countMult = 2.0f;
+        fxMults.m_fSize *= 0.5f;
+        break;
+    default:
+        countMult = 1.5f;
+        fxMults.m_fSize *= 0.7f;
+        break;
+    }
+
+    const CVector step   = moveSpeed * CTimer::ms_fTimeStep;
+    const auto    count  = std::max(1, static_cast<int32>(step.Magnitude() * countMult));
+    const auto    velZ   = speedMult + 0.8f - 0.2f;
+    for (auto i = 0; i < count; i++) {
+        CVector vel;
+        vel.x = RandomUnit() * (gasPedal * vehicle->GetMoveSpeed().x * -40.0f);
+        vel.y = RandomUnit() * (gasPedal * vehicle->GetMoveSpeed().y * -40.0f);
+        vel.z = RandomUnit() * velZ + 0.2f;
+
+        const auto    t      = 1.0f - static_cast<float>(i) / static_cast<float>(count);
+        const CVector prtPos = pos - step * t;
+
+        fx.m_Sand->AddParticle(prtPos, vel, 0.0f, fxMults, -1.0f, lightMult, 0.7f, false);
+    }
 }
 
 // 0x4A0610
 void Fx_c::AddWheelSand(CVehicle* vehicle, CVector pos, bool bWheelsSpinning, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, CVehicle*, CVector, uint8, float))0x4A0610)(this, vehicle, pos, bWheelsSpinning, lightMult);
+    AddWheelSandOrDust(*this, vehicle, pos, bWheelsSpinning, lightMult, false);
 }
 
 // 0x4A09C0
 void Fx_c::AddWheelDust(CVehicle* vehicle, CVector pos, bool bWheelsSpinning, float lightMult) {
-    ((void(__thiscall*)(Fx_c*, CVehicle*, CVector, uint8, float))0x4A09C0)(this, vehicle, pos, bWheelsSpinning, lightMult);
+    AddWheelSandOrDust(*this, vehicle, pos, bWheelsSpinning, lightMult, true);
 }
 
 // 0x4A0D70
 void Fx_c::TriggerWaterHydrant(const CVector& pos) {
-    ((void(__thiscall*)(Fx_c*, const CVector&))0x4A0D70)(this, pos);
+    CreateFxWithinCameraRange("water_hydrant", pos, 625.0f);
 }
 
 // 0x4A0DE0
 void Fx_c::TriggerGunshot(CEntity* entity, const CVector& origin, const CVector& target, bool doGunflash) {
-    ((void(__thiscall*)(Fx_c*, CEntity*, const CVector&, const CVector&, bool))0x4A0DE0)(this, entity, origin, target, doGunflash);
+    if (GetDistSqToCamera(origin) > sq(25.0f)) {
+        return;
+    }
+
+    RwMatrix* createdMat = nullptr; // Matrix we have to destroy afterwards
+    RwMatrix* parentMat;
+    CVector   pos;
+    if (entity) {
+        // Transform the origin into the entity's space
+        const CVector offset = origin - entity->GetPosition();
+        pos = entity->GetMatrix().InverseTransformVector(offset);
+
+        if (!entity->GetRwObject()) {
+            return;
+        }
+        parentMat = entity->GetRwMatrix();
+    } else {
+        createdMat = g_fxMan.FxRwMatrixCreate();
+        CreateMatFromVec(createdMat, &origin, &target);
+        pos       = CVector{ 0.0f, 0.0f, 0.0f };
+        parentMat = createdMat;
+    }
+
+    if (parentMat) {
+        if (doGunflash) {
+            if (const auto fx = g_fxMan.CreateFxSystem("gunflash", pos, parentMat, false)) {
+                if (!entity) {
+                    fx->CopyParentMatrix();
+                }
+                fx->PlayAndKill();
+            }
+        }
+
+        if (const auto fx = g_fxMan.CreateFxSystem("gunsmoke", pos, parentMat, false)) {
+            if (!entity) {
+                fx->CopyParentMatrix();
+            }
+            fx->PlayAndKill();
+        }
+    }
+
+    if (createdMat) {
+        g_fxMan.FxRwMatrixDestroy(createdMat);
+    }
 }
 
 // 0x4A0FA0
 void Fx_c::TriggerTankFire(const CVector& pos, const CVector& dir) {
-    ((void(__thiscall*)(Fx_c*, const CVector&, const CVector&))0x4A0FA0)(this, pos, dir);
+    if (GetDistSqToCamera(pos) > sq(25.0f)) {
+        return;
+    }
+
+    const auto mat = g_fxMan.FxRwMatrixCreate();
+    CreateMatFromVec(mat, &pos, &dir);
+
+    if (const auto fx = g_fxMan.CreateFxSystem("tank_fire", CVector{ 0.0f, 0.0f, 0.0f }, mat, false)) {
+        fx->CopyParentMatrix();
+        fx->PlayAndKill();
+    }
+
+    g_fxMan.FxRwMatrixDestroy(mat);
 }
 
 // 0x4A1070
