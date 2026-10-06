@@ -8,7 +8,8 @@
 struct RwRGBA;
 class FxSystem_c;
 
-class FxEmitterPrt_c : public Particle_c, ListItem_c<FxEmitterPrt_c> {
+// NB: Only `Particle_c` is a list item (SA allocates these with a stride of 0x3C - see `FxManager_c::Init` @ 0x4A98E0)
+class FxEmitterPrt_c : public Particle_c {
 public:
     CRGBA m_MultColor;
     FixedFloat<uint8, 255.0f> m_MultSize;
@@ -29,4 +30,4 @@ public:
 
     static void* operator new[](size_t size);
 };
-VALIDATE_SIZE(FxEmitterPrt_c, 0x44);
+VALIDATE_SIZE(FxEmitterPrt_c, 0x3C);
