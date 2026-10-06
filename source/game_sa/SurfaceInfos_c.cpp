@@ -56,6 +56,7 @@ void SurfaceInfos_c::InjectHooks()
     RH_ScopedInstall(IsAudioLongGrass, 0x55EB10);
     RH_ScopedInstall(IsAudioTile, 0x55EB30);
     RH_ScopedInstall(GetAdhesiveLimit, 0x55EB50);
+    RH_ScopedInstall(LoadAdhesiveLimits, 0x55D0E0);
 }
 
 // 0x55D220
@@ -252,27 +253,52 @@ SurfaceId SurfaceInfos_c::GetSurfaceIdFromName(Const char* cName)
 // 0x55D0E0
 void SurfaceInfos_c::LoadAdhesiveLimits()
 {
-    return plugin::CallMethod<0x55D0E0, SurfaceInfos_c*>(this);
-
     CFileMgr::SetDir("");
     auto* file = CFileMgr::OpenFile("data\\surface.dat", "rb");
 #if FIX_BUGS
     if (!file) {
         NOTSA_LOG_DEBUG("[SurfaceInfos_c] Failed to open surface.dat");
-        CFileMgr::CloseFile(file);
         return;
     }
 #endif
-    for (const char* line = CFileLoader::LoadLine(file); line; line = CFileLoader::LoadLine(file)) {
-        if (*line == ';' || !*line)
-            continue;
+    const auto IsSep = [](char c) { return c == ' ' || c == '\t'; };
 
-        char value[4];
-        VERIFY(sscanf_s(line, "%s", SCANF_S_STR(value)) == 1);
-        for (auto i = *line; i != ' '; i = *++line) {
-            if (i == '\t')
-                break;
+    size_t row = 0;
+    for (const char* line = CFileLoader::LoadLine(file); line; line = CFileLoader::LoadLine(file)) {
+        if (*line == ';' || !*line) {
+            continue;
         }
+
+        // Group name (unused)
+        char name[256];
+        VERIFY(sscanf_s(line, "%s", SCANF_S_STR(name)) == 1);
+#ifdef FIX_BUGS
+        while (*line && !IsSep(*line)) { // Original doesn't check for the null terminator here
+#else
+        while (!IsSep(*line)) {
+#endif
+            line++;
+        }
+
+        // The file contains only the lower triangle of the (symmetric) matrix
+        assert(row < m_adhesiveLimits.size());
+        for (size_t col = 0; col <= row; col++) {
+            while (IsSep(*line)) {
+                line++;
+            }
+
+            float value = 0.f;
+            if (*line != '-') {
+                (void)sscanf_s(line, "%f", &value);
+            }
+            while (*line && !IsSep(*line)) {
+                line++;
+            }
+
+            m_adhesiveLimits[row][col] = value;
+            m_adhesiveLimits[col][row] = value;
+        }
+        row++;
     }
     CFileMgr::CloseFile(file);
 }
