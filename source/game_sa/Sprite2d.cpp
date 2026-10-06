@@ -48,6 +48,9 @@ void CSprite2d::InjectHooks() {
     RH_ScopedInstall(Draw2DPolygon, 0x7285B0);
     RH_ScopedInstall(DrawBarChart, 0x728640);
     RH_ScopedInstall(DrawCircleAtNearClip, 0x727D60);
+    RH_ScopedInstall(SetVerticesForSniper, 0x727FD0);
+    RH_ScopedInstall(OffsetTexCoordForBilinearFiltering, 0x728150);
+    RH_ScopedInstall(AddToBuffer, 0x728200);
 }
 
 CSprite2d::CSprite2d()
@@ -404,20 +407,59 @@ void CSprite2d::DrawCircleAtNearClip(const CVector2D& posn, float size, const CR
 }
 
 // this makes some trick with sprite z position (z = NearScreenZ + 0.000001).
+// 0x727FD0
 void CSprite2d::SetVerticesForSniper(const CRect& posn, const CRGBA& color1, const CRGBA& color2, const CRGBA& color3, const CRGBA& color4)
 {
-    ((void(__cdecl*)(const CRect&, const CRGBA&, const CRGBA&, const CRGBA&, const CRGBA&))0x727FD0)(posn, color1, color2, color3, color4);
+    const auto screenZ = NearScreenZ + 0.000001f;
+
+    const auto SetVertex = [&](size_t i, float x, float y, float u, float v, const CRGBA& color) {
+        RwIm2DVertexSetScreenX(&maVertices[i], x);
+        RwIm2DVertexSetScreenY(&maVertices[i], y);
+        RwIm2DVertexSetScreenZ(&maVertices[i], screenZ);
+        RwIm2DVertexSetRecipCameraZ(&maVertices[i], RecipNearClip);
+        RwIm2DVertexSetU(&maVertices[i], u, RecipNearClip);
+        RwIm2DVertexSetV(&maVertices[i], v, RecipNearClip);
+        RwIm2DVertexSetIntRGBA(&maVertices[i], color.r, color.g, color.b, color.a);
+    };
+    SetVertex(0, posn.left,  posn.bottom, 0.f, 0.f, color3);
+    SetVertex(1, posn.right, posn.bottom, 1.f, 0.f, color4);
+    SetVertex(2, posn.right, posn.top,    1.f, 1.f, color2);
+    SetVertex(3, posn.left,  posn.top,    0.f, 1.f, color1);
 }
 
+// 0x728150
 void CSprite2d::OffsetTexCoordForBilinearFiltering(float width, float height)
 {
-    ((void(__cdecl*)(float, float))0x728150)(width, height);
+    const auto offsetU = 1.f / (width + width);
+    const auto offsetV = 1.f / (height + height);
+    for (auto& vertex : maVertices | rngv::take(4)) {
+        vertex.u += offsetU;
+        vertex.v += offsetV;
+    }
 }
 
 // add vertices to buffer
+// 0x728200
 void CSprite2d::AddToBuffer(const CRect& posn, const CRGBA& color, float u1, float v1, float u2, float v2, float u3, float v3, float u4, float v4)
 {
-    ((void(__cdecl*)(const CRect&, const CRGBA&, float, float, float, float, float, float, float, float))0x728200)(posn, color, u1, v1, u2, v2, u3, v3, u4, v4);
+    const auto vtx = nextBufferVertex;
+    SetVertices(&aRadiosityVertexBuffer[vtx], posn, color, color, color, color, u1, v1, u2, v2, u3, v3, u4, v4);
+
+    const auto idx = nextBufferIndex;
+    aTempBufferIndices[idx + 0] = (RxVertexIndex)(vtx + 0);
+    aTempBufferIndices[idx + 1] = (RxVertexIndex)(vtx + 1);
+    aTempBufferIndices[idx + 2] = (RxVertexIndex)(vtx + 2);
+    aTempBufferIndices[idx + 3] = (RxVertexIndex)(vtx + 3);
+    aTempBufferIndices[idx + 4] = (RxVertexIndex)(vtx + 0);
+    aTempBufferIndices[idx + 5] = (RxVertexIndex)(vtx + 2);
+
+    nextBufferVertex = vtx + 4;
+    nextBufferIndex  = idx + 6;
+
+    // Flush if there's no space for another quad
+    if (nextBufferVertex > TOTAL_RADIOSITY_VERTEX_BUFFER || nextBufferIndex > TOTAL_TEMP_BUFFER_INDICES - 6) {
+        RenderVertexBuffer();
+    }
 }
 
 // non-textured polygon
