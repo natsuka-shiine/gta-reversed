@@ -2807,7 +2807,7 @@ auto IsCharInTaxi(CPed& ped) {
 auto LoadCharDecisionMaker(CRunningScript& S, int32 type) { // TODO: return ScriptThing<CDecisionMaker>
     char pedDMName[1024];
     CDecisionMakerTypesFileLoader::GetPedDMName(type, pedDMName);
-    const auto id = CDecisionMakerTypesFileLoader::LoadDecisionMaker(pedDMName, DEFAULT_DECISION_MAKER, S.m_UsesMissionCleanup);
+    const auto id = CDecisionMakerTypesFileLoader::LoadDecisionMaker(pedDMName, PED_DECISION_MAKER, S.m_UsesMissionCleanup);
     const auto handle = CTheScripts::GetNewUniqueScriptThingIndex(id, SCRIPT_THING_DECISION_MAKER);
     if (S.m_UsesMissionCleanup) {
         CTheScripts::MissionCleanUp.AddEntityToList(handle, MISSION_CLEANUP_ENTITY_TYPE_DECISION_MAKER);
@@ -2829,8 +2829,8 @@ auto LoadCharDecisionMaker(CRunningScript& S, int32 type) { // TODO: return Scri
 auto SetCharDecisionMaker(CPed& ped, int32 scriptHandleOfDM) { // TODO: Use `ScriptThing<CDecisionMaker>` instead of `int32` for `scriptHandleOfDM`
     ped.GetIntelligence()->SetPedDecisionMakerType(
         scriptHandleOfDM == -1
-            ? -1
-            : CTheScripts::GetActualScriptThingIndex(scriptHandleOfDM, SCRIPT_THING_DECISION_MAKER)
+            ? eDecisionMakerType::UNKNOWN
+            : (eDecisionMakerType)(CTheScripts::GetActualScriptThingIndex(scriptHandleOfDM, SCRIPT_THING_DECISION_MAKER))
     );
 }
 
@@ -3283,9 +3283,33 @@ bool IsCharUsingMapAttractor(CPed& ped) {
     return GetPedAttractorManager()->IsPedRegisteredWithEffect(&ped);
 }
 
-// todo: move that to somewhere else
+// 0x64F110
+// NOTE: This address is `CCarEnterExit::ComputeTargetDoorToExit` (which is where the hook is installed), this is a 1:1 copy of the original code
 eTargetDoor ComputeTargetDoorToExit(const CVehicle& vehicle, const CPed& ped) {
-    return plugin::CallAndReturn<eTargetDoor, 0x64F110, const CVehicle&, const CPed&>(vehicle, ped);
+    if (vehicle.m_pDriver == &ped) {
+        return TARGET_DOOR_DRIVER;
+    }
+
+    switch (vehicle.m_pHandlingData->GetAnimGroupId()) {
+    case ANIM_GROUP_COACHCARANIMS:
+    case ANIM_GROUP_BUSCARANIMS:
+        return TARGET_DOOR_FRONT_RIGHT; // Buses have only 1 door
+    default:
+        break;
+    }
+
+    if (vehicle.m_apPassengers[0] == &ped) {
+        return vehicle.IsBike() || vehicle.m_pHandlingData->m_bTandemSeats
+            ? TARGET_DOOR_REAR_LEFT
+            : TARGET_DOOR_FRONT_RIGHT;
+    }
+    if (vehicle.m_apPassengers[1] == &ped) {
+        return TARGET_DOOR_REAR_LEFT;
+    }
+    if (vehicle.m_apPassengers[2] == &ped) {
+        return TARGET_DOOR_REAR_RIGHT;
+    }
+    return static_cast<eTargetDoor>(-1);
 }
 
 /*
