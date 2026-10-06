@@ -12,8 +12,8 @@ void CTaskComplexTrackEntity::InjectHooks() {
     RH_ScopedInstall(Destructor, 0x65F460);
 
     RH_ScopedInstall(SetOffsetPos, 0x65F760, {.State = HS::RedirectToGTA, .Locked = true});
-    RH_ScopedInstall(CalcTargetPos, 0x65F780, {.State = HS::RedirectToGTA, .Locked = true});
-    RH_ScopedInstall(CalcMoveRatio, 0x65F930, {.State = HS::RedirectToGTA, .Locked = true});
+    RH_ScopedInstall(CalcTargetPos, 0x65F780);
+    RH_ScopedInstall(CalcMoveRatio, 0x65F930);
 
     RH_ScopedVMTInstall(Clone, 0x65F4E0);
     RH_ScopedVMTInstall(GetTaskType, 0x65F450);
@@ -55,12 +55,55 @@ void CTaskComplexTrackEntity::SetOffsetPos(CVector posn) {
 
 // 0x65F780
 void CTaskComplexTrackEntity::CalcTargetPos(CPed* ped) {
-    plugin::CallMethod<0x65F780, CTaskComplexTrackEntity*, CPed*>(this, ped);
+    m_goToPos = m_toTrack->GetPosition();
+
+    if (f) { // Offset is local to the entity
+        const auto& right = m_toTrack->GetMatrix().GetRight();
+        const auto& fwd   = m_toTrack->GetMatrix().GetForward();
+        m_goToPos += right * m_offsetPosn.x;
+        m_goToPos += fwd * m_offsetPosn.y;
+    } else { // World space offset (Z is ignored)
+        m_goToPos.x += m_offsetPosn.x;
+        m_goToPos.y += m_offsetPosn.y;
+    }
+
+    // Predict the position of moving entities
+    if (m_toTrack->GetIsTypeVehicle() || m_toTrack->GetIsTypePed()) {
+        m_goToPos += static_cast<CPhysical*>(m_toTrack)->GetMoveSpeed() * CTimer::GetTimeStep();
+    }
+
+    const auto& pedPos = ped->GetPosition();
+    m_distToTargetSq = sq(m_goToPos.y - pedPos.y) + sq(m_goToPos.x - pedPos.x);
 }
 
 // 0x65F930
 void CTaskComplexTrackEntity::CalcMoveRatio(CPed* ped) {
-    plugin::CallMethod<0x65F930, CTaskComplexTrackEntity*, CPed*>(this, ped);
+    constexpr auto MIN_DIST = 0.2f; // 0x65F93x (Originally static variables with init guards @ 0xC18D08)
+    constexpr auto MID_DIST = 1.0f;
+    constexpr auto MAX_DIST = 5.0f;
+    constexpr auto MAX_RATIO_CHANGE = 0.2f;
+
+    if (m_distToTargetSq < sq(MIN_DIST)) {
+        float40 = 0.0f;
+    } else if (m_distToTargetSq > sq(MAX_DIST)) {
+        float40 = 1.0f;
+    } else {
+        const auto dist = std::sqrt(m_distToTargetSq);
+        float40 = m_distToTargetSq < sq(MID_DIST)
+            ? (dist - MIN_DIST) * (1.0f / (MID_DIST - MIN_DIST)) * 0.5f
+            : (dist - MID_DIST) * (1.0f / (MAX_DIST - MID_DIST)) * 0.5f + 0.5f;
+    }
+
+    float40 = std::sqrt(float40) * 3.0f;
+    if (!a && float40 > 2.0f) { // Not allowed to sprint
+        float40 = 2.0f;
+    }
+
+    if (float40 - m_fMoveRatio > MAX_RATIO_CHANGE) {
+        m_fMoveRatio += MAX_RATIO_CHANGE;
+    } else {
+        m_fMoveRatio = float40;
+    }
 }
 
 // 0x65F4C0
