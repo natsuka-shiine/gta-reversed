@@ -2,6 +2,7 @@
 
 #include "CustomBuildingDNPipeline.h"
 #include "CustomCarEnvMapPipeline.h"
+#include <PipelinesCommon.hpp>
 
 auto& s_Magic1 = StaticRef<uint32>(0xC02C14);
 auto& s_Magic2 = StaticRef<uint32>(0xC02C18);
@@ -224,14 +225,122 @@ uint32 CCustomBuildingDNPipeline::UsesThisPipeline(RpAtomic* atomic) {
         - atomic->pipeline;
 }
 
+// NOTSA: The game reads the shininess as an unsigned byte here (`movzx`), while `CustomEnvMapPipeMaterialData::Shininess` is declared as signed.
+static float GetEnvMapShininessUnsigned(const CustomEnvMapPipeMaterialData* data) {
+    return static_cast<float>(*reinterpret_cast<const uint8*>(&data->Shininess)) / 255.0f;
+}
+
 // 0x5D7120
 RpMaterial* CCustomBuildingDNPipeline::CustomPipeMaterialSetup(RpMaterial* material, void* data) {
-    return plugin::CallAndReturn<RpMaterial*, 0x5D7120, RpMaterial*, void*>(material, data);
+    CCustomCarEnvMapPipeline::SetMaterialFlags(material, CCustomCarEnvMapPipeline::MF_NONE);
+
+    auto** const envMapData = &CCustomCarEnvMapPipeline::EnvMapPlGetData(material);
+
+    if (RpMatFXMaterialGetEffects(material) == rpMATFXEFFECTENVMAP) {
+        if (auto* const fxData = SetFxEnvTexture(envMapData)) {
+            fxData->Texture = (MATFXD3D9ENVMAPGETDATA(material, 0))->texture;
+            if (fxData->Texture) {
+                RwTextureSetAddressing(fxData->Texture, rwTEXTUREADDRESSWRAP);
+                RwTextureSetFilterMode(fxData->Texture, rwFILTERLINEAR);
+            }
+        }
+    }
+
+    const bool bHasShine = *envMapData
+        && GetEnvMapShininessUnsigned(*envMapData) != 0.0f
+        && (*envMapData)->Texture;
+
+    CCustomCarEnvMapPipeline::SetMaterialFlags(
+        material,
+        (CCustomCarEnvMapPipeline::GetMaterialFlags(material) & ~0b111u) | (bHasShine ? CCustomCarEnvMapPipeline::MF_HAS_SHINE_CAM : CCustomCarEnvMapPipeline::MF_NONE)
+    );
+
+    return material;
 }
 
 // 0x5D6480
 void CCustomBuildingDNPipeline::CustomPipeRenderCB(RwResEntry* entry, void* object, uint8 type, uint32 flags) {
-    plugin::Call<0x5D6480, RwResEntry*, void*, uint8, uint32>(entry, object, type, flags);
+    // Texture transform matrix for the env map - only written to, never actually set as a transform (on Windows)
+    static auto& s_EnvMapTexMatrix = StaticRef<D3DMATRIX>(0xC02C28);
+
+    _rwD3D9EnableClippingIfNeeded(object, type);
+
+    DWORD isLightingEnabled = 0;
+    RwD3D9GetRenderState(D3DRS_LIGHTING, &isLightingEnabled);
+
+    const auto geoHasNoLighting = !isLightingEnabled && !(flags & rxGEOMETRY_PRELIT);
+    if (geoHasNoLighting) {
+        RwD3D9SetTexture(NULL, 0);
+        RwD3D9SetRenderState(D3DRS_TEXTUREFACTOR, 0xFF000000);
+        RwD3D9SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG2);
+        RwD3D9SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+        RwD3D9SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+        RwD3D9SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+    }
+
+    auto* const header = (RxD3D9ResEntryHeader*)(entry + 1);
+    auto* const meshes = (RxD3D9InstanceData*)(header + 1);
+
+    if (const auto ib = header->indexBuffer) {
+        RwD3D9SetIndices(ib);
+    }
+
+    _rwD3D9SetStreams(header->vertexStream, header->useOffsets);
+    RwD3D9SetVertexDeclaration(header->vertexDeclaration);
+
+    for (RwUInt32 i = 0; i < header->numMeshes; i++) {
+        auto* const mesh       = &meshes[i];
+        auto* const mat        = mesh->material;
+        const auto  envMapData = CCustomCarEnvMapPipeline::EnvMapPlGetData(mat);
+        const auto  matFlags   = CCustomCarEnvMapPipeline::GetMaterialFlags(mat);
+
+        RwD3D9SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+        RwD3D9SetTextureStageState(2, D3DTSS_COLOROP, D3DTOP_DISABLE);
+
+        if (matFlags & CCustomCarEnvMapPipeline::MF_HAS_SHINE_CAM) { // 0x5D6580
+            RwRenderStateSet(rwRENDERSTATETEXTUREADDRESS, RWRSTATE(rwTEXTUREADDRESSWRAP));
+
+            s_EnvMapTexMatrix._11 = envMapData->Scale.x;
+            s_EnvMapTexMatrix._22 = envMapData->Scale.y;
+            s_EnvMapTexMatrix._33 = 1.0f;
+            s_EnvMapTexMatrix._44 = 1.0f;
+
+            RwD3D9SetTexture(envMapData->Texture, 1);
+
+            const auto shine = (uint32)std::min((int32)(GetEnvMapShininessUnsigned(envMapData) * 254.0f), 255);
+            RwD3D9SetRenderState(D3DRS_TEXTUREFACTOR, D3DCOLOR_ARGB(0xFF, shine, shine, shine));
+
+            RwD3D9SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_MULTIPLYADD);
+            RwD3D9SetTextureStageState(1, D3DTSS_COLORARG0, D3DTA_CURRENT);
+            RwD3D9SetTextureStageState(1, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+            RwD3D9SetTextureStageState(1, D3DTSS_COLORARG2, D3DTA_DIFFUSE); // NOTE: Not `D3DTA_TFACTOR` (unlike in `CCustomBuildingPipeline`)
+
+            RwD3D9SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_SELECTARG2);
+            RwD3D9SetTextureStageState(1, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+            RwD3D9SetTextureStageState(1, D3DTSS_ALPHAARG2, D3DTA_CURRENT);
+
+            RwD3D9SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1 | D3DTSS_TCI_CAMERASPACENORMAL);
+            RwD3D9SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+
+            RwD3D9SetTextureStageState(2, D3DTSS_COLOROP, D3DTOP_DISABLE);
+        }
+
+        RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, RWRSTATE(mesh->vertexAlpha || mesh->material->color.alpha != 0xFF));
+
+        if (geoHasNoLighting) {
+            RxD3D9InstanceDataRender(header, mesh);
+        } else {
+            if (isLightingEnabled) {
+                RwD3D9SetSurfaceProperties(&mesh->material->surfaceProps, &mesh->material->color, flags);
+            }
+            RxD3D9InstanceDataRenderLighting(header, mesh, flags, mesh->material->texture);
+        }
+    }
+
+    RwD3D9SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+    RwD3D9SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+    RwD3D9SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
+    RwD3D9SetTextureStageState(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 }
 
 // 0x5D6E90
@@ -302,5 +411,7 @@ void CCustomBuildingDNPipeline::InjectHooks() {
     RH_ScopedInstall(DestroyPipe, 0x5D5FA0);
     RH_ScopedInstall(CreateCustomObjPipe, 0x5D6750);
     RH_ScopedInstall(CustomPipeAtomicSetup, 0x5D71C0);
+    RH_ScopedInstall(CustomPipeMaterialSetup, 0x5D7120);
+    RH_ScopedInstall(CustomPipeRenderCB, 0x5D6480);
     RH_ScopedInstall(SetFxEnvTexture, 0x5D9570);
 }
