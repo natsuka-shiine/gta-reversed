@@ -42,6 +42,8 @@ public:
 
     auto GetStrength() const { return m_Strength; }
 
+    void SetRemovalDist(uint8 dist) { m_RemovalDist = dist; }
+
     // NOTSA funcs:
     auto GetFireParticleNameForStrength() const;
     void DestroyFx();
