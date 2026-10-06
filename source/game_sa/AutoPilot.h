@@ -50,8 +50,8 @@ public:
     CNodeAddress        m_currentAddress;
     CNodeAddress        m_startingRouteNode;
     CNodeAddress        m_endingRouteNode;
-    int32               field_C;
-    uint32              m_nSpeedScaleFactor;
+    int32               m_timeToLeaveLink;
+    int32               m_timeToGetToNextLink;
     CCarPathLinkAddress m_nCurrentPathNodeInfo;
     CCarPathLinkAddress m_nNextPathNodeInfo;
     CCarPathLinkAddress m_nPreviousPathNodeInfo;
@@ -115,6 +115,8 @@ public:
     int8            m_vehicleRecordingId;
     bool            m_bPlaneDogfightSomething;
     int16           field_96;
+
+    static void InjectHooks();
 
     CAutoPilot();
 
