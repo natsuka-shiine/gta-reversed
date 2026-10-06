@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TaskSimple.h"
+#include "TaskTimer.h"
 
 class CVehicle;
 class CTaskUtilityLineUpPedWithCar;
@@ -10,10 +11,7 @@ public:
     CVehicle*                     m_pVehicle;
     CAnimBlendAssociation*        m_pAnimCloseDoorRolling;
     CTaskUtilityLineUpPedWithCar* m_pTaskUtilityLineUpPedWithCar;
-    CTaskTimer*                   m_TaskTimer;
-    int32                         field_18;
-    char                          field_1C;
-    char                          field_1D;
+    CTaskTimer                    m_LeaveCarTimer; // Used for passengers of driverless cars to take over the wheel (was: `CTaskTimer* m_TaskTimer; int32 field_18; char field_1C, field_1D;`)
     int32                         m_nBoppingStartTime;
     int32                         field_24;
     int32                         m_nBoppingEndTime;  // Seemingly not a tick count, but rather the bopping interval
@@ -58,6 +56,7 @@ eTaskType GetTaskType() const override { return Type; }
     void ProcessHeadBopping(CPed* ped, bool a3, float a4);
     void ProcessArmBopping(CPed* pPed, bool a3, float a4);
     void ProcessBopping(CPed* ped, bool a3);
+    void StartCloseDoorRolling(CPed* ped);
 
     [[nodiscard]] auto GetVehicle() const { return m_pVehicle; }
 
