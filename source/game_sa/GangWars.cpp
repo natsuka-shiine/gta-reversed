@@ -15,6 +15,7 @@
 #include "TaskComplexDriveWander.h"
 #include "TaskSimpleCarDrive.h"
 #include "TaskComplexWanderGang.h"
+#include "TaskSimpleGangDriveBy.h"
 #include "Hud.h"
 
 void CGangWars::InjectHooks() {
@@ -22,14 +23,14 @@ void CGangWars::InjectHooks() {
     RH_ScopedCategoryGlobal();
 
     RH_ScopedInstall(InitAtStartOfGame, 0x443920);
-    RH_ScopedInstall(AddKillToProvocation, 0x443950, { .Reversed = false });                  // ?
+    RH_ScopedInstall(AddKillToProvocation, 0x443950);
     RH_ScopedInstall(AttackWaveOvercome, 0x445B30);
     RH_ScopedInstall(CalculateTimeTillNextAttack, 0x443DB0);
     RH_ScopedInstall(CanPlayerStartAGangWarHere, 0x443F80);
     RH_ScopedInstall(CheerVictory, 0x444040);
     RH_ScopedInstall(ClearSpecificZonesToTriggerGangWar, 0x443FF0);
     RH_ScopedInstall(ClearTheStreets, 0x4444B0);
-    RH_ScopedInstall(CreateAttackWave, 0x444810, { .Reversed = false });                   //
+    RH_ScopedInstall(CreateAttackWave, 0x444810);                   //
     RH_ScopedInstall(CreateDefendingGroup, 0x4453D0);
     RH_ScopedInstall(DoesPlayerControlThisZone, 0x443AE0);
     RH_ScopedInstall(DoStuffWhenPlayerVictorious, 0x446400);
@@ -52,7 +53,7 @@ void CGangWars::InjectHooks() {
     RH_ScopedInstall(SwitchGangWarsActive, 0x4465F0);
     RH_ScopedInstall(TellGangMembersTo, 0x444530);                     // ?
     RH_ScopedInstall(TellStreamingWhichGangsAreNeeded, 0x443D50);
-    RH_ScopedInstall(Update, 0x446610, { .Reversed = false });                             //
+    RH_ScopedInstall(Update, 0x446610);                                                     //
     RH_ScopedInstall(UpdateTerritoryUnderControlPercentage, 0x443DE0); //
     RH_ScopedInstall(Load, 0x5D3EB0);
     RH_ScopedInstall(Save, 0x5D5530);
@@ -203,7 +204,261 @@ void CGangWars::ClearTheStreets() {
 
 // 0x444810
 bool CGangWars::CreateAttackWave(int32 warFerocity, int32 waveID) {
-    return plugin::CallAndReturn<bool, 0x444810, int32, int32>(warFerocity, waveID);
+    const CVector playerPos = FindPlayerCoors();
+    const auto    player    = FindPlayerPed();
+
+    if (CGame::currArea != AREA_CODE_NORMAL_WORLD || playerPos.z > 950.f) {
+        return false;
+    }
+
+    if (!ThePaths.AreNodesLoadedForArea(playerPos.x - 20.f, playerPos.x + 20.f, playerPos.y - 20.f, playerPos.y + 20.f)) {
+        return false;
+    }
+
+    // 0x4448B7 - Make sure there are peds streamed in for both gangs
+    if (!PedStreamedInForThisGang(Gang1)) {
+        CStreaming::RequestModel(CPopulation::GetPedGroupModelId(CPopulation::GetGangGroupId(Gang1), 0), STREAMING_KEEP_IN_MEMORY);
+    }
+    if (Gang1 != Gang2 && !PedStreamedInForThisGang(static_cast<eGangID>(Gang2))) {
+        CStreaming::RequestModel(CPopulation::GetPedGroupModelId(CPopulation::GetGangGroupId(static_cast<eGangID>(Gang2)), 0), STREAMING_KEEP_IN_MEMORY);
+    }
+
+    // 0x444928 - Weapons used
+    struct WaveWeapon {
+        eModelID    model;
+        eWeaponType type;
+    };
+    WaveWeapon weakWeapon, strongWeapon;
+    switch (warFerocity) {
+    case 0:
+        weakWeapon   = { MODEL_BAT, WEAPON_BASEBALLBAT };
+        strongWeapon = { MODEL_COLT45, WEAPON_PISTOL };
+        break;
+    case 1:
+        weakWeapon   = { MODEL_COLT45, WEAPON_PISTOL };
+        strongWeapon = { MODEL_MICRO_UZI, WEAPON_MICRO_UZI };
+        break;
+    case 2:
+        weakWeapon   = { MODEL_MICRO_UZI, WEAPON_MICRO_UZI };
+        strongWeapon = { MODEL_MP5LNG, WEAPON_MP5 };
+        break;
+    case 3:
+        weakWeapon   = { MODEL_MP5LNG, WEAPON_MP5 };
+        strongWeapon = { MODEL_AK47, WEAPON_AK47 };
+        break;
+    case 4:
+        weakWeapon   = { MODEL_AK47, WEAPON_AK47 };
+        strongWeapon = { MODEL_AK47, WEAPON_AK47 };
+        break;
+    case 5:
+        weakWeapon   = { MODEL_DESERT_EAGLE, WEAPON_DESERT_EAGLE };
+        strongWeapon = { MODEL_AK47, WEAPON_AK47 };
+        break;
+    default:
+        // NOTE: The PC version leaves all 4 values uninitialized here (and ends up using the player ped's pointer as the model IDs).
+        //       The Android version uses these values.
+        weakWeapon   = { MODEL_BAT, WEAPON_BASEBALLBAT };
+        strongWeapon = { MODEL_COLT45, WEAPON_PISTOL };
+        break;
+    }
+    if (bTrainingMission) { // 0x4449F0
+        switch (warFerocity) {
+        case 0:  weakWeapon = strongWeapon = { MODEL_BAT, WEAPON_BASEBALLBAT }; break;
+        case 1:  weakWeapon = strongWeapon = { MODEL_COLT45, WEAPON_PISTOL };   break;
+        default: weakWeapon = strongWeapon = { MODEL_TEC9, WEAPON_TEC9 };       break;
+        }
+    }
+
+    // 0x444A30
+    if (!CStreaming::GetInfo(weakWeapon.model).IsLoaded() || !CStreaming::GetInfo(strongWeapon.model).IsLoaded()) {
+        CStreaming::RequestModel(weakWeapon.model, STREAMING_DEFAULT);
+        CStreaming::RequestModel(strongWeapon.model, STREAMING_DEFAULT);
+        return false;
+    }
+
+    if (!PedStreamedInForThisGang(Gang1) || !PedStreamedInForThisGang(static_cast<eGangID>(Gang2))) {
+        return false;
+    }
+
+    // 0x444A79 - Create 2 groups of attackers, the first group belongs to `Gang1`, the second to `Gang2`
+    CVector lastGroupPos{ 999'999.875f, 999'999.875f, 999'999.875f };
+    bool    bCreatedAny = false;
+    int32   groupGang{};
+    for (int32 groupIdx = 0; groupIdx < 2; groupIdx++) {
+        groupGang = groupIdx == 0 ? (int32)Gang1 : Gang2;
+
+        // 0x444AD1 - Find a place for them, preferably not visible and not too close to the previous group
+        CVector groupPos;
+        bool    bFoundPos = false;
+        for (int32 tries = 0; tries < 20; tries++) {
+            CVector      pos;
+            CNodeAddress nodeA, nodeB;
+            float        nodeT;
+            if (!CCarCtrl::GenerateCarCreationCoors2(playerPos, 1.f, 0.f, -1.f, true, 50.f, 50.f, &pos, &nodeA, &nodeB, &nodeT, false, true)) {
+                continue;
+            }
+            if (!TheCamera.IsSphereVisible(pos, 7.f)) {
+                groupPos  = pos;
+                bFoundPos = true;
+                if (DistanceBetweenPoints(lastGroupPos, pos) > 15.f) {
+                    break;
+                }
+            } else if (!bFoundPos) {
+                groupPos  = pos;
+                bFoundPos = true;
+            }
+        }
+        if (!bFoundPos) {
+            continue;
+        }
+        lastGroupPos = groupPos;
+
+        // 0x444BF0 - The peds are lined up perpendicular to the direction of the player
+        CVector spacing{ playerPos.y - groupPos.y, groupPos.x - playerPos.x, 0.f };
+        spacing.Normalise();
+        spacing *= 1.2f;
+
+        auto numPeds = (int32)((Difficulty * 0.3f + 0.7f) * (float)(warFerocity + 3));
+        if (bTrainingMission) {
+            numPeds = 2;
+        }
+        if (warFerocity == 5) {
+            numPeds = 10;
+        }
+
+        for (int32 i = 0, offset = -(numPeds / 2) * 2; i < numPeds; i++, offset += 2) { // 0x444CD0
+            CVector pedPos = groupPos + spacing * (float)offset;
+            pedPos.x += (float)rand() * (1.f / 32767.f) * 3.f - 1.5f;
+            pedPos.y += (float)rand() * (1.f / 32767.f) * 3.f - 1.5f;
+
+            int32 pedModel;
+            if (!PickStreamedInPedForThisGang(static_cast<eGangID>(groupGang), pedModel)) {
+                continue;
+            }
+
+            pedPos.z = CWorld::FindGroundZFor3DCoord({ pedPos.x, pedPos.y, pedPos.z + 2.f }, nullptr, nullptr) + 1.3f;
+
+            // 0x444DC7
+            const auto ped = new CCivilianPed(static_cast<ePedType>(Gang1 + PED_TYPE_GANG1), pedModel); // NOTE: Uses `Gang1` for the ped type of both groups
+            ped->SetPosn(pedPos);
+            ped->SetCharCreatedBy(PED_MISSION);
+            CWorld::Add(ped);
+
+            // 0x444E31
+            {
+                CEventScriptCommand event(TASK_PRIMARY_PRIMARY, new CTaskComplexKillPedOnFoot(player, -1, 0, 0, 0, 2), false);
+                ped->GetEventGroup().Add(&event);
+            }
+
+            // 0x444E9D - The higher the difficulty the more of them get the better weapon
+            const auto weapon = CGeneral::GetRandomNumberInRange(-0.3f, 1.3f) > Difficulty
+                ? weakWeapon.type
+                : strongWeapon.type;
+            ped->GiveWeapon(weapon, 5000, false);
+            ped->SetCurrentWeapon(weapon);
+
+            ped->SetWeaponAccuracy(static_cast<uint8>(Difficulty * 25.f + 70.f));
+            ped->bPartOfAttackWave      = true;
+            ped->bClearRadarBlipOnDeath = true;
+            ped->m_fMaxHealth           = 120.f;
+            ped->m_fHealth              = 120.f;
+
+            // 0x444F13
+            const auto color = GetGangColor(groupGang);
+            const auto blip  = CRadar::SetEntityBlip(BLIP_CHAR, CPools::GetPedRef(ped), color, BLIP_DISPLAY_BLIPONLY); // Original also passes "CODEGW2" (debug name)
+            CRadar::ChangeBlipScale(blip, 2);
+            CRadar::ChangeBlipColour(blip, color);
+
+            bCreatedAny = true;
+        }
+
+        // 0x444F9D - Leave a pickup too
+        CVector pickupPos = groupPos;
+        pickupPos.x += (float)rand() * (1.f / 32767.f) * 4.f - 2.f;
+        pickupPos.y += (float)rand() * (1.f / 32767.f) * 4.f - 2.f;
+        pickupPos.z = CWorld::FindGroundZFor3DCoord({ pickupPos.x, pickupPos.y, pickupPos.z + 1.f }, nullptr, nullptr) + 0.75f;
+
+        const auto GeneratePickup = [&](eModelID model) {
+            CPickups::GenerateNewOne(pickupPos, model, PICKUP_ONCE_TIMEOUT_SLOW, 0, 0, false, nullptr);
+        };
+        switch (waveID) {
+        case 0:
+            if (groupIdx == 0) {
+                GeneratePickup(ModelIndices::MI_PICKUP_HEALTH);
+            }
+            break;
+        case 1:
+            if (groupIdx == 0) {
+                GeneratePickup(ModelIndices::MI_PICKUP_BODYARMOUR);
+            }
+            break;
+        case 2:
+            GeneratePickup(groupIdx == 0 ? ModelIndices::MI_PICKUP_HEALTH : ModelIndices::MI_PICKUP_BODYARMOUR);
+            break;
+        }
+    }
+
+    // 0x4450B2
+    if (!bCreatedAny) {
+        return false;
+    }
+
+    if (bTrainingMission || pDriveByCar) {
+        return true;
+    }
+
+    // 0x4450D8 - Create a car that does a drive-by on the player
+    const auto carModel = CPopulation::PickGangCar(Gang1);
+    if ((int32)carModel < 0 || !CStreaming::GetInfo(carModel).IsLoaded()) {
+        return true;
+    }
+
+    pDriveByCar = CCarCtrl::GenerateOneEmergencyServicesCar(carModel, FindPlayerCoors());
+    if (!pDriveByCar) {
+        return true;
+    }
+    pDriveByCar->RegisterReference(reinterpret_cast<CEntity**>(&pDriveByCar));
+
+    CCarCtrl::JoinCarWithRoadSystemGotoCoors(pDriveByCar, FindPlayerCoors(), false, false);
+    pDriveByCar->vehicleFlags.bPartOfAttackWave    = true;
+    pDriveByCar->m_autoPilot.m_nCarMission         = MISSION_DO_DRIVEBY_FARAWAY;
+    pDriveByCar->m_autoPilot.m_nCruiseSpeed        = 10;
+    pDriveByCar->m_autoPilot.m_TargetEntity        = reinterpret_cast<CVehicle*>(FindPlayerPed()); // Yes, it's the ped
+    pDriveByCar->m_autoPilot.m_nCarDrivingStyle    = DRIVING_STYLE_AVOID_CARS;
+    pDriveByCar->SetStatus(STATUS_PHYSICS);
+    pDriveByCar->vehicleFlags.bNeverUseSmallerRemovalRange = true;
+    pDriveByCar->m_autoPilot.m_nStraightLineDistance       = 30;
+
+    // 0x4451C9
+    CCarCtrl::SetUpDriverAndPassengersForVehicle(pDriveByCar, Gang1 + 14, 1, false, false, 1);
+    if (const auto driver = pDriveByCar->m_pDriver) {
+        driver->GetIntelligence()->SetPedDecisionMakerType(eDecisionMakerType::UNKNOWN);
+    }
+
+    // 0x445220
+    for (size_t i = 0; i < pDriveByCar->m_apPassengers.size(); i++) {
+        if (!pDriveByCar->m_apPassengers[i]) {
+            continue;
+        }
+        pDriveByCar->m_apPassengers[i]->GiveDelayedWeapon(WEAPON_MICRO_UZI, 1500);
+        pDriveByCar->m_apPassengers[i]->SetCurrentWeapon(WEAPON_MICRO_UZI);
+
+        CEventScriptCommand event(
+            TASK_PRIMARY_PRIMARY,
+            new CTaskSimpleGangDriveBy(FindPlayerPed(), nullptr, 100.f, 50, eDrivebyStyle::AI_ALL_DIRN, i % 2 == 0),
+            false
+        );
+        pDriveByCar->m_apPassengers[i]->GetEventGroup().Add(&event);
+    }
+
+    // 0x445303 - NOTE: `groupGang` is the gang of the last group here (`Gang2`)
+    const auto color = GetGangColor(groupGang);
+    const auto blip  = CRadar::SetEntityBlip(BLIP_CHAR, CPools::GetPedRef(pDriveByCar->m_pDriver), color, BLIP_DISPLAY_BLIPONLY); // Original also passes "CODEGW3" (debug name)
+    CRadar::ChangeBlipScale(blip, 3);
+    CRadar::ChangeBlipColour(blip, color);
+    pDriveByCar->m_pDriver->bClearRadarBlipOnDeath = true;
+
+    return true;
 }
 
 // 0x4453D0
@@ -724,8 +979,6 @@ void CGangWars::TellStreamingWhichGangsAreNeeded(uint32& gangsBitFlags) {
 // 0x446610
 void CGangWars::Update() {
     ZoneScoped;
-
-    return plugin::Call<0x446610>();
 
     if (CTheScripts::IsPlayerOnAMission() && !bIsPlayerOnAMission && NumSpecificZones == 0)
         EndGangWar(true);
