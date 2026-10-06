@@ -47,6 +47,7 @@ void CTaskComplexEnterCar::InjectHooks() {
     RH_ScopedInstall(CreateTaskUtilityLineUpPedWithCar, 0x63ACC0);
     RH_ScopedInstall(GetTargetPos, 0x63A300);
     RH_ScopedInstall(GetCameraAvoidVehicle, 0x63A690);
+    RH_ScopedInstall(GetCameraStickModifier, 0x63A380);
     RH_ScopedInstall(SetVehicleFlags, 0x63AB90);
     RH_ScopedInstall(CreateSubTask, 0x63E040);
 
@@ -820,6 +821,103 @@ CVector CTaskComplexEnterCar::GetTargetPos() const {
         return tGoTo->GetTargetPt();
     }
     return {};
+}
+
+// 0x63A380
+void CTaskComplexEnterCar::GetCameraStickModifier(CPed* ped, float distance, float& vertAngle, float& horzAngle, float& vertStick, float& horzStick) {
+    enum : uint8 {
+        CAM_MOVEMENT_BEHIND   = 1, //< Brake pressed
+        CAM_MOVEMENT_INFRONT  = 2, //< Accelerate pressed
+        CAM_MOVEMENT_BY_STICK = 3, //< Player is moving the camera, don't interfere
+    };
+    static constexpr float STICK_MULT[]{ 0.1f, 0.2f, 0.2f }; // 0x86E678
+    static constexpr float MAX_DELTA[]{ 0.1f, 0.2f, 0.2f };  // 0x86E684
+    static constexpr float SIDE_ANGLE_MULT   = 0.7f;         // 0x86E690
+    static constexpr float CLOSE_SIDE_ANGLE  = 0.139626f;    // 0x86E694
+    static constexpr float MIN_VERT_ANGLE    = -0.174533f;   // 0x8D2ECC
+
+    if (!m_Car || m_Car->m_nVehicleSubType == VEHICLE_TYPE_HELI) {
+        return;
+    }
+
+    const auto pad = CPad::GetPad(ped->m_nPedType == PED_TYPE_PLAYER2 ? 1 : 0);
+
+    if (!GetSubTask()) {
+        return;
+    }
+    switch (GetSubTask()->GetTaskType()) {
+    case TASK_SIMPLE_CAR_OPEN_DOOR_FROM_OUTSIDE:
+    case TASK_SIMPLE_BIKE_PICK_UP:
+    case TASK_SIMPLE_CAR_SLOW_DRAG_PED_OUT:
+    case TASK_SIMPLE_CAR_GET_IN:
+    case TASK_SIMPLE_CAR_SHUFFLE:
+        break;
+    default:
+        return;
+    }
+
+    // 0x63A458
+    if (std::abs((float)pad->AimWeaponLeftRight(ped)) > 20.0f || std::abs((float)pad->AimWeaponUpDown(ped)) > 20.0f) {
+        m_CamMovementChoice = CAM_MOVEMENT_BY_STICK;
+    } else if (pad->GetAccelerate()) {
+        m_CamMovementChoice = CAM_MOVEMENT_INFRONT;
+    } else if (pad->GetBrake()) {
+        m_CamMovementChoice = CAM_MOVEMENT_BEHIND;
+    }
+    if (m_CamMovementChoice == CAM_MOVEMENT_BY_STICK) {
+        return;
+    }
+
+    // 0x63A4CE
+    const auto  vehAngle = m_Car->GetHeading() - HALF_PI;
+    const auto& vehMat   = *m_Car->m_matrix;
+
+    // On which side of the vehicle the ped is at
+    const auto side = (ped->GetPosition() - m_Car->GetPosition()).Dot(vehMat.GetRight());
+
+    auto angleOffset = std::atan2(side, distance) * SIDE_ANGLE_MULT;
+    if (-m_Car->GetColModel()->GetBoundingBox().m_vecMin.y > distance) {
+        angleOffset = angleOffset > 0.0f
+            ? -CLOSE_SIDE_ANGLE
+            : CLOSE_SIDE_ANGLE;
+    }
+
+    auto targetAngle = m_CamMovementChoice == CAM_MOVEMENT_BEHIND
+        ? angleOffset + (vehAngle + PI)
+        : vehAngle - angleOffset;
+
+    // 0x63A58B - Wrap it around
+    if (targetAngle > horzAngle + PI) {
+        targetAngle -= TWO_PI;
+    } else if (targetAngle < horzAngle - PI) {
+        targetAngle += TWO_PI;
+    }
+
+    auto delta = targetAngle - horzAngle;
+
+    // 0x63A5C5 - Make sure the camera doesn't go thru the vehicle
+    if ((side > 0.0f) == (m_CamMovementChoice == CAM_MOVEMENT_BEHIND)) {
+        if (delta <= -HALF_PI) {
+            delta *= -1.0f;
+        }
+    } else {
+        if (delta >= HALF_PI) {
+            delta *= -1.0f;
+        }
+    }
+
+    // 0x63A5EE
+    const auto maxDelta = MAX_DELTA[m_CamMovementChoice];
+    if (delta > maxDelta) {
+        delta = maxDelta;
+    } else if (delta < -maxDelta) {
+        delta = -maxDelta;
+    }
+    horzStick += delta * STICK_MULT[m_CamMovementChoice];
+
+    if (vertAngle > MIN_VERT_ANGLE) {
+        vertStick -= STICK_MULT[m_CamMovementChoice] * MAX_DELTA[m_CamMovementChoice];
+    }
 }
 
 // 0x63A690
