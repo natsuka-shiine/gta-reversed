@@ -2,11 +2,20 @@
 
 #include "Lines.h"
 
+void CLines::InjectHooks() {
+    RH_ScopedClass(CLines);
+    RH_ScopedCategoryGlobal();
+
+    RH_ScopedOverloadedInstall(RenderLineNoClipping, "", 0x6FF460, void(*)(float, float, float, float, float, float, uint32, uint32));
+    RH_ScopedOverloadedInstall(RenderLineWithClipping, "", 0x6FF4F0, void(*)(float, float, float, float, float, float, uint32, uint32));
+    RH_ScopedOverloadedInstall(ImmediateLine2D, "", 0x6FF790, void(*)(int32, int32, int32, int32, uint8, uint8, uint8, uint8, uint8, uint8, uint8, uint8));
+}
+
 // 0x6FF460
 void CLines::RenderLineNoClipping(float startX, float startY, float startZ, float endX, float endY, float endZ, uint32 startColor, uint32 endColor) {
     RxObjSpace3DVertex vertices[] = {
-        { .objVertex = { startX, startY, startZ }, .color = startColor >> 8 | startColor << 24 },
-        { .objVertex = { endX,   endY,   endZ   }, .color =   endColor >> 8 | endColor   << 24 }
+        { .objVertex = { startX, startY, startZ }, .color = startColor >> 8 | startColor << 24 }, // Convert color to ARGB
+        { .objVertex = { endX,   endY,   endZ   }, .color =   endColor >> 8 | endColor   << 24 }, // Convert color to ARGB
     };
 
     LittleTest();
@@ -18,17 +27,31 @@ void CLines::RenderLineNoClipping(float startX, float startY, float startZ, floa
 
 // 0x6FF4F0
 void CLines::RenderLineWithClipping(float startX, float startY, float startZ, float endX, float endY, float endZ, uint32 startColor, uint32 endColor) {
-    return plugin::Call<0x6FF4F0, float, float, float, float, float, float, uint32, uint32>(startX, startY, startZ, endX, endY, endZ, startColor, endColor);
-
     const CVector start = { startX, startY, startZ };
     const CVector end   = { endX,   endY,   endZ };
 
-    auto iters = DistanceBetweenPoints(start, end) * 0.4f + 1.0f;
-    auto numVerts = (uint32)std::min(iters, 7.0f);
-    if (numVerts > 0) {
-        // todo:
-        for (auto i = 0u; i < numVerts; i++) {
-            // todo:
+    // The line is split into segments (At most 7), each of them has 2 vertices
+    const auto numSegments = (int16)std::min(DistanceBetweenPoints(start, end) * 0.4f + 1.0f, 7.0f);
+    if (numSegments > 0) {
+        // Colors are RGBA (R being the most significant byte)
+        const auto GetChannel = [](uint32 color, uint32 shift) { return (float)((color >> shift) & 0xFF); };
+        const float startR = GetChannel(startColor, 24), deltaR = GetChannel(endColor, 24) - startR;
+        const float startG = GetChannel(startColor, 16), deltaG = GetChannel(endColor, 16) - startG;
+        const float startB = GetChannel(startColor, 8),  deltaB = GetChannel(endColor, 8)  - startB;
+        const float startA = GetChannel(startColor, 0),  deltaA = GetChannel(endColor, 0)  - startA;
+        const auto  delta  = end - start;
+
+        const auto SetVertex = [&](RxObjSpace3DVertex& vertex, float t) {
+            const auto a = (uint32)(uint8)(int32)(deltaA * t + startA);
+            const auto r = (uint32)(uint8)(int32)(deltaR * t + startR);
+            const auto g = (uint32)(uint8)(int32)(deltaG * t + startG);
+            const auto b = (uint32)(uint8)(int32)(deltaB * t + startB);
+            vertex.color     = (a << 24) | (r << 16) | (g << 8) | b; // ARGB
+            vertex.objVertex = { delta.x * t + start.x, delta.y * t + start.y, delta.z * t + start.z };
+        };
+        for (int32 i = 0; i < numSegments; i++) {
+            SetVertex(TempBufferVertices.m_3d[2 * i + 0], (float)(i) / (float)(numSegments));
+            SetVertex(TempBufferVertices.m_3d[2 * i + 1], (float)(i + 1) / (float)(numSegments));
         }
     }
 
@@ -37,8 +60,8 @@ void CLines::RenderLineWithClipping(float startX, float startY, float startZ, fl
         12, 13, 14, 15, 16, 17, 18, 19, 20, 0
     };
     LittleTest();
-    if (RwIm3DTransform(TempBufferVertices.m_3d, 2 * numVerts, nullptr, 0)) {
-        RwIm3DRenderIndexedPrimitive(rwPRIMTYPELINELIST, indices, 2 * numVerts);
+    if (RwIm3DTransform(TempBufferVertices.m_3d, 2 * numSegments, nullptr, 0)) {
+        RwIm3DRenderIndexedPrimitive(rwPRIMTYPELINELIST, indices, 2 * numSegments);
         RwIm3DEnd();
     }
 }
