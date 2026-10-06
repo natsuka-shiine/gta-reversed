@@ -104,12 +104,16 @@ void CPad::InjectHooks() {
     RH_ScopedInstall(GroupControlBackJustDown, 0x541260);
     RH_ScopedInstall(LookAroundLeftRight, 0x540BD0);
     RH_ScopedInstall(LookAroundUpDown, 0x540CC0);
+    RH_ScopedInstall(LookAroundLeftRightOnPC, 0x540E80);
+    RH_ScopedInstall(LookAroundUpDownOnPC, 0x540F80);
+    RH_ScopedInstall(CycleCameraModeJustDown, 0x5404A0);
     RH_ScopedInstall(GetAnaloguePadUp, 0x540950);
     RH_ScopedInstall(GetAnaloguePadLeft, 0x5409B0);
     RH_ScopedInstall(GetAnaloguePadRight, 0x5409E0);
     RH_ScopedInstall(GetAnaloguePadDown, 0x540980);
 #ifndef NOTSA_USE_SDL3
     RH_ScopedInstall(GetMouseState, 0x746ED0);
+    RH_ScopedGlobalInstall(GetCurrentKeyPressed, 0x541490);
 #endif
 }
 
@@ -1274,6 +1278,45 @@ int16 CPad::LookAroundUpDown(CPed* ped) noexcept {
     return static_cast<int16>((static_cast<float>(s1) + (s1 < 0 ? 35.0f : -35.0f)) * UNK);
 }
 
+// 0x540E80
+int16 CPad::LookAroundLeftRightOnPC() const {
+    const auto axis = static_cast<float>(GetPad(0)->NewState.RightStickX);
+    if (std::abs(axis) > 100.0f && (DisablePlayerControls || !NewState.ShockButtonR)) {
+        return static_cast<int16>(axis + (axis > 0.0f ? -50.0f : 50.0f));
+    }
+    if (TheCamera.m_aCams[0].Using3rdPersonMouseCam() && std::abs(axis) > 50.0f) {
+        return static_cast<int16>((axis + (axis > 0.0f ? -50.0f : 50.0f)) * 0.5f);
+    }
+    return 0;
+}
+
+// 0x540F80
+int16 CPad::LookAroundUpDownOnPC() const {
+    const auto stickY = GetPad(0)->NewState.RightStickY;
+    const auto axis = static_cast<float>(bInvertLook4Pad ? static_cast<int16>(-stickY) : stickY);
+    if (std::abs(axis) > 100.0f && (DisablePlayerControls || !NewState.ShockButtonR)) {
+        return static_cast<int16>(axis + (axis > 0.0f ? -50.0f : 50.0f));
+    }
+    if (TheCamera.m_aCams[0].Using3rdPersonMouseCam() && std::abs(axis) > 50.0f) {
+        return static_cast<int16>((axis + (axis > 0.0f ? -50.0f : 50.0f)) * 0.5f);
+    }
+    return 0;
+}
+
+// 0x5404A0
+bool CPad::CycleCameraModeJustDown() const {
+    switch (Mode) {
+    case 0:
+    case 2:
+    case 3:
+        return NewState.Select && !OldState.Select;
+    case 1:
+        return NewState.DPadUp && !OldState.DPadUp;
+    default:
+        return false;
+    }
+}
+
 // 0x541290
 int32 CPad::sub_541290() {
     if (DisablePlayerControls || bDisablePlayerFireWeapon) {
@@ -1422,7 +1465,81 @@ bool CPad::DebugMenuJustPressed() {
 
 // 0x541490
 int GetCurrentKeyPressed(RsKeyCodes& keys) {
-    return plugin::CallAndReturn<int, 0x541490, RsKeyCodes&>(keys);
+    const auto& newState = CPad::NewKeyState;
+    const auto& oldState = CPad::OldKeyState;
+
+    keys = rsNULL;
+
+    // NOTE: No early outs, so if multiple keys were pressed in this frame the last one checked wins
+
+    // Regular keys (NOTE: The last one [255] is not checked by the original code)
+    for (auto i = 0; i < 255; i++) {
+        if (newState.standardKeys[i] && !oldState.standardKeys[i]) {
+            keys = static_cast<RsKeyCodes>(i);
+        }
+    }
+
+    // F1 - F12
+    for (auto i = 0; i < 12; i++) {
+        if (newState.FKeys[i] && !oldState.FKeys[i]) {
+            keys = static_cast<RsKeyCodes>(rsF1 + i);
+        }
+    }
+
+    // Everything else (Order is the same as in the original code)
+    static constexpr struct { int16 CKeyboardState::*key; RsKeyCodes code; } s_Mapping[]{
+        { &CKeyboardState::esc,      rsESC      },
+        { &CKeyboardState::insert,   rsINS      },
+        { &CKeyboardState::del,      rsDEL      },
+        { &CKeyboardState::home,     rsHOME     },
+        { &CKeyboardState::end,      rsEND      },
+        { &CKeyboardState::pgup,     rsPGUP     },
+        { &CKeyboardState::pgdn,     rsPGDN     },
+        { &CKeyboardState::up,       rsUP       },
+        { &CKeyboardState::down,     rsDOWN     },
+        { &CKeyboardState::left,     rsLEFT     },
+        { &CKeyboardState::right,    rsRIGHT    },
+        { &CKeyboardState::scroll,   rsSCROLL   },
+        { &CKeyboardState::pause,    rsPAUSE    },
+        { &CKeyboardState::numlock,  rsNUMLOCK  },
+        { &CKeyboardState::div,      rsDIVIDE   },
+        { &CKeyboardState::mul,      rsTIMES    },
+        { &CKeyboardState::sub,      rsMINUS    },
+        { &CKeyboardState::add,      rsPLUS     },
+        { &CKeyboardState::enter,    rsPADENTER },
+        { &CKeyboardState::decimal,  rsPADDEL   },
+        { &CKeyboardState::num1,     rsPADEND   },
+        { &CKeyboardState::num2,     rsPADDOWN  },
+        { &CKeyboardState::num3,     rsPADPGDN  },
+        { &CKeyboardState::num4,     rsPADLEFT  },
+        { &CKeyboardState::num5,     rsPAD5     },
+        { &CKeyboardState::num6,     rsPADRIGHT },
+        { &CKeyboardState::num7,     rsPADHOME  },
+        { &CKeyboardState::num8,     rsPADUP    },
+        { &CKeyboardState::num9,     rsPADPGUP  },
+        { &CKeyboardState::num0,     rsPADINS   },
+        { &CKeyboardState::back,     rsBACKSP   },
+        { &CKeyboardState::tab,      rsTAB      },
+        { &CKeyboardState::capslock, rsCAPSLK   },
+        { &CKeyboardState::extenter, rsENTER    },
+        { &CKeyboardState::lshift,   rsLSHIFT   },
+        { &CKeyboardState::shift,    rsSHIFT    }, // Checked before `rshift` in the original code
+        { &CKeyboardState::rshift,   rsRSHIFT   },
+        { &CKeyboardState::lctrl,    rsLCTRL    },
+        { &CKeyboardState::rctrl,    rsRCTRL    },
+        { &CKeyboardState::lalt,     rsLALT     },
+        { &CKeyboardState::ralt,     rsRALT     },
+        { &CKeyboardState::lwin,     rsLWIN     },
+        { &CKeyboardState::rwin,     rsRWIN     },
+        { &CKeyboardState::apps,     rsAPPS     },
+    };
+    for (const auto& [key, code] : s_Mapping) {
+        if (newState.*key && !oldState.*key) {
+            keys = code;
+        }
+    }
+
+    return reinterpret_cast<int>(&keys); // Original code returns the address of the out parameter (eax is just left as-is)
 }
 
 #ifndef NOTSA_USE_SDL3
