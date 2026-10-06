@@ -57,6 +57,8 @@ public:
 public:
     static constexpr auto Type = TASK_SIMPLE_GANG_DRIVEBY;
 
+    static void InjectHooks();
+
     CTaskSimpleGangDriveBy(CEntity *target, const CVector *targetPos, float abortRange, int8 frequencyPercentage, eDrivebyStyle drivebyStyle, bool seatRHS);
     ~CTaskSimpleGangDriveBy() override;
 
@@ -64,6 +66,21 @@ public:
     CTask* Clone() const override;
     bool MakeAbortable(CPed* ped, eAbortPriority priority = ABORT_PRIORITY_URGENT, const CEvent* event = nullptr) override;
     bool ProcessPed(CPed* ped) override;
+
+    bool ManageAnim(CPed* ped);
+    void FireGun(CPed* ped);
+    void PlayerTarget(CPed* ped);
+    bool LineOfSightClearForAttack(CPed* ped, const CVector& target);
+    void LookForTarget(CPed* ped);
+    void AimGun(CPed* ped);
+
+    static void FinishAnimGangDriveByCB(CAnimBlendAssociation* anim, void* data);
+
+public:
+    static inline auto& ANIM_LOOP_START   = StaticRef<float>(0x8D2E7C);  // 0.2667
+    static inline auto& ANIM_LOOP_END     = StaticRef<float>(0x8D2E80);  // 0.4333
+    static inline auto& ANIM_LOOP_FIRE    = StaticRef<float>(0x8D2E84);  // 0.3
+    static inline auto& GUN_FLASH_TIME_MS = StaticRef<uint16>(0x8D2E90); // 250
 };
 VALIDATE_SIZE(CTaskSimpleGangDriveBy, 0x44);
 
