@@ -6,6 +6,7 @@
 */
 #include "StdInc.h"
 
+#include "PostEffects.h"
 #include "Pickups.h"
 #include "Garages.h"
 #include "tPickupMessage.h"
@@ -15,6 +16,8 @@
 #include "TaskSimpleJetPack.h"
 
 using namespace ModelIndices;
+static int32 GenerateNewOne_Hook(CVector coors, uint32 modelId, ePickupType pickupType, uint32 ammo, uint32 moneyPerDay, bool isEmpty, char* message);
+
 void CPickups::InjectHooks() {
     RH_ScopedClass(CPickups);
     RH_ScopedCategoryGlobal();
@@ -22,17 +25,17 @@ void CPickups::InjectHooks() {
     RH_ScopedInstall(Init, 0x454A70);
     RH_ScopedInstall(ReInit, 0x456E60);
     RH_ScopedInstall(AddToCollectedPickupsArray, 0x455240);
-    RH_ScopedOverloadedInstall(CreatePickupCoorsCloseToCoors, "", 0x458A80, void(*)(float, float, float, float&, float&, float&), {.Reversed = false});
+    RH_ScopedOverloadedInstall(CreatePickupCoorsCloseToCoors, "", 0x458A80, void(*)(float, float, float, float&, float&, float&));
     RH_ScopedInstall(CreateSomeMoney, 0x458970);
     RH_ScopedInstall(DetonateMinesHitByGunShot, 0x4590C0);
     RH_ScopedInstall(DoCollectableEffects, 0x455E20);
     RH_ScopedInstall(DoMineEffects, 0x4560E0);
     RH_ScopedInstall(DoMoneyEffects, 0x454E80);
-    RH_ScopedInstall(DoPickUpEffects, 0x455720, { .Reversed = false });
+    RH_ScopedInstall(DoPickUpEffects, 0x455720);
     RH_ScopedInstall(FindPickUpForThisObject, 0x4551C0);
 
-    // Cannot be hooked at all for now due to ABI fuckery, the return value is 32 bit, but causes the function to assume the calling convention of of T* Function(T*, ...)
-    //RH_ScopedInstall(GenerateNewOne, 0x456F20, { .Reversed = false });
+    // NOTE: A wrapper is used, because the game's function returns a 32 bit value in `eax`, while `tPickupReference` would be returned through a hidden pointer
+    RH_ScopedNamedGlobalInstall(GenerateNewOne_Hook, "GenerateNewOne", 0x456F20);
 
     RH_ScopedInstall(GenerateNewOne_WeaponType, 0x457380);
     RH_ScopedInstall(GetActualPickupIndex, 0x4552A0);
@@ -97,7 +100,44 @@ void CPickups::AddToCollectedPickupsArray(int32 pickupIndex) {
  * @param [out] outX, outY, outZ Created pickup's position
  */
 void CPickups::CreatePickupCoorsCloseToCoors(float inX, float inY, float inZ, float& outX, float& outY, float& outZ) {
-    plugin::Call<0x458A80, float, float, float, float&, float&, float&>(inX, inY, inZ, outX, outY, outZ);
+    // Binary verb (S_0x458A80.txt): up to 32 random candidates on a 1.5-unit ring around
+    // the input; each is lifted to ground + 0.5. Past 16 failures any clear-LOS candidate
+    // wins, otherwise (matches TestSphereAgainstWorld(_, 1.2, nullptr, false, false, true,
+    // false, false, false) == nullptr + no other pickup within 1.3 + 2.0 clear of the
+    // player) the candidate must also win. Fallback: input x/y, input z + 0.4.
+    for (auto tries = 0; tries < 32; tries++) {
+        const auto angle = static_cast<float>(CGeneral::GetRandomNumber() & 0xFF) * (2.0f * 3.14159265f / 256.0f);
+        const CVector candidate{ inX + 1.5f * std::sinf(angle), inY + 1.5f * std::cosf(angle), inZ };
+        bool foundGround{};
+        const CVector ground{
+            candidate.x,
+            candidate.y,
+            CWorld::FindGroundZFor3DCoord(candidate, &foundGround, nullptr) + 0.5f,
+        };
+        if (!foundGround)
+            continue;
+        const auto relaxed = tries > 0x10;
+        // Binary: dist(candidate.xz -> player.xz) must EXCEED 2.0; when it does and we are
+        // past 16 failures any clear-LOS candidate wins, otherwise the candidate must also
+        // have no other pickup within 1.3 and a clear 1.2 test-sphere.
+        if ((candidate - FindPlayerCoors()).Magnitude2D() <= 2.0f) {
+            if (!relaxed)
+                continue;
+        } else if (!relaxed && TestForPickupsInBubble(ground, 1.3f)) {
+            continue;
+        }
+        if (!CWorld::GetIsLineOfSightClear({ inX, inY, inZ + 0.3f }, ground - CVector{ 0.0f, 0.0f, 0.4f }, true, relaxed, false, relaxed, false, false, false))
+            continue;
+        if (!relaxed && CWorld::TestSphereAgainstWorld(ground, 1.2f, nullptr, false, false, true, false, false, false))
+            continue;
+        outX = candidate.x;
+        outY = candidate.y;
+        outZ = ground.z;
+        return;
+    }
+    outX = inX;
+    outY = inY;
+    outZ = inZ + 0.4f;
 }
 
 /*!
@@ -246,7 +286,154 @@ void CPickups::DoMoneyEffects(CEntity* entity) {
 
 // 0x455720
 void CPickups::DoPickUpEffects(CEntity* entity) {
-    plugin::Call<0x455720, CEntity*>(entity);
+    constexpr uint32 OBJ_FLAG_INVISIBLE = 0x2000000; // TODO: Name this flag in `CObject` (bit 25 of `m_nObjectFlags`)
+
+    auto* const obj    = entity->AsObject();
+    auto* const pickup = FindPickUpForThisObject(obj);
+
+    if (entity->m_nModelIndex != ModelIndices::MI_PICKUP_CAMERA) {
+        if (pickup->PickUpShouldBeInvisible()) {
+            obj->m_nObjectFlags |= OBJ_FLAG_INVISIBLE;
+        } else {
+            obj->m_nObjectFlags &= ~OBJ_FLAG_INVISIBLE;
+        }
+    } else if (TheCamera.m_aCams[TheCamera.m_nActiveCam].m_nMode == MODE_CAMERA) {
+        obj->m_nObjectFlags &= ~OBJ_FLAG_INVISIBLE;
+    } else {
+        obj->m_nObjectFlags |= OBJ_FLAG_INVISIBLE;
+        if (CClock::GetGameClockHours() < 5 || CPostEffects::IsVisionFXActive()) {
+            const auto red     = 100 - (int32)((float)(CGeneral::GetRandomNumber() & 0xFFFF) * (1.0f / 32768.0f) * -50.0f);
+            const auto size    = (std::sin((float)(CTimer::GetTimeInMS() & 0x1FFF) * 0.000766601588f) + 1.7f) * 3.7f;
+            const auto greenBlue = (int32)((float)red * 0.7f);
+            CCoronas::RegisterCorona(
+                reinterpret_cast<uint32>(&entity) - 3, // NOTE: The original code uses an address on the stack too (not the entity's address)
+                nullptr,
+                (uint8)red, (uint8)greenBlue, (uint8)greenBlue, 255,
+                entity->GetPosition(),
+                size,
+                100.0f,
+                CORONATYPE_HEADLIGHT,
+                static_cast<eCoronaFlareType>(0),
+                static_cast<eCoronaReflType>(0),
+                static_cast<eCoronaLOSCheck>(0),
+                static_cast<eCoronaTrail>(0),
+                0.0f,
+                false,
+                1.5f,
+                false,
+                15.0f,
+                false,
+                false
+            );
+        }
+    }
+
+    if (obj->m_nObjectFlags & OBJ_FLAG_INVISIBLE) {
+        return;
+    }
+
+    // Index into the color table below
+    // NOTE: Uninitialized in the original code for the bribe/info/killfrenzy/property/savegame pickups
+    int32 colorIdx = 0;
+    {
+        using namespace ModelIndices;
+        const auto model = entity->m_nModelIndex;
+        if (model == MI_PICKUP_ADRENALINE) {
+            colorIdx = 47;
+        } else if (model == MI_PICKUP_BODYARMOUR) {
+            colorIdx = 48;
+        } else if (model == MI_PICKUP_BRIBE || model == MI_PICKUP_INFO || model == MI_PICKUP_KILLFRENZY) {
+            /* nop */
+        } else if (model == MI_PICKUP_HEALTH || model == MI_PICKUP_BONUS) {
+            colorIdx = 47;
+        } else if (model == MI_PICKUP_PROPERTY) {
+            /* nop */
+        } else if (model == MI_PICKUP_PROPERTY_FORSALE) {
+            colorIdx = 47;
+        } else if (model == MI_PICKUP_REVENUE) {
+            colorIdx = 53;
+        } else if (model == MI_PICKUP_SAVEGAME) {
+            /* nop */
+        } else if (model == MI_PICKUP_CLOTHES) {
+            colorIdx = 47;
+        } else {
+            colorIdx = (int32)WeaponForModel(model);
+        }
+    }
+
+    // Pickup message (price, etc)
+    if ((obj->m_nObjectFlags & 0xC) || obj->m_nBonusValue || obj->m_wCostValue) {
+        const auto dist2D = (TheCamera.GetPosition() - entity->GetPosition()).Magnitude2D();
+        if (dist2D < 14.0f && NumMessages < MAX_PICKUP_MESSAGES) {
+            struct tPickupColor { // TODO: Proper name + move it to the header
+                uint8 r, g, b;
+                uint8 pad[5];
+            };
+            static const auto& s_PickupColors = StaticRef<tPickupColor[54]>(0x8A5FB0);
+
+            const CVector textPos = entity->GetPosition() + CVector{ 0.0f, 0.0f, 0.7f };
+            RwV3d         screenPos;
+            float         width, height;
+            if (CSprite::CalcScreenCoors(textPos, &screenPos, &width, &height, true, true)) {
+                auto& msg = aMessages[NumMessages];
+                msg.pos.x = screenPos.x;
+                msg.pos.y = screenPos.y;
+                *reinterpret_cast<int32*>(&msg.pos.z) = (int32)WeaponForModel(entity->m_nModelIndex); // The `z` component is actually used as the weapon type
+                msg.width  = width;
+                msg.height = height;
+                msg.color  = CRGBA{
+                    s_PickupColors[colorIdx].r,
+                    s_PickupColors[colorIdx].g,
+                    s_PickupColors[colorIdx].b,
+                    (uint8)(int32)((1.0f - dist2D * (1.0f / 14.0f)) * 255.0f)
+                };
+                if (obj->m_nObjectFlags & 8) {
+                    msg.flags |= 1;
+                } else {
+                    msg.flags &= ~1;
+                }
+                msg.field_19 = (char)obj->m_nBonusValue;
+                msg.price    = (uint32)obj->m_wCostValue * 5;
+
+                const auto GetPropertyText = [&] {
+                    return const_cast<GxtChar*>(TheText.Get(CPickup::FindStringForTextIndex(
+                        static_cast<ePickupPropertyText>(FindPickUpForThisObject(obj)->m_nFlags.nPropertyTextIndex)
+                    )));
+                };
+                if (entity->m_nModelIndex == ModelIndices::MI_PICKUP_PROPERTY) {
+                    msg.text   = GetPropertyText();
+                    msg.flags &= ~2;
+                } else if (entity->m_nModelIndex == ModelIndices::MI_PICKUP_PROPERTY_FORSALE) {
+                    msg.text   = GetPropertyText();
+                    msg.flags |= 2;
+                } else {
+                    msg.text   = nullptr;
+                    msg.flags &= ~2;
+                }
+                NumMessages++;
+            }
+        }
+    }
+
+    // Scale (so that all pickups are roughly the same size) + rotate
+    const auto& bb     = CModelInfo::GetModelInfo(entity->m_nModelIndex)->GetColModel()->m_boundBox;
+    const auto  extent = std::max({
+        bb.m_vecMax.x - bb.m_vecMin.x,
+        bb.m_vecMax.y - bb.m_vecMin.y,
+        bb.m_vecMax.z - bb.m_vecMin.z,
+    });
+    auto scale = (std::max(1.2f / extent, 1.0f) - 1.0f) * 0.6f + 1.0f;
+    if (entity->m_nModelIndex == MODEL_MINIGUN) {
+        scale = 1.2f;
+    }
+    const auto angle = (float)(CTimer::GetTimeInMS() & 0x7FF) * 0.00305664074f;
+    const auto c     = std::cos(angle) * scale;
+    const auto s     = std::sin(angle) * scale;
+
+    auto& mat = entity->GetMatrix();
+    mat.GetRight()   = CVector{ c, s, 0.0f };
+    mat.GetForward() = CVector{ -s, c, 0.0f };
+    mat.GetUp()      = CVector{ 0.0f, 0.0f, scale };
 }
 
 // 0x4551C0
@@ -261,9 +448,106 @@ CPickup* CPickups::FindPickUpForThisObject(CObject* object) {
 
 // returns pickup handle
 // g
+// 0x456F20
 tPickupReference CPickups::GenerateNewOne(CVector coors, uint32 modelId, ePickupType pickupType, uint32 ammo, uint32 moneyPerDay, bool isEmpty, char* message) {
-    auto retVal = plugin::CallAndReturn<int32, 0x456F20, CVector, uint32, ePickupType, uint32, uint32, bool, char*>(coors, modelId, pickupType, ammo, moneyPerDay, isEmpty, message);
-    return tPickupReference(retVal);
+    const auto FindFirstOfType = [](std::initializer_list<ePickupType> types) -> int32 {
+        for (auto&& [i, pickup] : rngv::enumerate(aPickUps)) {
+            if (rng::find(types, pickup.m_nPickupType) != types.end()) {
+                return (int32)i;
+            }
+        }
+        return -1;
+    };
+
+    int32 idx = -1;
+
+    // These kind of pickups are allocated from the end of the array
+    if (pickupType == PICKUP_FLOATINGPACKAGE || pickupType == PICKUP_NAUTICAL_MINE_INACTIVE || isEmpty) {
+        for (auto i = (int32)aPickUps.size() - 1; i >= 0; i--) {
+            if (aPickUps[i].m_nPickupType == PICKUP_NONE) {
+                idx = i;
+                break;
+            }
+        }
+    }
+
+    if (idx == -1) {
+        idx = FindFirstOfType({ PICKUP_NONE });
+        if (idx == -1) { // No free slot, try reusing one of the less important ones
+            idx = FindFirstOfType({ PICKUP_MONEY });
+            if (idx == -1) {
+                idx = FindFirstOfType({ PICKUP_ONCE_TIMEOUT, PICKUP_ONCE_TIMEOUT_SLOW });
+                if (idx == -1) {
+                    return tPickupReference{ -1 };
+                }
+            }
+            if (auto*& obj = aPickUps[idx].m_pObject) {
+                CWorld::Remove(obj);
+                delete obj;
+                obj = nullptr;
+            }
+        }
+    }
+
+    auto&      pickup = aPickUps[idx];
+    const auto timeMs = CTimer::GetTimeInMS();
+
+    pickup.m_nAmmo                        = ammo;
+    pickup.m_nMoneyPerDay                 = (uint16)moneyPerDay;
+    pickup.m_nPickupType                  = pickupType;
+    pickup.m_fRevenueValue                = 0.0f;
+    pickup.m_nRegenerationTime            = timeMs;
+    pickup.m_nFlags.bDisabled             = false;
+    pickup.m_nFlags.bEmpty                = isEmpty;
+    pickup.m_nFlags.bHelpMessageDisplayed = false;
+
+    switch (pickupType) {
+    case PICKUP_ONCE_TIMEOUT:
+        pickup.m_nRegenerationTime = timeMs + 20'000;
+        break;
+    case PICKUP_ONCE_TIMEOUT_SLOW:
+        pickup.m_nRegenerationTime = timeMs + 120'000;
+        break;
+    case PICKUP_MONEY:
+        pickup.m_nRegenerationTime = timeMs + 30'000;
+        break;
+    case PICKUP_MINE_INACTIVE:
+    case PICKUP_MINE_ARMED:
+        pickup.m_nPickupType       = PICKUP_MINE_INACTIVE;
+        pickup.m_nRegenerationTime = timeMs + 1'500;
+        break;
+    case PICKUP_NAUTICAL_MINE_INACTIVE:
+    case PICKUP_NAUTICAL_MINE_ARMED:
+        pickup.m_nPickupType       = PICKUP_NAUTICAL_MINE_INACTIVE;
+        pickup.m_nRegenerationTime = timeMs + 1'500;
+        break;
+    default:
+        break;
+    }
+
+    pickup.m_nModelIndex               = (int16)modelId;
+    pickup.m_nFlags.nPropertyTextIndex = CPickup::FindTextIndexForString(message);
+    pickup.SetPosn(coors);
+    pickup.m_nFlags.bVisible           = pickup.IsVisible();
+    pickup.m_pObject                   = nullptr;
+    if (pickup.m_nFlags.bVisible) {
+        pickup.GiveUsAPickUpObject(pickup.m_pObject, -1);
+        if (pickup.m_pObject) {
+            CWorld::Add(pickup.m_pObject);
+        }
+    }
+
+    if ((uint16)pickup.m_nReferenceIndex >= 0xFFFE) {
+        pickup.m_nReferenceIndex = 1;
+    } else {
+        pickup.m_nReferenceIndex++;
+    }
+    return tPickupReference{ (int32)(((uint32)(uint16)pickup.m_nReferenceIndex << 16) | (uint32)idx) };
+}
+
+// The game's function returns a 32 bit value in `eax`, but `tPickupReference` isn't trivial, so it would be returned through a hidden pointer => A wrapper has to be used for the hook
+static int32 GenerateNewOne_Hook(CVector coors, uint32 modelId, ePickupType pickupType, uint32 ammo, uint32 moneyPerDay, bool isEmpty, char* message) {
+    return CPickups::GenerateNewOne(coors, modelId, pickupType, ammo, moneyPerDay, isEmpty, message).num;
 }
 
 /*!
