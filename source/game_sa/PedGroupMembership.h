@@ -106,6 +106,9 @@ public:
     //! Get followers [that is, members excl. the leader]
     auto GetFollowers() { return GetMembers(false); }
 
+    //! Set the max distance members can be from the leader (NOTSA)
+    void SetSeparationRange(float range) { m_separationRange = range; }
+
     // Closest member, closest member distance sq
     using FindClosestMemberResult = std::tuple<CPed*, float>;
 
