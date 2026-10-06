@@ -37,6 +37,8 @@ public:
 public:
     static constexpr auto Type = TASK_COMPLEX_PROSTITUTE_SOLICIT;
 
+    static void InjectHooks();
+
     explicit CTaskComplexProstituteSolicit(CPed* client);
     ~CTaskComplexProstituteSolicit() override;
 
