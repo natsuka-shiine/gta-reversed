@@ -4,12 +4,15 @@
 
 auto& gCollisionPluginOffset = StaticRef<RwInt32>(0x9689DC);
 
+static RwStream* ClumpCollisionStreamRead(RwStream* stream, RwInt32 binaryLength, void* object, RwInt32 offsetInObject, RwInt32 sizeInObject);
+
 void CCollisionPlugin::InjectHooks() {
     RH_ScopedClass(CCollisionPlugin);
     RH_ScopedCategory("Plugins");
 
     RH_ScopedInstall(PluginAttach, 0x41B310);
     RH_ScopedInstall(SetModelInfo, 0x41B350);
+    RH_ScopedGlobalInstall(ClumpCollisionStreamRead, 0x41B1D0);
 }
 
 // internal
@@ -33,28 +36,34 @@ static void* ClumpCollisionCopyConstructor(void* dstObject, const void* srcObjec
 // internal
 // 0x41B1D0
 static RwStream* ClumpCollisionStreamRead(RwStream* stream, RwInt32 binaryLength, void* object, RwInt32 offsetInObject, RwInt32 sizeInObject) {
-    return plugin::CallAndReturn<RwStream*, 0x41B1D0, RwStream*, RwInt32, void*, RwInt32, RwInt32>(stream, binaryLength, object, offsetInObject, sizeInObject);
-
-    // incomplete
-    CMemoryMgr::LockScratchPad();
+    CMemoryMgr::LockScratchPad(); // NOTE: No-op on Windows, present on Android
     RwStreamRead(stream, &PC_Scratch, binaryLength);
-    CColModel* model = new CColModel();
 
-    switch (*(uint32*)PC_Scratch) {
+    auto* const cm = new CColModel();
+
+    auto* const buffer   = reinterpret_cast<uint8*>(&PC_Scratch[0]);
+    const auto  fourCC   = *reinterpret_cast<uint32*>(&buffer[0]);
+    const auto  fileSize = *reinterpret_cast<uint32*>(&buffer[4]);
+    constexpr auto HEADER_SIZE = 32u;
+    switch (fourCC) {
     case MakeFourCC("COLL"):
-        CFileLoader::LoadCollisionModel((uint8*)(&PC_Scratch[32]), *model);
+        CFileLoader::LoadCollisionModel(&buffer[HEADER_SIZE], *cm);
         break;
     case MakeFourCC("COL2"):
-        CFileLoader::LoadCollisionModelVer2((uint8*)(&PC_Scratch[32]), (PC_Scratch[4] - 24), *model, nullptr);
+        CFileLoader::LoadCollisionModelVer2(&buffer[HEADER_SIZE], fileSize - 24, *cm, nullptr);
         break;
     case MakeFourCC("COL3"):
-        CFileLoader::LoadCollisionModelVer3((uint8*)(&PC_Scratch[32]), (PC_Scratch[4] - 24), *model, nullptr);
+        CFileLoader::LoadCollisionModelVer3(&buffer[HEADER_SIZE], fileSize - 24, *cm, nullptr);
+        break;
+    default: // Headerless data
+        CFileLoader::LoadCollisionModel(&buffer[0], *cm);
         break;
     }
 
-    model->MakeMultipleAlloc();
-    CCollisionPlugin::ms_currentModel->SetColModel(model, true);
-    CCollisionPlugin::ms_currentModel->bDontWriteZBuffer = true;
+    cm->MakeMultipleAlloc();
+    CCollisionPlugin::ms_currentModel->SetColModel(cm, true);
+    CCollisionPlugin::ms_currentModel->bOwnsCollisionModel = true;
+
     CMemoryMgr::ReleaseScratchPad();
     return stream;
 }
