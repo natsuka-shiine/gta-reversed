@@ -30,7 +30,7 @@ void CTaskSimpleUseGun::InjectHooks() {
     RH_ScopedVMTInstall(Clone, 0x622F20);
     RH_ScopedVMTInstall(GetTaskType, 0x61DF20);
     RH_ScopedVMTInstall(MakeAbortable, 0x624E30);
-    RH_ScopedVMTInstall(ProcessPed, 0x62A380, { .Reversed = false });
+    RH_ScopedVMTInstall(ProcessPed, 0x62A380);
     RH_ScopedVMTInstall(SetPedPosition, 0x624ED0);
 }
 
@@ -422,126 +422,361 @@ bool CTaskSimpleUseGun::MakeAbortable(CPed* ped, eAbortPriority priority, const 
 
 // 0x62A380
 bool CTaskSimpleUseGun::ProcessPed(CPed* ped) {
-    return plugin::CallMethodAndReturn<bool, 0x62A380>(this, ped);
-    /*
-    * Code so far (should be) good, but has to be finished...
-    * 
-    m_IsLookIKInUse    = m_IsLookIKInUse && g_ikChainMan.IsLooking(ped);
-    m_IsArmIKInUse     = m_IsArmIKInUse && g_ikChainMan.IsArmPointing(0, ped);
-    m_IsFiringGunRightHandThisFrame = false;
-    m_IsFiringGunLeftHandThisFrame = false;
+    using enum eGunCommand;
 
-    if (m_WeaponInfo) { // Inverted
-        if (m_WeaponInfo != &ped->GetActiveWeapon().GetWeaponInfo(ped)) {
-            MakeAbortable(ped);
+    if (m_IsLookIKInUse && !g_ikChainMan.IsLooking(ped)) {
+        m_IsLookIKInUse = false;
+    }
+    if (m_IsArmIKInUse && !g_ikChainMan.IsArmPointing(eIKArm::IK_ARM_RIGHT, ped)) {
+        m_IsArmIKInUse = false;
+    }
+    m_IsFiringGunRightHandThisFrame = false;
+    m_IsFiringGunLeftHandThisFrame  = false;
+
+    // 0x62AF1A / 0x62AF27
+    const auto Finish = [&](bool removeStanceAnims) {
+        if (removeStanceAnims) {
+            RemoveStanceAnims(ped, -4.f);
+        }
+        AbortIK(ped);
+        if (const auto pd = ped->GetPlayerData()) {
+            pd->m_fAttackButtonCounter = 0.f;
+        }
+        return true;
+    };
+
+    if (m_WeaponInfo) {
+        if (m_WeaponInfo != &ped->GetActiveWeapon().GetWeaponInfo(ped)) { // Weapon has changed
+            MakeAbortable(ped, ABORT_PRIORITY_URGENT, nullptr);
         }
     } else {
         if (const auto pd = ped->GetPlayerData()) {
-            if (pd->m_nChosenWeapon != ped->m_nActiveWeaponSlot) {
+            if (pd->m_nChosenWeapon != ped->m_nActiveWeaponSlot) { // Still switching weapons
                 return false;
             }
         }
         m_WeaponInfo = &ped->GetActiveWeapon().GetWeaponInfo(ped);
-        if (m_WeaponInfo->m_nWeaponFire == 0 || m_WeaponInfo->flags.bThrow) {
+        if (m_WeaponInfo->m_nWeaponFire == WEAPON_FIRE_MELEE || m_WeaponInfo->flags.bThrow) {
             m_IsFinished = true;
             m_WeaponInfo = nullptr;
-
-            AbortIK(ped);
-            if (const auto pd = ped->GetPlayerData()) {
-                pd->m_fAttackButtonCounter = 0.f;
-            }
-            return true;
+            return Finish(false);
         }
         m_MoveCmd = { 0.f, 0.f };
     }
 
+    // 0x62A488
     if (!m_WeaponInfo->flags.b1stPerson || !ped->GetPlayerData()) {
         ped->bTestForBlockedPositions = true;
     }
 
-    if (!m_IsFinished) {
-        if (const auto pd = ped->GetPlayerData()) {
-            pd->m_fAttackButtonCounter *= std::pow(0.96f, CTimer::GetTimeStep());
-        }
-        if (m_IsInControl) {
-            m_CountDownFrames = -1;
-            if (ped->bDuckRightArmBlocked && (ped->bGetUpAnimStarted || !m_WeaponInfo->flags.bAimWithArm)) {
-                if (m_LastCmd != eGunCommand::PISTOLWHIP && (m_NextCmd != eGunCommand::PISTOLWHIP || m_Anim)) { // 0x62A532
-                    if (m_Anim) {
-                        m_Anim->SetBlendDelta(-4.f);
-                        m_Anim->SetFlag(ANIMATION_IS_PLAYING, false);
-                        m_Anim->SetFlag(ANIMATION_FREEZE_LAST_FRAME, true);
-                    } else if (notsa::contains({ eGunCommand::AIM, eGunCommand::FIRE, eGunCommand::FIREBURST }, m_NextCmd)) { // 0x62A63B - Inverted
-                        AbortIK(ped);
-                        m_IsLOSBlocked = true;
-                        if (m_LastCmd == eGunCommand::FIREBURST) {
-                            m_LastCmd = eGunCommand::AIM;
-                        }
+    if (m_IsFinished) {
+        return Finish(true);
+    }
 
-                    SET_MOVE_ANIM_AND_COMMAND_RET_0: // 0x62A586
-                        if (m_WeaponInfo->flags.bAimWithArm || ped->bIsDucking || m_HasMoveControl) {
-                            SetMoveAnim(ped);
-                        }
-                        if (m_NextCmd < eGunCommand::END_LEISURE) {
-                            if (m_NextCmd != eGunCommand::RELOAD || notsa::contains({ eGunCommand::FIRE, eGunCommand::FIREBURST }, m_LastCmd)) {
-                                m_NextCmd = eGunCommand::NONE;
-                            }
-                        }
-                        m_IsInControl = false;
-                        return false;
-                    }
-                }
-            } else if (m_NextCmd == eGunCommand::PISTOLWHIP && m_LastCmd <= eGunCommand::FIREBURST) { // 0x62A5E4
+    if (const auto pd = ped->GetPlayerData()) {
+        if (pd->m_fAttackButtonCounter > 0.f) {
+            pd->m_fAttackButtonCounter *= std::pow(WEAPON_RE_AIM_RATE, CTimer::GetTimeStep());
+        }
+    }
+
+    if (!m_IsInControl) { // 0x62AEFA
+        m_HasFiredGun = false;
+        m_MoveCmd     = { 0.f, 0.f };
+        if (m_CountDownFrames-- != 0) {
+            return false;
+        }
+        m_IsFinished = true;
+        return Finish(true);
+    }
+    m_CountDownFrames = 0xFF;
+
+    const auto isAimBlocked = ped->bIsDucking
+        ? ped->bDuckRightArmBlocked
+        : ped->bRightArmBlocked && !m_WeaponInfo->flags.bAimWithArm;
+
+    bool doProcessAnim = true;
+    if (isAimBlocked) { // 0x62A532
+        if (m_LastCmd != PISTOLWHIP && (m_NextCmd != PISTOLWHIP || m_Anim)) { // 0x62A606
+            if (m_Anim || (m_NextCmd >= AIM && m_NextCmd <= FIREBURST)) {
                 if (m_Anim) {
-                    m_Anim->SetDefaultDeleteCallback();
-                    m_Anim = nullptr;
+                    m_Anim->SetBlendDelta(-4.f);
+                    m_Anim->SetFlag(ANIMATION_IS_PLAYING, false);
+                    m_Anim->SetFlag(ANIMATION_IS_BLEND_AUTO_REMOVE, true);
                 }
+                AbortIK(ped); // 0x62A638
+                m_IsLOSBlocked = true;
+                if (m_LastCmd == FIREBURST) {
+                    m_LastCmd = AIM;
+                }
+                doProcessAnim = false;
+            }
+        }
+    } else if (m_NextCmd == PISTOLWHIP && m_LastCmd <= FIREBURST) { // 0x62A5D0
+        if (m_Anim) {
+            m_Anim->SetDefaultDeleteCallback();
+        }
+        m_Anim = nullptr;
+        AbortIK(ped);
+    }
+
+    if (doProcessAnim) { // 0x62A54D
+        if (!m_Anim) {
+            StartAnim(ped);
+            if (!m_Anim) {
                 AbortIK(ped);
             }
+        } else {
+            ProcessAnim(ped); // 0x62A657
 
-            if (!m_Anim) { // 0x62A55B
-                StartAnim(ped);
-                if (!m_Anim) {
-                    AbortIK(ped);
+            // 0x62AC99
+            m_SkipAim = false;
+            if (ped->m_pedIK.bUseArm) {
+                const auto isTargetDeadPed = m_TargetEntity && m_TargetEntity->GetIsTypePed() && !(m_TargetEntity->AsPed()->m_fHealth > 0.f);
+                const auto aimTargetPos    = GetAimTargetPosition(ped);
+                if (aimTargetPos.x != 0.f || aimTargetPos.y != 0.f) { // 0x62ADDC
+                    auto aimDir = aimTargetPos - ped->GetPosition();
+                    aimDir.Normalise();
+
+                    auto angle = std::atan2(-aimDir.x, aimDir.y) - ped->m_fCurrentRotation;
+                    if (angle > PI) {
+                        angle -= TWO_PI;
+                    } else if (angle < -PI) {
+                        angle += TWO_PI;
+                    }
+
+                    // If the target is a dead ped the range is narrower (they're on the ground)
+                    const auto angleLimitOffset = isTargetDeadPed ? DegreesToRadians(40.f) : 0.f;
+                    if (angle > DegreesToRadians(115.f) - angleLimitOffset || angle < -DegreesToRadians(130.f) + angleLimitOffset) {
+                        m_SkipAim = true;
+                    }
+
+                    const auto pedUp = ped->GetUpVector();
+                    if (isTargetDeadPed && aimDir.Dot(pedUp) < -0.8f) {
+                        m_SkipAim = true;
+                    }
                 }
-                goto SET_MOVE_ANIM_AND_COMMAND_RET_0;
+                if (!ped->bIsDucking && ped->bRightArmBlocked) { // 0x62AEB6
+                    m_SkipAim = true;
+                }
             }
 
-            if (m_LastCmd == eGunCommand::RELOAD) { // 0x62A65A
-                if (notsa::contains({ ANIM_ID_RELOAD, ANIM_ID_CROUCHRELOAD }, m_Anim->GetAnimId())) {
-                    if (m_Anim->GetBlendDelta() >= 0.f) {
-                        m_Anim->SetBlendDelta(-4.f);
-                    }
-                }
-                m_SkipAim = false;
-                if (ped->m_pedIK.bUseArm) { // 0x62ACB7
-                    const auto isAimTargetPedDead = 
-                    const auto aimTargetPos = GetAimTargetPosition(ped, isAimTargetPedDead);
-                    if (aimTargetPos.x != 0.f || aimTargetPos.y != 0.f) {
-                        const auto aimDir = (aimTargetPos - ped->GetPosition()).Normalized(); // 0x62ADF0
-                        const auto targetAngleToUs = CGeneral::LimitRadianAngle(aimDir.Heading() - ped->m_fCurrentRotation);
-                        m_SkipAim = [&, this]{
-                            if (m_TargetEntity && m_TargetEntity->GetIsTypePed() && m_TargetEntity->AsPed()->m_fHealth <= 0.f) {
-                                if (DegreesToRadians(115.f - 40.f) < targetAngleToUs || targetAngleToUs < -DegreesToRadians(130.f - 40.f)) {
-                                    return true;
-                                }
-                                if (aimDir.Dot(ped->GetUpVector()) < -0.8f) { // 0x62AE84
-                                    return true;
-                                }
-                            } else {
-                                if (DegreesToRadians(115.f) < targetAngleToUs || targetAngleToUs < -DegreesToRadians(130.f)) {
-                                    return true;
-                                }
-                            }
-                            return m_SkipAim;
-                        }();
-                    }
-                    m_SkipAim |= ped->bIsDucking && ped->bDuckRightArmBlocked; // 0x62AEB6
-                }
+            // 0x62AECF
+            if (m_LastCmd == NONE || m_LastCmd >= RELOAD || m_SkipAim) {
+                AbortIK(ped);
+            } else {
+                AimGun(ped);
             }
         }
     }
-    */
+
+    // 0x62A56D
+    if (!m_WeaponInfo->flags.bAimWithArm || ped->bIsDucking || m_HasMoveControl) {
+        SetMoveAnim(ped);
+    }
+    if (m_NextCmd < END_LEISURE) {
+        if (m_NextCmd != RELOAD || (m_LastCmd != FIRE && m_LastCmd != FIREBURST)) {
+            m_NextCmd = NONE;
+        }
+    }
+    m_IsInControl = false;
+    return false;
+}
+
+// NOTSA - Code from `ProcessPed` (0x62A657 - 0x62AC99)
+// Processes the current anim (`m_Anim`, must be valid) according to the last/next commands
+void CTaskSimpleUseGun::ProcessAnim(CPed* ped) {
+    using enum eGunCommand;
+
+    const auto FadeOutAnim = [this] { // 0x62AC82
+        if (!(m_Anim->m_BlendDelta < 0.f)) {
+            m_Anim->m_BlendDelta = -4.f;
+        }
+    };
+
+    const auto isDucking = ped->bIsDucking;
+
+    switch (m_LastCmd) {
+    case RELOAD: { // 0x62A65F
+        if (m_Anim->m_AnimId != ANIM_ID_RELOAD && m_Anim->m_AnimId != ANIM_ID_CROUCHRELOAD) {
+            FadeOutAnim();
+        }
+        return;
+    }
+    case PISTOLWHIP: { // 0x62A685
+        const auto& comboData = CTaskSimpleFight::GetComboData(MELEE_COMBO_PISTOL_WHIP);
+        const auto  hitTime   = comboData.m_fHit[isDucking ? 1 : 0];
+        if (   m_Anim->m_BlendAmount > 0.9f
+            && !(m_Anim->m_BlendDelta < 0.f)
+            && m_Anim->m_CurrentTime > hitTime
+            && m_Anim->m_CurrentTime - m_Anim->m_TimeStep < hitTime
+        ) {
+            CVector hitPos = ped->m_matrix->TransformPoint(CTaskSimpleFight::m_aHitOffset[comboData.m_nHitLevel[isDucking ? 1 : 0]]);
+
+            CTaskSimpleFight fight(m_TargetEntity, MELEE_CMD_ATTACK_1, 20'000);
+            fight.m_nComboSet    = MELEE_COMBO_PISTOL_WHIP;
+            fight.m_nCurrentMove = static_cast<eFightAttackType>(isDucking ? 1 : 0);
+            fight.m_nLastCommand = MELEE_CMD_ATTACK_1;
+            fight.m_pAnim        = m_Anim;
+            fight.FightStrike(ped, hitPos);
+            fight.m_pAnim = nullptr;
+        }
+        if (m_TargetEntity) { // 0x62A771
+            const auto dir = m_TargetEntity->GetPosition() - ped->GetPosition();
+            ped->m_fAimingRotation = std::atan2(-dir.x, dir.y);
+        }
+        return;
+    }
+    case NONE: { // 0x62AC72
+        if (m_Anim->m_BlendAmount > 0.f) {
+            FadeOutAnim();
+        }
+        return;
+    }
+    case AIM:
+    case FIRE:
+    case FIREBURST:
+        break;
+    default: // UNKNOWN, END_LEISURE, END_NOW
+        return;
+    }
+
+    // 0x62A7E3 - AIM, FIRE, FIREBURST
+    if (m_Anim->m_BlendDelta < 0.f) {
+        return;
+    }
+
+    const auto loopStart     = m_WeaponInfo->GetAnimLoopStart(isDucking);
+    const auto loopEnd       = m_WeaponInfo->GetAnimLoopEnd(isDucking);
+    const auto fireTime      = isDucking ? m_WeaponInfo->m_fAnimLoop2Fire : m_WeaponInfo->m_fAnimLoopFire;
+    const auto leftFireTime  = (loopEnd - loopStart) * 0.5f + fireTime; // Left hand fires half a loop later
+
+    const auto IsCmdFire = [](eGunCommand cmd) {
+        return cmd == FIRE || cmd == FIREBURST;
+    };
+    const auto IsWeaponReloading = [ped] {
+        return ped->GetActiveWeapon().GetState() == WEAPONSTATE_RELOADING;
+    };
+    const auto GetBurstShots = [this] { // The original code treats this value as signed
+        return static_cast<int16>(m_BurstShots);
+    };
+    //! Has the anim just passed the given time (in this frame)?
+    const auto HasAnimPassedTime = [this](float time) {
+        return m_Anim->m_CurrentTime > time && m_Anim->m_CurrentTime - m_Anim->m_TimeStep <= time;
+    };
+
+    if (IsCmdFire(m_LastCmd)) { // 0x62A855
+        if (m_Anim->m_BlendAmount < 0.99f || IsWeaponReloading()) { // 0x62A89A - Hold the anim at the loop start
+            if (m_Anim->IsPlaying() && m_Anim->m_CurrentTime >= loopStart && m_Anim->m_CurrentTime - m_Anim->m_TimeStep < loopStart) {
+                m_Anim->SetFlag(ANIMATION_IS_PLAYING, false);
+                m_Anim->SetCurrentTime(loopStart);
+            }
+        } else if (!m_Anim->IsPlaying() && m_Anim->m_CurrentTime == loopStart) { // 0x62A880
+            m_Anim->SetFlag(ANIMATION_IS_PLAYING, true);
+        }
+    }
+
+    // 0x62A8D9
+    if (m_WeaponInfo->flags.bContinuosFire) {
+        if (IsCmdFire(m_LastCmd) && m_Anim->m_CurrentTime > loopStart && m_Anim->m_CurrentTime < loopEnd && m_Anim->IsPlaying()) {
+            if (m_HasFiredGun && !(m_LastCmd == FIREBURST && GetBurstShots() > 0) && !IsCmdFire(m_NextCmd)) { // 0x62A950 - Stop firing
+                m_Anim->SetFlag(ANIMATION_IS_PLAYING, false);
+                m_Anim->m_BlendDelta = -4.f;
+            } else { // 0x62A95F
+                m_IsFiringGunRightHandThisFrame = true;
+                m_HasFiredGun                   = true;
+                if (m_NextCmd > m_LastCmd) {
+                    m_LastCmd = m_NextCmd;
+                }
+                m_NextCmd = NONE;
+                if (m_LastCmd == FIREBURST && GetBurstShots() > 0) {
+                    m_BurstShots--;
+                } else {
+                    m_BurstShots = 0;
+                }
+            }
+        }
+    } else {
+        if (m_Anim->IsPlaying() && HasAnimPassedTime(fireTime) && IsCmdFire(m_LastCmd)) { // 0x62A99A
+            m_IsFiringGunRightHandThisFrame = true;
+            m_HasFiredGun                   = true;
+            if (GetBurstShots() > 0) {
+                m_BurstShots--;
+            }
+        }
+        if (m_WeaponInfo->flags.bTwinPistol && !ped->bLeftArmBlocked && m_Anim->IsPlaying() && HasAnimPassedTime(leftFireTime) && IsCmdFire(m_LastCmd)) { // 0x62A9E5
+            m_IsFiringGunLeftHandThisFrame = true;
+            m_HasFiredGun                  = true;
+            if (GetBurstShots() > 0) {
+                m_BurstShots--;
+            }
+        }
+    }
+
+    // 0x62AA48
+    const auto wasAnimPlaying = m_Anim->IsPlaying();
+    if (   !wasAnimPlaying
+        && !(m_LastCmd == AIM && m_NextCmd <= AIM)
+        && (m_Anim->m_BlendHier->m_fTotalTime > m_Anim->m_CurrentTime || !(m_Anim->m_BlendDelta < 0.f))
+    ) {
+        if (m_LastCmd > RELOAD || m_NextCmd > RELOAD) { // 0x62AAD3
+            if (m_WeaponInfo->flags.bExpands) {
+                m_Anim->SetFlag(ANIMATION_IS_PLAYING, true);
+                if (m_Anim->m_CurrentTime <= loopStart) {
+                    m_Anim->SetCurrentTime(loopEnd);
+                }
+            } else {
+                m_Anim->m_BlendDelta = -4.f;
+            }
+        } else if (m_Anim->m_BlendAmount > 0.f && !(m_Anim->m_BlendDelta < 0.f) && !IsWeaponReloading()) { // 0x62AA99
+            m_Anim->SetFlag(ANIMATION_IS_PLAYING, true);
+        }
+
+        // 0x62AB05
+        if (IsCmdFire(m_NextCmd)) {
+            m_LastCmd = m_NextCmd;
+            m_NextCmd = NONE;
+            if (m_LastCmd == FIREBURST) {
+                m_BurstShots = m_BurstLength;
+            }
+        } else if (m_LastCmd == AIM && m_NextCmd != AIM) {
+            m_LastCmd = NONE;
+        }
+    } else if (m_LastCmd == AIM && wasAnimPlaying) { // 0x62AB35 - Hold the anim at the loop start while aiming
+        const auto currTime = m_Anim->m_CurrentTime;
+        const auto timeStep = m_Anim->m_TimeStep;
+        if ((currTime >= loopStart && currTime - timeStep < loopStart) || !(currTime + timeStep < loopStart)) {
+            m_Anim->SetFlag(ANIMATION_IS_PLAYING, false);
+            m_Anim->SetCurrentTime(loopStart);
+        }
+    }
+
+    // 0x62AB80 - End of the loop reached
+    if (HasAnimPassedTime(loopEnd)) {
+        if (IsCmdFire(m_NextCmd) || (m_LastCmd == FIREBURST && GetBurstShots() > 0 && m_NextCmd != RELOAD)) { // 0x62ABE1 - Keep on firing
+            m_Anim->SetCurrentTime(loopStart);
+            m_Anim->SetFlag(ANIMATION_IS_PLAYING, !IsWeaponReloading());
+            if (IsCmdFire(m_NextCmd)) {
+                if (m_NextCmd > m_LastCmd) {
+                    m_LastCmd = m_NextCmd;
+                }
+                if (m_NextCmd == FIREBURST && m_BurstShots == 0) {
+                    m_BurstShots = m_BurstLength;
+                }
+                m_NextCmd = NONE;
+            }
+        } else if (m_NextCmd == AIM) { // 0x62ABCA - Back to aiming
+            m_Anim->SetCurrentTime(loopStart);
+            m_Anim->SetFlag(ANIMATION_IS_PLAYING, false);
+            m_LastCmd = AIM;
+            m_NextCmd = NONE;
+        }
+    }
+
+    // 0x62AC36
+    if (m_Anim->m_CurrentTime > m_WeaponInfo->m_fBreakoutTime && m_NextCmd == END_NOW) {
+        m_IsFinished         = true;
+        m_Anim->m_BlendDelta = m_Anim->HasFlag(ANIMATION_DONT_ADD_TO_PARTIAL_BLEND) ? -1.f : -4.f;
+    }
 }
 
 // 0x624ED0
