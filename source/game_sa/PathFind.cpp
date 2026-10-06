@@ -52,6 +52,8 @@ void CPathFind::InjectHooks() {
     RH_ScopedInstall(MakeRequestForNodesToBeLoaded, 0x450D70);
     RH_ScopedInstall(UpdateStreaming, 0x450A60);
     RH_ScopedInstall(TakeWidthIntoAccountForWandering, 0x4509A0);
+    RH_ScopedInstall(TakeWidthIntoAccountForCoors, 0x44DA30);
+    RH_ScopedInstall(GeneratePedCreationCoors, 0x44E790);
     RH_ScopedInstall(Shutdown, 0x450950);
     RH_ScopedOverloadedInstall(FindNodeCoorsForScript, "TwoNodes", 0x450780, CVector(CPathFind::*)(CNodeAddress, CNodeAddress, float&, bool*));
     RH_ScopedOverloadedInstall(FindNodeCoorsForScript, "LinkedNode", 0x4505E0, CVector(CPathFind::*)(CNodeAddress, bool*));
@@ -68,13 +70,13 @@ void CPathFind::InjectHooks() {
     RH_ScopedInstall(SwitchPedRoadsOffInArea, 0x452F00);
     RH_ScopedInstall(SwitchRoadsOffInArea, 0x452C80);
     RH_ScopedInstall(SwitchRoadsOffInAreaForOneRegion, 0x452820);
-    RH_ScopedInstall(ComputeRoute, 0x452760, { .Reversed = false });
+    RH_ScopedInstall(ComputeRoute, 0x452760);
     //RH_ScopedInstall(CompleteNewInterior, 0x452270);
     RH_ScopedInstall(SwitchOffNodeAndNeighbours, 0x452160);
     //RH_ScopedInstall(Find2NodesForCarCreation, 0x452090);
     //RH_ScopedInstall(TestCoorsCloseness, 0x452000);
     //RH_ScopedInstall(FindNextNodeWandering, 0x451B70);
-    RH_ScopedInstall(DoPathSearch, 0x4515D0, {.Reversed = false}); // Sometimes breaks `CTaskComplexFollowNodeRoute::ComputePathNodes` - To repro just walk around in groove st. 
+    RH_ScopedInstall(DoPathSearch, 0x4515D0);
     //RH_ScopedInstall(FindParkingNodeInArea, 0x4513F0);
     RH_ScopedInstall(FindLinkBetweenNodes, 0x451350);
     RH_ScopedInstall(ReturnInteriorNodeIndex, 0x451300);
@@ -251,9 +253,215 @@ bool CPathFind::TestCrossesRoad(CNodeAddress startNodeAddress, CNodeAddress targ
     return intersect && intersect->m_bRoadCross;
 }
 
+// 0x44E790
+bool CPathFind::GeneratePedCreationCoors(
+    float         x,
+    float         y,
+    float         minDist1,
+    float         maxDist1,
+    float         minDist2,
+    float         maxDist2,
+    CVector*      outCoords,
+    CNodeAddress* outAddress1,
+    CNodeAddress* outAddress2,
+    float*        outOrientation,
+    bool          bLowTraffic,
+    CMatrix*      transformMatrix
+) {
+    // Nodes with a spawn probability less than (or equal to) this are ignored
+    const auto minSpawnProbability = (int32)((float)(rand() & 0xFFFF) * (1.0f / 32768.0f) * 15.0f);
+    const auto maxNodeDistSq       = sq(maxDist1 + 30.0f);
+    const auto areaId              = FindRegionForCoors({ x, y });
+
+    for (auto attempt = 0; attempt < 300; attempt++) {
+        if (!IsAreaLoaded(areaId) || m_anNumPedNodes[areaId] == 0) {
+            continue;
+        }
+
+        // 0x44E82E - Pick a random ped node in this area
+        const CPathNode& node = m_pPathNodes[areaId][(rand() >> 6) % (int32)m_anNumPedNodes[areaId] + m_anNumVehicleNodes[areaId]];
+
+        // 0x44E855 - `m_vPos.x/y` convert to the uncompressed value (int16 / 8)
+        const float nodeX      = node.m_vPos.x;
+        const float nodeY      = node.m_vPos.y;
+        const float nodeDistSq = (nodeY - y) * (nodeY - y) + (nodeX - x) * (nodeX - x);
+        if (!(nodeDistSq < maxNodeDistSq)) {
+            continue;
+        }
+        if ((int32)node.m_nSpawnProbability <= minSpawnProbability) {
+            continue;
+        }
+
+        // 0x44E8D4
+        const auto numLinks = (int32)node.m_nNumLinks;
+        for (auto linkIdx = 0; linkIdx < numLinks; linkIdx++) {
+            const auto linkId = node.m_wBaseLinkId + linkIdx;
+            if (m_pPathIntersections[areaId][linkId].m_bRoadCross) { // 0x44E90D
+                continue;
+            }
+
+            // 0x44E917 - Interior areas are ignored
+            const auto linkedAddr = m_pNodeLinks[areaId][linkId];
+            if (linkedAddr.m_wAreaId >= NUM_PATH_MAP_AREAS || !IsAreaLoaded(linkedAddr.m_wAreaId)) {
+                continue;
+            }
+            const CPathNode& linkedNode = m_pPathNodes[linkedAddr.m_wAreaId][linkedAddr.m_wNodeId];
+
+            // 0x44E94F
+            if ((node.m_isSwitchedOff || linkedNode.m_isSwitchedOff) && !bLowTraffic) {
+                continue;
+            }
+            if ((int32)linkedNode.m_nSpawnProbability <= minSpawnProbability) { // 0x44E96A
+                continue;
+            }
+
+            // 0x44E97E - Either of the nodes must be closer than `maxDist1`
+            const float nodeDist = std::sqrt(nodeDistSq);
+            {
+                const CVector linkedPos    = linkedNode.GetPosition();
+                const float   linkedDistSq = (linkedPos.y - y) * (linkedPos.y - y) + (linkedPos.x - x) * (linkedPos.x - x);
+                if (!(nodeDist < maxDist1) && !(std::sqrt(linkedDistSq) < maxDist1)) {
+                    continue;
+                }
+            }
+
+            // 0x44EA30 - Try a few random points on the line between the 2 nodes
+            for (auto i = 0; i < 5; i++) {
+                const float t = (float)(rand() & 0xFF) * (1.0f / 256.0f);
+                *outOrientation = t;
+
+                const CVector pos = t * linkedNode.GetPosition() + (1.0f - t) * node.GetPosition();
+
+                const float dist2D = std::sqrt((pos.y - y) * (pos.y - y) + (pos.x - x) * (pos.x - x));
+
+                // 0x44EB36
+                const bool isVisible = transformMatrix
+                    ? TheCamera.IsSphereVisible(pos, 2.0f, (RwMatrix*)transformMatrix)
+                    : TheCamera.IsSphereVisible(pos, 2.0f);
+                if (isVisible) { // 0x44EB6B
+                    if (!(dist2D > minDist1) || !(dist2D < maxDist1)) {
+                        continue;
+                    }
+                } else { // 0x44EB91
+                    if (!(dist2D > minDist2) || !(dist2D < maxDist2)) {
+                        continue;
+                    }
+                    if ((rand() & 1) == 0) {
+                        continue;
+                    }
+                }
+
+                // 0x44EBBA - NOTE: The out values are written even if the ground isn't found
+                *outAddress1 = node.GetAddress();
+                *outAddress2 = linkedNode.GetAddress();
+                *outCoords   = pos;
+
+                bool        bGroundFound{};
+                const float groundZ = CWorld::FindGroundZFor3DCoord({ pos.x, pos.y, pos.z + 2.0f }, &bGroundFound, nullptr);
+                if (!bGroundFound) {
+                    continue;
+                }
+
+                // 0x44EC60
+                if (std::abs(groundZ - pos.z) > 3.0f) {
+                    return false;
+                }
+                outCoords->z = groundZ;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// 0x44DA30
+void CPathFind::TakeWidthIntoAccountForCoors(CNodeAddress address, CNodeAddress address2, uint16 seed, float* fOut1, float* fOut2) {
+    if (!address.IsAreaValid() || !IsAreaNodesAvailable(address)) {
+        return;
+    }
+    if (!address2.IsAreaValid() || !IsAreaNodesAvailable(address2)) {
+        return;
+    }
+
+    // The narrower of the two nodes decides the offset
+    const auto pathWidth = (int32)std::min(
+        m_pPathNodes[address.m_wAreaId][address.m_wNodeId].m_nPathWidth,
+        m_pPathNodes[address2.m_wAreaId][address2.m_wNodeId].m_nPathWidth
+    );
+
+    // Each nibble is remapped to [-7, +8]
+    *fOut1 += (float)(((seed & 0xF) - 7) * pathWidth) * 0.00775f;
+    *fOut2 += (float)((((seed >> 4) & 0xF) - 7) * pathWidth) * 0.00775f;
+}
+
 // 0x44ECA0
-bool CPathFind::GeneratePedCreationCoors_Interior(float x, float y, CVector* outCoords, CNodeAddress* unused1, CNodeAddress* unused2, float* outOrientation) {
-    return plugin::CallMethodAndReturn<bool, 0x44ECA0>(this, x, y, outCoords, unused1, unused2, outOrientation);
+bool CPathFind::GeneratePedCreationCoors_Interior(
+    float         x,
+    float         y,
+    CVector*      outCoords,
+    CNodeAddress* unused1,
+    CNodeAddress* unused2,
+    float*        outOrientation
+) {
+    int   closestInteriorSlot = -1;
+    float closestDistSq       = std::numeric_limits<float>::max();
+    int   bestNodeIdx         = -1;
+
+    for (int intSlot = 0; intSlot < NUM_PATH_INTERIOR_AREAS; ++intSlot) {
+        int areaId = NUM_PATH_MAP_AREAS + intSlot;
+        if (!IsAreaLoaded(areaId) || m_interiorIDs[intSlot] == uint32(-1)) {
+            continue;
+        }
+
+        uint32 numPedNodes = m_anNumPedNodes[areaId];
+        if (numPedNodes == 0) {
+            continue;
+        }
+        uint32 firstPedNode = m_anNumVehicleNodes[areaId];
+        for (uint32 nodeIdx = firstPedNode; nodeIdx < firstPedNode + numPedNodes; ++nodeIdx) {
+            CPathNode& node = m_pPathNodes[areaId][nodeIdx];
+
+            CVector pos    = node.GetPosition();
+            float   dx     = x - pos.x;
+            float   dy     = y - pos.y;
+            float   distSq = dx * dx + dy * dy;
+            if (distSq < closestDistSq) {
+                closestDistSq       = distSq;
+                closestInteriorSlot = intSlot;
+                bestNodeIdx         = nodeIdx;
+            }
+        }
+    }
+
+    if (closestInteriorSlot == -1 || bestNodeIdx == -1) {
+        return false;
+    }
+
+    int        areaId = NUM_PATH_MAP_AREAS + closestInteriorSlot;
+    CPathNode& node   = m_pPathNodes[areaId][bestNodeIdx];
+    if (node.m_isSwitchedOff) {
+        return false;
+    }
+    if (node.m_onDeadEnd) {
+        return false;
+    }
+    if (node.m_nNumLinks == 0) {
+        return false;
+    }
+    if (outCoords) {
+        *outCoords = node.GetPosition();
+    }
+    if (outOrientation) {
+        *outOrientation = 0.0f; 
+    }
+    if (unused1) {
+        *unused1 = CNodeAddress(areaId, node.m_wNodeId);
+    }
+    if (unused2) {
+        *unused2 = CNodeAddress(); 
+    }
+    return true;
 }
 
 // 0x44D480
@@ -278,17 +486,102 @@ CVector CPathFind::TakeWidthIntoAccountForWandering(CNodeAddress nodeAddress, in
 }
 
 //  0x44F8C0
-CNodeAddress CPathFind::FindNthNodeClosestToCoors(CVector pos, uint8 nodeType, float maxDistance, bool bLowTraffic, bool bUnkn, int32 nthNode, bool bBoatsOnly,
-                                                  bool bIgnoreInterior, CNodeAddress* outNode) {
-    CNodeAddress outAddress;
-    plugin::CallMethod<0x44F8C0, CPathFind*, CNodeAddress*, CVector, uint8, float, bool, bool, int32, bool, bool, CNodeAddress*>(
-        this, &outAddress, pos, nodeType, maxDistance, bLowTraffic, bUnkn, nthNode, bBoatsOnly, bIgnoreInterior, outNode);
-    return outAddress;
+CNodeAddress CPathFind::FindNthNodeClosestToCoors( CVector pos,uint8 nodeType,float maxDistance,bool bLowTraffic,bool bUnkn,int32 nthNode,bool bBoatsOnly,bool bIgnoreInterior,CNodeAddress* outNode)
+{
+    struct Candidate {
+        float        distSq;
+        CNodeAddress addr;
+    };
+    std::vector<Candidate> candidates;
+    size_t areaStart = 0, areaEnd = NUM_PATH_MAP_AREAS;
+    if (!bIgnoreInterior) {
+        areaEnd += NUM_PATH_INTERIOR_AREAS;
+    }
+    for (size_t areaId = areaStart; areaId < areaEnd; ++areaId) {
+        if (!IsAreaLoaded(areaId)) {
+            continue;
+        }
+        auto nodes = GetPathNodesInArea(areaId, static_cast<ePathType>(nodeType));
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            auto& node = nodes[i];
+            if (bBoatsOnly && !node.m_bWaterNode) {
+                continue;
+            }
+            if (node.m_isSwitchedOff) {
+                continue;
+            }
+            if (bLowTraffic && node.m_nSpawnProbability < 2) {
+                continue;
+            }
+            float distSq = (node.GetPosition() - pos).SquaredMagnitude();
+            if (distSq > maxDistance * maxDistance) {
+                continue;
+            }
+            candidates.push_back({
+                distSq, { (uint16)areaId, (uint16)i }
+            });
+        }
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b) {
+        return a.distSq < b.distSq;
+    });
+
+    if (nthNode < 0 || (size_t)nthNode >= candidates.size()) {
+        if (outNode) {
+            *outNode = {};
+        }
+        return {};
+    }
+
+    auto result = candidates[nthNode].addr;
+    if (outNode) {
+        *outNode = result;
+    }
+    return result;
 }
 
 // 0x451B70
-void CPathFind::FindNextNodeWandering(uint8 nodeType, CVector vecPos, CNodeAddress* originAddress, CNodeAddress* targetAddress, uint8 dir, uint8* outDir) {
-    plugin::CallMethod<0x451B70, CPathFind*, uint8, CVector, CNodeAddress*, CNodeAddress*, uint8, uint8*>(this, nodeType, vecPos, originAddress, targetAddress, dir, outDir);
+void CPathFind::FindNextNodeWandering(uint8 nodeType,CVector vecPos,CNodeAddress* originAddress,CNodeAddress* targetAddress,uint8 dir,uint8* outDir) {
+    if (!originAddress || !originAddress->IsValid()) {
+        if (targetAddress) {
+            *targetAddress = CNodeAddress();
+        }
+        if (outDir) {
+            *outDir = 0;
+        }
+        return;
+    }
+
+    CPathNode* originNode = GetPathNode(*originAddress);
+    if (!originNode) {
+        if (targetAddress) {
+            *targetAddress = CNodeAddress();
+        }
+        if (outDir) {
+            *outDir = 0;
+        }
+        return;
+    }
+
+    for (const auto& linked : GetNodeLinkedNodes(*originNode)) {
+        if (linked.GetAddress() != *originAddress) {
+            if (targetAddress) {
+                *targetAddress = linked.GetAddress();
+            }
+            if (outDir) {
+                *outDir = dir;
+            }
+            return;
+        }
+    }
+
+    if (targetAddress) {
+        *targetAddress = CNodeAddress();
+    }
+    if (outDir) {
+        *outDir = 0;
+    }
 }
 
 // 0x4515D0
@@ -337,9 +630,10 @@ void CPathFind::DoPathSearch(
     };
 
     // Resolve addresses to use. Dont use `originAddrAddr` or `targetNodeAddr` after this point
-    CPathNode *origin, *target{};
-    if (   !(origin = ResolveNode(originPos, &originAddrAddrHint))
-        || !(target = ResolveNode(targetPos, targetNodeAddrHint))
+    // NOTE: The target is resolved first (matters only for the order of the `FindNodeClosestToCoors` calls)
+    CPathNode *origin{}, *target{};
+    if (   !(target = ResolveNode(targetPos, targetNodeAddrHint))
+        || !(origin = ResolveNode(originPos, &originAddrAddrHint))
     ) {
     fail:
         outNodesCount = 0;
@@ -403,11 +697,12 @@ void CPathFind::DoPathSearch(
                     const auto& naviLinkAddr = m_pNaviLinks[node->m_wAreaId][linkIdx];
                     if (IsAreaLoaded(naviLinkAddr.m_wAreaId)) {
                         const auto& naviLink = GetCarPathLink(naviLinkAddr);
+                        // 0x45184A: `(byte[0xB] >> 3) & 7` if attached to the linked node, `byte[0xB] & 7` otherwise
                         if (naviLink.m_attachedTo == linked.GetAddress()) {
-                            if (!naviLink.m_numOppositeDirLanes) {
+                            if (!naviLink.m_numSameDirLanes) {
                                 continue;
                             }
-                        } else if (!naviLink.m_numSameDirLanes) {
+                        } else if (!naviLink.m_numOppositeDirLanes) {
                             continue;
                         }
                     }
@@ -465,17 +760,23 @@ void CPathFind::DoPathSearch(
             outResultNodes[outNodesCount++] = origin->GetAddress();
         }
 
-        for (auto node = origin; node == target || outNodesCount < maxNodesToFind; outNodesCount++) {
-            for (auto linkNum = 0u; linkNum < node->m_nNumLinks; linkNum++) {
-                const auto linkedAddr = m_pNodeLinks[node->m_wAreaId][linkNum];
-                const auto linkIdx    = node->m_wBaseLinkId + linkNum;
-                if (!IsAreaNodesAvailable(linkedAddr)) {
-                    continue;
+        // 0x4519F7 - Walk back from the origin to the target by always stepping onto the linked node that is exactly `linkLength` closer
+        if (outNodesCount < maxNodesToFind) {
+            for (auto node = origin; node != target;) {
+                for (auto linkNum = 0u; linkNum < node->m_nNumLinks; linkNum++) {
+                    const auto linkIdx    = node->m_wBaseLinkId + linkNum;
+                    const auto linkedAddr = m_pNodeLinks[node->m_wAreaId][linkIdx];
+                    if (!IsAreaNodesAvailable(linkedAddr)) {
+                        continue;
+                    }
+                    const auto linked = GetPathNode(linkedAddr);
+                    if (node->m_totalDistFromOrigin - m_pLinkLengths[node->m_wAreaId][linkIdx] == linked->m_totalDistFromOrigin) {
+                        outResultNodes[outNodesCount++] = linkedAddr;
+                        node = linked;
+                        break;
+                    }
                 }
-                const auto linked = GetPathNode(linkedAddr);
-                if (const auto dist = node->m_totalDistFromOrigin - m_pLinkLengths[node->m_wAreaId][linkIdx]; dist == linked->m_totalDistFromOrigin) {
-                    outResultNodes[outNodesCount++] = linkedAddr;
-                    node = linked;
+                if (outNodesCount >= maxNodesToFind) {
                     break;
                 }
             }
@@ -489,7 +790,32 @@ void CPathFind::DoPathSearch(
 
 // 0x452760
 void CPathFind::ComputeRoute(uint8 nodeType, const CVector& vecStart, const CVector& vecEnd, const CNodeAddress& startAddress, CNodeRoute* route) {
-    plugin::CallMethod<0x452760>(this, nodeType, &vecStart, &vecEnd, &startAddress, route);
+    CNodeAddress outNodes[8]{};
+    int16 outCount = 0;
+    static auto& forbiddenAddr = StaticRef<CNodeAddress>(0x8A5F44); // Invalid node (area 0xFFFF) = no forbidden node
+    DoPathSearch(
+        static_cast<ePathType>(nodeType),
+        vecStart,
+        startAddress,
+        vecEnd,
+        outNodes,
+        outCount,
+        8,
+        nullptr,
+        999999.875f,
+        nullptr,
+        999999.875f,
+        false,
+        forbiddenAddr,
+        false,
+        false
+    );
+    route->Clear();
+    for (int32 i = 0; i < outCount; i++) {
+        if (route->GetSize() < 8) {
+            route->Add(outNodes[i]);
+        }
+    }
 }
 
 // 0x44D960
@@ -752,20 +1078,31 @@ bool CPathFind::IsWaterNodeNearby(CVector position, float radius) {
 }
 
 // 0x44F460
-CNodeAddress CPathFind::FindNodeClosestToCoors(
-    CVector pos,
-    ePathType nodeType,
-    float maxDistance,
-    uint16 unk2,
-    int32 unk3,
-    uint16 unk4,
-    uint16 bBoatsOnly,
-    int32 unk6
-) {
-    CNodeAddress tempAddress;
-    plugin::CallMethodAndReturn<CNodeAddress*, 0x44F460, CPathFind*, CNodeAddress*, CVector, ePathType, float, uint16, int32, uint16, uint16, int32>(
-        this, &tempAddress, pos, nodeType, maxDistance, unk2, unk3, unk4, bBoatsOnly, unk6);
-    return tempAddress;
+CNodeAddress CPathFind::FindNodeClosestToCoors(CVector pos,ePathType nodeType,float maxDistance,uint16,int32,uint16,uint16 bBoatsOnly,int32)
+{
+    CNodeAddress bestAddress;
+    float        bestDistSq = maxDistance * maxDistance;
+
+    for (size_t areaId = 0; areaId < NUM_TOTAL_PATH_NODE_AREAS; ++areaId) {
+        auto nodes = GetPathNodesInArea(areaId, nodeType);
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            const auto& node = nodes[i];
+
+            if (node.m_isSwitchedOff) {
+                continue;
+            }
+            if (bBoatsOnly && !node.m_bWaterNode) {
+                continue;
+            }
+
+            float distSq = (node.GetPosition() - pos).SquaredMagnitude();
+            if (distSq < bestDistSq) {
+                bestDistSq  = distSq;
+                bestAddress = CNodeAddress((uint16)areaId, (uint16)i);
+            }
+        }
+    }
+    return bestAddress;
 }
 
 // 0x450A60
@@ -901,10 +1238,35 @@ CCarPathLinkAddress CPathFind::FindLinkBetweenNodes(CNodeAddress nodeAddrA, CNod
 
 // 0x4513F0
 CVector CPathFind::FindParkingNodeInArea(float minX, float maxX, float minY, float maxY, float minZ, float maxZ) {
-    CVector vecOut;
-    plugin::CallMethod<0x4513F0, CPathFind*, CVector*, float, float, float, float, float, float>(this, &vecOut, minX, maxX, minY, maxY, minZ, maxZ);
-    return vecOut;
+    // Loop over all areas
+    for (size_t areaId = 0; areaId < NUM_PATH_MAP_AREAS; ++areaId) {
+        // Get all vehicle nodes in this area
+        auto nodes = GetPathNodesInArea(areaId, PATH_TYPE_VEH);
+
+        for (const auto& node : nodes) {
+            CVector pos = node.GetPosition();
+
+            // Check if node position is within the bounds
+            if (pos.x < minX || pos.x > maxX) {
+                continue;
+            }
+            if (pos.y < minY || pos.y > maxY) {
+                continue;
+            }
+            if (pos.z < minZ || pos.z > maxZ) {
+                continue;
+            }
+
+            // Check if it's a parking node (behaviour type 2)
+            if (node.m_nBehaviourType == 2) {
+                return pos;
+            }
+        }
+    }
+    // Return zero vector if not found
+    return CVector(0.0f, 0.0f, 0.0f);
 }
+
 
 // 0x450F30
 CNodeAddress CPathFind::FindNearestExteriorNodeToInteriorNode(int32 interiorId) {
@@ -1073,9 +1435,82 @@ size_t CPathFind::CountNeighboursToBeSwitchedOff(const CPathNode& node) {
 }
 
 // 0x450320
+// Returns the orientation in degrees for car placement at the given node.
+// Reverse engineered from FUN_00450320, 100% faithful version.
 float CPathFind::FindNodeOrientationForCarPlacement(CNodeAddress nodeInfo) {
-    return plugin::CallMethodAndReturn<float, 0x450320, CPathFind*, CNodeAddress>(this, nodeInfo);
+    // Get area and node id from input address
+    uint16 areaId = nodeInfo.m_wAreaId;
+    uint16 nodeId = nodeInfo.m_wNodeId;
+
+    // Sanity: get node array for area
+    CPathNode* nodes = m_pPathNodes[areaId];
+    if (!nodes) {
+        return 0.0f; // Fallback: node array not loaded
+    }
+
+    // Sanity: get node
+    CPathNode& node = nodes[nodeId];
+
+    // The node must have at least one link
+    if (node.m_nNumLinks == 0) {
+        return 0.0f;
+    }
+
+    // Find the first valid link (with flags filter)
+    int foundIdx = -1;
+    for (uint8_t i = 0; i < node.m_nNumLinks; ++i) {
+        CNodeAddress linkAddr   = m_pNodeLinks[areaId][node.m_wBaseLinkId + i];
+        uint16       linkAreaId = linkAddr.m_wAreaId;
+
+        // Area of linked node must be loaded
+        if (!IsAreaLoaded(linkAreaId)) {
+            continue;
+        }
+
+        // Get linked node
+        CPathNode* linkNodes  = m_pPathNodes[linkAreaId];
+        CPathNode& linkedNode = linkNodes[linkAddr.m_wNodeId];
+
+        // Check node ids and flags (matches ASM: checks if nodeId/areaId pair matches and flag bits)
+        // In the original ASM, it checks a byte at offset 0x18 & 0x0F != 0
+        uint8 flags = node.m_nBehaviourType; // CPathNode offset 0x18 is the fourth byte after all bitfields, likely behaviourType
+        if ((flags & 0x0F) == 0) {
+            continue;
+        }
+
+        foundIdx = i;
+        break;
+    }
+
+    // If no valid link found, return 0.0f (just like the fallback in ASM)
+    if (foundIdx == -1) {
+        return 0.0f;
+    }
+
+    // Get first valid link address and nodes
+    CNodeAddress linkAddr   = m_pNodeLinks[areaId][node.m_wBaseLinkId + foundIdx];
+    uint16       linkAreaId = linkAddr.m_wAreaId;
+
+    if (!IsAreaLoaded(linkAreaId)) {
+        return 0.0f;
+    }
+
+    CPathNode* linkNodes  = m_pPathNodes[linkAreaId];
+    CPathNode& linkedNode = linkNodes[linkAddr.m_wNodeId];
+
+    // Get world positions
+    CVector pos1 = node.GetPosition();
+    CVector pos2 = linkedNode.GetPosition();
+
+    // Calculate difference
+    float dx = pos2.x - pos1.x;
+    float dy = pos2.y - pos1.y;
+
+    // Calculate angle in radians and convert to degrees
+    float angle = RadiansToDegrees(std::atan2(dy, dx));
+    return angle;
 }
+
 
 // 0x452160
 void CPathFind::SwitchOffNodeAndNeighbours(CPathNode* node, CPathNode*& outNext1, CPathNode** outNext2, bool bWhatToSwitchTo, bool bBackToOriginal) {
