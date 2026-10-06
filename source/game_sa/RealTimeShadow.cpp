@@ -15,6 +15,7 @@ void CRealTimeShadow::InjectHooks() {
     RH_ScopedInstall(Create, 0x706460);
     RH_ScopedInstall(Update, 0x706600);
     RH_ScopedInstall(Destroy, 0x705990);
+    RH_ScopedInstall(SetupForThisEntity, 0x706520);
 }
 
 CRealTimeShadow::~CRealTimeShadow() {
@@ -39,6 +40,44 @@ RwFrame* CRealTimeShadow::SetLightProperties(float angle, float unused, bool doS
     }
 
     return frame;
+}
+
+// 0x706520
+bool CRealTimeShadow::SetupForThisEntity(CPhysical* owner) {
+    m_pOwner = owner;
+
+    auto* const rwObject = owner->m_pRwObject;
+    if (!rwObject) {
+        return false;
+    }
+
+    m_nRwObjectType = RwObjectGetType(rwObject);
+    switch (m_nRwObjectType) {
+    case rpATOMIC: {
+        auto* const atomic = owner->GetRpAtomic();
+        m_boundingSphere.m_vecCenter = RpAtomicGetBoundingSphere(atomic)->center;
+        m_boundingSphere.m_fRadius   = RpAtomicGetBoundingSphere(atomic)->radius;
+        m_baseSphere.m_fRadius       = m_boundingSphere.m_fRadius;
+        RwV3dTransformPoints(&m_baseSphere.m_vecCenter, &m_boundingSphere.m_vecCenter, 1, RwFrameGetMatrix(RpAtomicGetFrame(atomic)));
+        break;
+    }
+    case rpCLUMP: {
+        auto* const clump = owner->GetRpClump();
+        RpClumpGetBoundingSphere(clump, reinterpret_cast<RwSphere*>(&m_boundingSphere), true);
+        m_baseSphere.m_fRadius = m_boundingSphere.m_fRadius;
+        RwV3dTransformPoints(&m_baseSphere.m_vecCenter, &m_boundingSphere.m_vecCenter, 1, RwFrameGetMatrix(RpClumpGetFrame(clump)));
+        break;
+    }
+    default: {
+        Destroy();
+        return false;
+    }
+    }
+
+    m_camera.SetFrustum(m_boundingSphere.m_fRadius * 1.1f);
+    m_camera.SetCenter(m_baseSphere.m_vecCenter);
+
+    return true;
 }
 
 // 0x7059F0
