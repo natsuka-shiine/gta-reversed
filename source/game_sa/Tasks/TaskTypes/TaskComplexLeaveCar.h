@@ -43,6 +43,13 @@ public:
     CTask* ControlSubTask(CPed* ped) override;
     CTask* CreateSubTask(eTaskType taskType, CPed* ped);
 
+    void PrepareVehicleForPedExit(CPed* ped);
+    void ComputeTargetDoor(CPed* ped);
+    void CreateTaskUtilityLineUpPedWithCar(CPed* ped);
+
+private:
+    void ClearVehicleFlagsSet(); // NOTSA
+
 private:
     friend void InjectHooksMain();
     static void InjectHooks();
