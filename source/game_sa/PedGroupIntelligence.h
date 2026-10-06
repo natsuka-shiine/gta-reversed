@@ -79,6 +79,7 @@ public:
     //! @notsa
     void SetEventResponseTask(CPed* ped, const CTask& task) { SetEventResponseTask(ped, true, task); }
     void SetEventResponseTaskAllocator(CTaskAllocator* ta);
+    auto GetGroupDecisionMakerType() const { return m_DecisionMakerType; }  
     void SetGroupDecisionMakerType(eDecisionMakerType t) { m_DecisionMakerType = t; }
     void SetPrimaryTaskAllocator(CTaskAllocator* ta);
 
@@ -95,6 +96,7 @@ public:
     void SetDefaultTask(CPed* ped, const CTask& task);
     void SetScriptCommandTask(CPed* ped, const CTask& task);
 
+    auto   GetTaskSeqId() const                       { return m_TaskSeqId; }
     auto&& GetPedTaskPairs(this auto&& self)          { return self.m_PedTaskPairs; }
     auto&& GetSecondaryPedTaskPairs(this auto&& self) { return self.m_SecondaryPedTaskPairs; }
     auto&& GetDefaultPedTaskPairs(this auto&& self)   { return self.m_DefaultPedTaskPairs; }
