@@ -149,7 +149,7 @@ void CRadar::InjectHooks() {
 
     RH_ScopedInstall(SetupAirstripBlips, 0x587D20); // TEST
     RH_ScopedInstall(DrawBlips, 0x588050);
-    // RH_ScopedInstall(ClipRadarPoly, 0x585040);
+    RH_ScopedInstall(ClipRadarPoly, 0x585040);
     RH_ScopedInstall(DrawAreaOnRadar, 0x5853D0);
     RH_ScopedOverloadedInstall(StreamRadarSections, "xy", 0x584C50, void (*)(int32, int32));
     RH_ScopedInstall(AddBlipToLegendList, 0x5859F0);
@@ -157,7 +157,7 @@ void CRadar::InjectHooks() {
     RH_ScopedInstall(DrawRadarSection, 0x586110);
     RH_ScopedInstall(DrawRadarSectionMap, 0x586520);
     RH_ScopedInstall(DrawRadarGangOverlay, 0x586650);
-    // RH_ScopedInstall(DrawEntityBlip, 0x587000);
+    RH_ScopedInstall(DrawEntityBlip, 0x587000);
     RH_ScopedGlobalInstall(LineRadarBoxCollision, 0x584E00);
 
     // unused
@@ -1117,7 +1117,95 @@ int32 LineRadarBoxCollision(CVector2D& result, const CVector2D& lineStart, const
 
 // 0x585040
 int32 CRadar::ClipRadarPoly(CVector2D* out, const CVector2D* in) {
-    return plugin::CallAndReturn<int32, 0x585040, CVector2D*, const CVector2D*>(out, in);
+    // Corners of the radar box, indexed by the side `LineRadarBoxCollision` returns
+    const CVector2D corners[4]{
+        {  1.0f, -1.0f },
+        {  1.0f,  1.0f },
+        { -1.0f,  1.0f },
+        { -1.0f, -1.0f },
+    };
+
+    // NaN-safe the same way as the original (NaNs count as inside)
+    const auto IsInside = [](const CVector2D& p) {
+        return !(p.x < -1.0f /*0x858C1C*/) && !(p.x > 1.0f /*0x858624*/) && !(p.y < -1.0f) && !(p.y > 1.0f);
+    };
+    const bool inside[4]{ IsInside(in[0]), IsInside(in[1]), IsInside(in[2]), IsInside(in[3]) };
+
+    int32 count    = 0;
+    int32 lastSide = -1;
+
+    for (int32 i = 0; i < 4; i++) {
+        if (inside[i]) { // 0x5851EF
+            out[count++] = in[i];
+            continue;
+        }
+
+        // 0x585209 - Vertex is outside, find where the 2 edges it's a part of enter the box
+        const int32 prev = (i - 1) & 3;
+        const int32 next = (i + 1) & 3;
+
+        const int32 sidePrev = LineRadarBoxCollision(out[count], in[i], in[prev]);
+        if (sidePrev != -1) {
+            lastSide = sidePrev;
+            count++;
+        }
+
+        const int32 sideNext = LineRadarBoxCollision(out[count], in[i], in[next]);
+        if (sideNext == -1) {
+            continue;
+        }
+        if (sidePrev != -1) { // 0x585307
+            count++;
+            continue;
+        }
+
+        // 0x585272 - Only the edge to the next vertex intersects the box:
+        // Have to add the corners of the box in-between the last intersected side and this one
+        if (lastSide == -1) {
+            // No side intersected yet, so look for the one the poly leaves the box at (going backwards)
+            for (int32 k = 3; k >= i; k--) {
+                CVector2D unused; // The original uses (the already dead) loop variable's stack slot for this
+                const int32 side = k == 0
+                    ? LineRadarBoxCollision(unused, in[0], in[3])
+                    : LineRadarBoxCollision(unused, in[k], in[k - 1]);
+                if (side != -1) {
+                    lastSide = side;
+                    break;
+                }
+            }
+        }
+
+        // 0x5852B5
+        const CVector2D intersection = out[count];
+        // NOTSA: If there's still no `lastSide` the original reads out-of-bounds of the `corners` array (index -1),
+        // writes that as a vertex and continues from corner 0. That garbage vertex is skipped here.
+        for (int32 k = lastSide == -1 ? 0 : lastSide; k != sideNext; k = (k + 1) & 3) {
+            out[count++] = corners[k];
+        }
+        out[count++] = intersection;
+    }
+
+    // 0x58532B
+    if (count != 0) {
+        return count;
+    }
+
+    // No vertices are inside and no edges intersect the box: The box is either fully inside or fully outside of the poly
+    const float slope01 = (in[0].y - in[1].y) / (in[0].x - in[1].x);
+    const float slope03 = (in[0].y - in[3].y) / (in[0].x - in[3].x);
+    if (!((slope01 * in[3].x - in[3].y) * (slope01 * in[0].x - in[0].y) < 0.0f /*0x858B50*/)) {
+        return 0;
+    }
+    if (!((slope03 * in[1].x - in[1].y) * (slope03 * in[0].x - in[0].y) < 0.0f)) {
+        return 0;
+    }
+
+    // 0x585391 - Fully inside
+    out[0] = corners[0];
+    out[1] = corners[1];
+    out[2] = corners[2];
+    out[3] = corners[3];
+    return 4;
 }
 
 // 0x5853D0
@@ -1725,7 +1813,308 @@ void CRadar::DrawCoordBlip(int32 blipIndex, bool isSprite) {
 
 // 0x587000
 void CRadar::DrawEntityBlip(int32 blipIndex, uint8 arg1) {
-    plugin::Call<0x587000, int32, uint8>(blipIndex, arg1);
+    // Function-local statics of the original (For the "running" lights of the airstrip)
+    static auto& s_bDontDisplayRunway  = StaticRef<bool>(0xBAA370);   // `dont_display`
+    static auto& s_nRunwayLightCounter = StaticRef<uint32>(0xBAA374); // `RunwayLightCounter`
+    static auto& s_nOldOffsetPos       = StaticRef<int16>(0xBAA378);  // `old_offset_pos`
+    static auto& s_nOffsetPos          = StaticRef<int16>(0xBAA37C);  // `offset_pos`
+    static auto& s_nStaticInitFlags    = StaticRef<uint32>(0xBAA380); // Init guards of the 2 above
+
+    auto&      trace    = ms_RadarTrace[blipIndex];
+    const bool isSprite = arg1 != 0;
+
+    CEntity*            entity      = nullptr;
+    tScriptSearchlight* searchLight = nullptr;
+    bool                bIsAirstrip = false;
+    float               distToAirstrip{};
+    CVector             pos;
+
+    const auto SetPosFromEntity = [&] { // 0x58705C
+        pos = entity->GetPosition();
+        if (entity->GetIsTypePed()) {
+            if (CEntryExit* const enex = entity->AsPed()->m_pEnex) {
+                enex->GetPositionRelativeToOutsideWorld(pos);
+            }
+        }
+    };
+
+    switch (trace.m_nBlipType) {
+    case BLIP_CAR: { // 0x58703C
+        entity = GetVehiclePool()->GetAtRef(trace.m_nEntityHandle);
+        if (!entity) {
+            return;
+        }
+        SetPosFromEntity();
+        break;
+    }
+    case BLIP_CHAR: { // 0x58706F
+        CPed* const ped = GetPedPool()->GetAtRef(trace.m_nEntityHandle);
+        if (!ped) {
+            return;
+        }
+        entity = ped->bInVehicle
+            ? static_cast<CEntity*>(ped->m_pVehicle)
+            : static_cast<CEntity*>(ped);
+        if (!entity) {
+            return;
+        }
+        SetPosFromEntity();
+        break;
+    }
+    case BLIP_OBJECT: { // 0x58709C
+        entity = GetObjectPool()->GetAtRef(trace.m_nEntityHandle);
+        if (!entity) {
+            return;
+        }
+        SetPosFromEntity();
+        break;
+    }
+    case BLIP_SPOTLIGHT: { // 0x5870B0
+        const auto idx = CTheScripts::GetActualScriptThingIndex(trace.m_nEntityHandle, SCRIPT_THING_SEARCH_LIGHT);
+        if (idx < 0) {
+            return;
+        }
+        searchLight = &CTheScripts::ScriptSearchLightArray[idx];
+        pos         = searchLight->m_Target; // 0x14
+        break;
+    }
+    case BLIP_PICKUP: { // 0x5870F6
+        const auto idx = CPickups::GetActualPickupIndex(trace.m_nEntityHandle);
+        if (idx < 0) {
+            return;
+        }
+        pos = CPickups::aPickUps[idx].GetPosn();
+        break;
+    }
+    case BLIP_AIRSTRIP: { // 0x58737B
+        bIsAirstrip = true;
+
+        const auto& airstrip = airstrip_table[airstrip_location];
+
+        // NOTE: The player's vehicle isn't null-checked in the original either
+        const CVector& vehPos = FindPlayerVehicle()->GetPosition();
+        distToAirstrip = std::sqrt(
+              (airstrip.position.y - vehPos.y) * (airstrip.position.y - vehPos.y)
+            + (airstrip.position.x - vehPos.x) * (airstrip.position.x - vehPos.x)
+        );
+
+        if (!(distToAirstrip < 500.0f /*0x858B58*/)) { // 0x587617
+            s_bDontDisplayRunway = false;
+            // NOTSA: The original leaves `pos` uninitialized here (It's only really used once it's set to this value at 0x587959)
+            pos = trace.m_vPosition;
+            break;
+        }
+
+        // 0x58743E - `static int16 offset_pos = -radius, old_offset_pos = -radius;`
+        if (!(s_nStaticInitFlags & 1)) {
+            s_nStaticInitFlags |= 1;
+            s_nOffsetPos = (int16)(-airstrip.radius);
+        }
+        if (!(s_nStaticInitFlags & 2)) {
+            s_nStaticInitFlags |= 2;
+            s_nOldOffsetPos = (int16)(-airstrip.radius);
+        }
+
+        // 0x5874D6 - Position of the light running along the runway
+        pos = trace.m_vPosition;
+        TransformRealWorldPointToRadarSpace(CVector2D{ pos.x, pos.y }); // Result is unused
+        const float angle = airstrip.direction * 0.017453292f /*0x8595EC*/;
+        pos.x = std::cos(angle) * (float)s_nOffsetPos + pos.x;
+        pos.y = pos.y - std::sin(angle) * (float)s_nOffsetPos;
+
+        CVector2D    lightRadarPos  = TransformRealWorldPointToRadarSpace(CVector2D{ pos.x, pos.y });
+        const uint32 time           = CTimer::GetTimeInMSPauseMode();
+        const float  lightRadarDist = std::sqrt(lightRadarPos.y * lightRadarPos.y + lightRadarPos.x * lightRadarPos.x);
+        if (!(lightRadarDist < 0.9f /*0x858C20*/) || time - s_nRunwayLightCounter > 3) { // 0x587590
+            s_nOffsetPos += 100;
+            if ((float)s_nOffsetPos > airstrip.radius) {
+                s_nOffsetPos = (int16)(-airstrip.radius);
+            }
+            if (s_nOldOffsetPos == s_nOffsetPos) {
+                s_bDontDisplayRunway = false;
+            }
+            if (lightRadarDist < 0.9f) {
+                s_nOldOffsetPos      = s_nOffsetPos;
+                s_bDontDisplayRunway = true;
+            }
+            s_nRunwayLightCounter = time;
+        }
+        LimitRadarPoint(lightRadarPos); // Result is unused
+        break;
+    }
+    default: // BLIP_NONE, BLIP_COORD, BLIP_CONTACT_POINT
+        return;
+    }
+
+    // 0x58713D
+    const uint32 color = GetRadarTraceColour(trace.m_nColour, trace.m_bBright, trace.m_bFriendly);
+
+    // Colour is passed on as 4 separate (untruncated in the original) values
+    const uint32 colorR = (color >> 24) & 0xFF,
+                 colorG = (color >> 16) & 0xFF,
+                 colorB = (color >> 8) & 0xFF,
+                 colorA = (color >> 0) & 0xFF;
+
+    if (trace.m_nBlipDisplayFlag == BLIP_DISPLAY_BOTH || trace.m_nBlipDisplayFlag == BLIP_DISPLAY_MARKERONLY) {
+        static constexpr bool s_bShowRadarMarkers = false; // 0x859CF8 - It's a constant in `.rdata`, so this is dead code
+        if (s_bShowRadarMarkers) { // 0x587183
+            ShowRadarMarker(pos, color, trace.m_fSphereRadius);
+            trace.m_fSphereRadius -= 0.1f /*0x858B1C*/;
+            if (trace.m_fSphereRadius < 1.0f /*0x858624*/) {
+                trace.m_fSphereRadius = 5.0f;
+            }
+        }
+    }
+
+    if (trace.m_pEntryExit) { // 0x5871D5
+        trace.m_pEntryExit->GetPositionRelativeToOutsideWorld(pos);
+    }
+
+    if (trace.m_nBlipDisplayFlag != BLIP_DISPLAY_BOTH && trace.m_nBlipDisplayFlag != BLIP_DISPLAY_BLIPONLY) {
+        return;
+    }
+
+    // 0x5871FD
+    CVector2D   radarPos  = TransformRealWorldPointToRadarSpace(CVector2D{ pos.x, pos.y });
+    const float radarDist = LimitRadarPoint(radarPos);
+    CVector2D   screenPos = TransformRadarPointToScreenSpace(radarPos);
+
+    if (trace.m_bShortRange && radarDist > 1.0f /*0x858624*/ && !FrontEndMenuManager.m_bDrawingMap) {
+        return;
+    }
+
+    const auto GetRadarPosDist = [&] {
+        return std::sqrt(radarPos.y * radarPos.y + radarPos.x * radarPos.x);
+    };
+
+    const auto DrawRotatingSprite = [&](eRadarSprite sprite, float angle, float size, CRGBA spriteColor) {
+        // NOTE: Args are evaluated in this order in the original (height first)
+        const auto height = (uint32)(SCREEN_HEIGHT * 0.002232143f /*0x859524*/ * size);
+        const auto width  = (uint32)(SCREEN_WIDTH * 0.0015625f /*0x859520*/ * size);
+        DrawRotatingRadarSprite(RadarBlipSprites[sprite], screenPos.x, screenPos.y, angle, width, height, spriteColor);
+    };
+
+    // 0x587264 - Radar is zoomed in (by the script) and the player is on foot: Draw entities as arrows showing their heading
+    if (   CTheScripts::RadarZoomValue != 0
+        && !FindPlayerVehicle()
+        && trace.m_nBlipType != BLIP_OBJECT
+        && trace.m_nBlipType != BLIP_PICKUP
+    ) {
+        if (isSprite) {
+            return;
+        }
+        if (!trace.m_bBlipRemain) {
+            if (!(GetRadarPosDist() <= 1.0f /*0x858624*/)) {
+                return;
+            }
+        }
+
+        const float heading = entity ? entity->GetHeading() : 0.0f;
+
+        if (FrontEndMenuManager.m_bDrawingMap && !FrontEndMenuManager.m_ShowMissionBlips) {
+            return;
+        }
+
+        const CVector playerPos = FindPlayerCentreOfWorldForMap(0);
+        if (pos.z - 2.0f /*0x858CA0*/ > playerPos.z) { // 0x587339 - Blip is above the player
+            if (CTheScripts::RadarShowBlipOnAllLevels) {
+                ShowRadarTraceWithHeight(screenPos.x, screenPos.y, (uint32)(int16)trace.m_nBlipSize, colorR, colorG, colorB, colorA, RADAR_TRACE_LOW);
+            }
+            return;
+        }
+        if (pos.z + 4.0f /*0x858B90*/ < playerPos.z) { // 0x58763C - Blip is below the player
+            if (CTheScripts::RadarShowBlipOnAllLevels) {
+                ShowRadarTraceWithHeight(screenPos.x, screenPos.y, (uint32)(int16)trace.m_nBlipSize, colorR, colorG, colorB, colorA, RADAR_TRACE_HIGH);
+            }
+            return;
+        }
+
+        // 0x58767E - Same level
+        const CRGBA arrowColor{ (uint8)colorR, (uint8)colorG, (uint8)colorB, 255 };
+        if (TheCamera.m_aCams[TheCamera.m_nActiveCam].m_nMode == MODE_TOPDOWN) {
+            DrawRotatingSprite(RADAR_SPRITE_CENTRE, heading + 3.1415927f /*0x858CB8*/, 8.0f /*0x859000*/, arrowColor);
+        } else {
+            DrawRotatingSprite(RADAR_SPRITE_CENTRE, heading - (m_fRadarOrientation + 3.1415927f /*0x858CB8*/), 8.0f /*0x859000*/, arrowColor);
+        }
+        return;
+    }
+
+    // 0x587790
+    if (isSprite) {
+        if (trace.HasSprite() && HasThisBlipBeenRevealed(blipIndex)) { // 0x587BAC
+            DrawRadarSprite(trace.m_nBlipSprite, screenPos.x, screenPos.y, 255);
+        }
+        return;
+    }
+
+    if (trace.HasSprite()) {
+        return;
+    }
+
+    if (FrontEndMenuManager.m_bDrawingMap && !FrontEndMenuManager.m_ShowMissionBlips) {
+        return;
+    }
+
+    if (searchLight) { // 0x5877CD - Draw as a circle
+        if (GetRadarPosDist() <= 0.9f /*0x858C20*/) {
+            if (!FrontEndMenuManager.m_bDrawingMap) {
+                const float radius = SCREEN_WIDTH * 0.0015625f /*0x859520*/ * 94.0f /*0x866B78*/ / m_radarRange * searchLight->m_fTargetRadius * 0.6f /*0x858CC8*/;
+                CSprite2d::DrawCircleAtNearClip(screenPos, radius, CRGBA{ 0, 0, 0, 150 }, 15);
+                CSprite2d::DrawCircleAtNearClip(screenPos, radius - SCREEN_WIDTH * 0.0015625f /*0x859520*/, CRGBA{ 220, 220, 220, 200 }, 15);
+            }
+        }
+        return; // 0x587B84 -> 0x587B8D: Search lights are never added to the legend
+    }
+
+    if (bIsAirstrip) { // 0x5878B6
+        if (!FrontEndMenuManager.m_bDrawingMap && GetRadarPosDist() < 0.9f /*0x858C20*/ && distToAirstrip < 500.0f /*0x858B58*/) {
+            // The light running along the runway
+            DrawRotatingSprite(RADAR_SPRITE_LIGHT, 0.0f, 8.0f /*0x859000*/, CRGBA{ 255, 255, 255, 255 });
+        }
+
+        // 0x587959 - Now the runway itself
+        pos       = trace.m_vPosition;
+        radarPos  = TransformRealWorldPointToRadarSpace(CVector2D{ pos.x, pos.y });
+        LimitRadarPoint(radarPos);
+        screenPos = TransformRadarPointToScreenSpace(radarPos);
+
+        if (FrontEndMenuManager.m_bDrawingMap) { // 0x5879B5
+            float direction = airstrip_table[airstrip_location].direction;
+            if (airstrip_location != AIRSTRIP_SF_AIRPORT) {
+                direction -= 90.0f /*0x85991C*/;
+            }
+            DrawRotatingSprite(RADAR_SPRITE_RUNWAY, direction * 0.017453292f /*0x8595EC*/, 16.0f /*0x8599D0*/, CRGBA{ 255, 255, 255, 255 });
+            AddBlipToLegendList(false, RADAR_SPRITE_RUNWAY);
+            return;
+        }
+
+        if (s_bDontDisplayRunway) { // 0x587A5F
+            return;
+        }
+        DrawRotatingSprite(
+            RADAR_SPRITE_RUNWAY,
+            -m_fRadarOrientation - (airstrip_table[airstrip_location].direction - 90.0f /*0x85991C*/) * 0.017453292f /*0x8595EC*/,
+            16.0f /*0x8599D0*/,
+            CRGBA{ 255, 255, 255, 255 }
+        );
+        return;
+    }
+
+    // 0x587B02
+    const CVector playerPos = FindPlayerCentreOfWorldForMap(0);
+    eRadarTraceHeight height;
+    if (pos.z - 2.0f /*0x858CA0*/ > playerPos.z) {
+        height = RADAR_TRACE_LOW;
+    } else if (pos.z + 4.0f /*0x858B90*/ < playerPos.z) {
+        height = RADAR_TRACE_HIGH;
+    } else {
+        height = RADAR_TRACE_NORMAL;
+    }
+    ShowRadarTraceWithHeight(screenPos.x, screenPos.y, (uint32)(int16)trace.m_nBlipSize, colorR, colorG, colorB, colorA, height);
+
+    if (FrontEndMenuManager.m_bDrawingMap) { // 0x587B84
+        AddBlipToLegendList(true, blipIndex);
+    }
 }
 
 /*
