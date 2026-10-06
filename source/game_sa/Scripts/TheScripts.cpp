@@ -715,8 +715,18 @@ void CTheScripts::ClearSpaceForMissionEntity(const CVector& pos, CEntity* ourEnt
     // Disable suspension lines of vehicles.
     const auto cdNumLines = std::exchange(ourColData->m_nNumLines, 0);
 
-    for (auto& entity : std::span{ colEntities.data(), (size_t)numColliding }) {
-        if (!entity || entity == ourEntity || (entity->GetIsTypePed() && entity->AsPed()->IsInVehicle())) {
+    const auto entities = std::span{ colEntities.data(), (size_t)numColliding };
+
+    // Peds in vehicles are dropped up-front (as in the original), because they are deleted together with
+    // their vehicle below, so they must not be touched anymore by the time the loop gets to them.
+    for (auto& entity : entities) {
+        if (entity != ourEntity && entity->GetIsTypePed() && entity->AsPed()->bInVehicle) {
+            entity = nullptr;
+        }
+    }
+
+    for (auto* const entity : entities) {
+        if (!entity || entity == ourEntity) {
             continue;
         }
 
@@ -758,9 +768,7 @@ void CTheScripts::ClearSpaceForMissionEntity(const CVector& pos, CEntity* ourEnt
             CCarCtrl::RemoveFromInterestingVehicleList(vehicle);
             CWorld::Remove(vehicle);
             delete vehicle;
-        }
-
-        if (entity->GetIsTypePed() && !entity->AsPed()->IsPlayer() && entity->AsPed()->CanBeDeleted()) {
+        } else if (entity->GetIsTypePed() && !entity->AsPed()->IsPlayer() && entity->AsPed()->CanBeDeleted()) { // NB: Must be `else` - the vehicle has just been deleted
             CPopulation::RemovePed(entity->AsPed());
         }
     }
@@ -1346,14 +1354,14 @@ void CTheScripts::Save() {
     auto* lastScript           = pActiveScripts;
     for (auto* s = pActiveScripts; s; s = s->m_pNext) {
         lastScript = s;
-        if (!s->m_IsExternal && s->m_ExternalType == -1) {
+        if (!s->m_IsExternal && s->m_ScriptBrainType == -1) {
             numNonExternalScripts++;
         }
     }
     CGenericGameStorage::SaveDataToWorkBuffer(numNonExternalScripts);
 
     for (auto* s = lastScript; s; s = s->m_pPrev) {
-        if (s->m_IsExternal || s->m_ExternalType != -1) {
+        if (s->m_IsExternal || s->m_ScriptBrainType != -1) {
             continue;
         }
 
@@ -1529,8 +1537,8 @@ void CTheScripts::ProcessWaitingForScriptBrainArray() {
         }
 
         switch (const auto t = ScriptsForBrains.m_aScriptForBrains[e.m_ScriptBrainIndex].m_TypeOfBrain) {
-        case 0: // TODO: enum
-        case 3: // for peds?
+        case CScriptsForBrains::PED_STREAMED:
+        case CScriptsForBrains::CODE_PED:
         {
             auto*      ped = e.m_pEntity->AsPed();
             const auto idx = ScriptsForBrains.m_aScriptForBrains[ped->m_StreamedScriptBrainToLoad].m_StreamedScriptIndex;
@@ -1546,12 +1554,12 @@ void CTheScripts::ProcessWaitingForScriptBrainArray() {
             }
             break;
         }
-        case 1:
-        case 4: // for objects?
+        case CScriptsForBrains::OBJECT_STREAMED:
+        case CScriptsForBrains::CODE_OBJECT:
         {
             auto* obj = e.m_pEntity->AsObject();
 
-            switch (obj->objectFlags.b0x100000_0x200000) {
+            switch (obj->objectFlags.bScriptBrainStatus) {
             case 1:
                 if (!ScriptsForBrains.IsObjectWithinBrainActivationRange(obj, FindPlayerCentreOfWorld()))
                     break;
