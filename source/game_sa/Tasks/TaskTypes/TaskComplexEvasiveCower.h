@@ -8,6 +8,8 @@ public:
     CEntity* m_Entity;
 
 public:
+    static void InjectHooks();
+
     static constexpr auto Type = TASK_COMPLEX_EVASIVE_COWER;
 
     CTaskComplexEvasiveCower(CEntity* entity, const CVector& pos);
