@@ -22,6 +22,7 @@ void CCustomCarPlateMgr::InjectHooks() {
     RH_ScopedInstall(AtomicSetCarplateTextureCB, 0x6FE0D0);
     RH_ScopedInstall(SetupClump, 0x6FE0F0);
     RH_ScopedInstall(RenderLicenseplateTextToRaster, 0x6FDD70);
+    RH_ScopedInstall(LoadPlatecharsetDat, 0x6FDC00);
 }
 
 // 0x6FD500
@@ -94,7 +95,42 @@ int8 CCustomCarPlateMgr::GetMapRegionPlateDesign() {
 // 0x6FDC00
 // unused
 int8 CCustomCarPlateMgr::LoadPlatecharsetDat(const char* filename, uint8* data) {
-    return plugin::CallAndReturn<int8, 0x6FDC00, const char*, uint8*>(filename, data);
+    CFileMgr::SetDir("DATA");
+    const auto file = CFileMgr::OpenFile(filename, "r");
+    CFileMgr::SetDir("");
+
+    auto* dstPal = reinterpret_cast<uint32*>(data);
+    for (char* line; (line = CFileLoader::LoadLine(file)) != nullptr;) {
+        if (!strcmp(line, ";the end")) {
+            break;
+        }
+        if (line[0] == ';') {
+            continue;
+        }
+
+        const char seps[]{ " \t" };
+        uint8      rgb[3]{};
+        uint32     numTokens = 0;
+        for (char* tok = strtok(line, seps); tok; tok = strtok(nullptr, seps), numTokens++) {
+            if (numTokens < 3) {
+                // NOTE: The original compares the low 16 bits (unsigned) of the value
+                const auto v     = static_cast<uint16>(atoi(tok));
+                rgb[numTokens] = v <= 0xFF ? static_cast<uint8>(v) : 0xFF;
+            }
+        }
+
+        if (numTokens < 3) {
+#ifdef FIX_BUGS
+            CFileMgr::CloseFile(file); // Original leaks the file handle here
+#endif
+            return 0;
+        }
+
+        *dstPal++ = 0x80000000u | (uint32{ rgb[2] } << 16) | (uint32{ rgb[1] } << 8) | uint32{ rgb[0] };
+    }
+
+    CFileMgr::CloseFile(file);
+    return 1;
 }
 
 auto ResolvePlateType(uint8 plateType) {
