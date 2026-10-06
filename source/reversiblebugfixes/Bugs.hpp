@@ -106,4 +106,19 @@ inline const ReversibleBugFix CDamageManager_GetLightStatus_IncorrectStatusCheck
     .Description = "Fixes incorrect use of `LIGHT_REAR_LEFT` instead of `LIGHT_REAR_RIGHT` for checking light status",
     .Credit      = "aeaeo"
 };
+inline const ReversibleBugFix CPedGeometryAnalyser_ComputeRouteRoundSphere_IncorrectDetourPosition{
+    .Name        = "CPedGeometryAnalyser::ComputeRouteRoundSphere - Incorrect detour position",
+    .Description = "Fix incorrect calculation of detour position in `CPedGeometryAnalyser::ComputeRouteRoundSphere` due to the direction being calculated in 3D instead of 2D (Sometimes giving points that would lead the ped to go into the sphere, instead of around it)",
+    .Credit      = "Pirulax"
+};
+inline const ReversibleBugFix CPedGeometryAnalyser_IsEntityBlockingTarget_IncorrectRadiusCheck{
+    .Name        = "CPedGeometryAnalyser::IsEntityBlockingTarget - Incorrect radius check",
+    .Description = "Fix incorrect radius check in `CPedGeometryAnalyser::IsEntityBlockingTarget`",
+    .Credit      = "Pirulax"
+};
+inline const ReversibleBugFix CPedToPlayerConversations_Update_SkipWhileInAGangWar{
+    .Name        = "Skip CPedToPlayerConversations::Update while in a gang war",
+    .Description = "You can't engage in a conversation while in a gang war.",
+    .Credit      = "WDS"
+};
 };
