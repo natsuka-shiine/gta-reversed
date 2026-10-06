@@ -18,7 +18,7 @@ public:
     float     m_fOffsetX;
     CVector   m_vecPosn;
     bool      m_bRemoveAnim;
-    bool      m_b31;
+    uint8     m_b31; // State: 0 - approaching, 1 - turning towards the vehicle, 2 - hassling, 3 - hassling the driver
     CEntity*  m_pEntity;
     uint32    m_nTime;
     int32     dword3C;
