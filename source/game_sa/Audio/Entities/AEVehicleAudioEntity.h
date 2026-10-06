@@ -722,6 +722,7 @@ public:
     void ProcessAircraft(tVehicleParams& vp);
     void ProcessPlayerBicycle(tVehicleParams& vp);
     void ProcessDummyBicycle(tVehicleParams& vp);
+    void ProcessGenericBicycle(tVehicleParams& vp, bool& wasFreewheeling); // notsa
     void ProcessDummyStateTransition(eAEState newState, float fRatio, tVehicleParams& vp);
     void ProcessDummyVehicleEngine(tVehicleParams& vp);
     void ProcessPlayerVehicleEngine(tVehicleParams& vp);
