@@ -244,12 +244,51 @@ CCoverPoint* CCover::AddCoverPoint(CCoverPoint::eType type, CEntity* coverEntity
 
 // 0x6987F0
 float CCover::CalculateHorizontalSize(CColTriangle* triangle, CVector* vertPositions) {
-    NOTSA_UNREACHABLE("Unused"); //return plugin::CallAndReturn<float, 0x6987F0, CColTriangle*, CVector*>(triangle, vertPositions);
+    const auto& a = vertPositions[triangle->vA];
+    const auto& b = vertPositions[triangle->vB];
+    const auto& c = vertPositions[triangle->vC];
+
+    const auto minX = std::min({ a.x, b.x, c.x });
+    const auto maxX = std::max({ a.x, b.x, c.x });
+    const auto minY = std::min({ a.y, b.y, c.y });
+    const auto maxY = std::max({ a.y, b.y, c.y });
+
+    return std::sqrt(sq(maxX - minX) + sq(maxY - minY));
 }
 
 // 0x698990
 bool CCover::DoLineCheckWithinObject(CColTriangle* triangle, int32 a2, CVector* a3, CVector* a4, CVector a5, CVector a6) {
-    NOTSA_UNREACHABLE("Unused"); // return plugin::CallAndReturn<bool, 0x698990, CColTriangle*, int32, CVector*, CVector*, CVector, CVector>(triangle, a2, a3, a4, a5, a6);
+    // triangle = triangles, a2 = numTriangles, a3 = vertices, a4 = triangle normals, a5/a6 = line start/end
+    for (int32 i = 0; i < a2; i++) {
+        const auto& tri    = triangle[i];
+        const auto& normal = a4[i];
+        const auto& vA     = a3[tri.vA];
+
+        // Signed distances of the 2 line points from the triangle's plane
+        const auto distStart = (a5 - vA).Dot(normal);
+        const auto distEnd   = (a6 - vA).Dot(normal);
+        if (distStart * distEnd >= 0.f) { // Both on the same side => No intersection with the plane
+            continue;
+        }
+
+        // Intersection point of the line and the plane
+        const auto t     = std::abs(distStart) / (std::abs(distStart) + std::abs(distEnd));
+        const auto point = a6 * t + a5 * (1.f - t);
+
+        // Now check if the point is inside the triangle
+        const auto& vB = a3[tri.vB];
+        const auto& vC = a3[tri.vC];
+
+        const auto sideAB = (point - vA).Cross(vB - vA).Dot(normal);
+        if ((point - vB).Cross(vC - vB).Dot(normal) * sideAB <= 0.f) {
+            continue;
+        }
+        if ((point - vC).Cross(vA - vC).Dot(normal) * sideAB <= 0.f) {
+            continue;
+        }
+        return true;
+    }
+    return false;
 }
 
 // 0x698DD0
@@ -273,7 +312,20 @@ bool CCover::DoesCoverPointStillProvideCover(CCoverPoint* cpt, CVector pos) {
 
 // 0x6988E0
 void CCover::Find2HighestPoints(CColTriangle* triangle, CVector* vertPositions, int32& outPoint1, int32& outPoint2) {
-    NOTSA_UNREACHABLE("Unused"); // plugin::Call<0x6988E0, CColTriangle*, CVector*, int32&, int32&>(triangle, vertPositions, outPoint1, outPoint2);
+    const auto zA = vertPositions[triangle->vA].z;
+    const auto zB = vertPositions[triangle->vB].z;
+    const auto zC = vertPositions[triangle->vC].z;
+
+    if (zA < zB && zA < zC) { // A is the lowest
+        outPoint1 = triangle->vB;
+        outPoint2 = triangle->vC;
+    } else if (zB < zA && zB < zC) { // B is the lowest
+        outPoint1 = triangle->vA;
+        outPoint2 = triangle->vC;
+    } else {
+        outPoint1 = triangle->vA;
+        outPoint2 = triangle->vB;
+    }
 }
 
 // 0x6992B0
