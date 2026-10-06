@@ -49,7 +49,7 @@ void FxInfoManager_c::InjectHooks() {
     RH_ScopedCategory("Fx");
 
     RH_ScopedInstall(AddFxInfo, 0x4A7B00);
-    // RH_ScopedInstall(Load, 0x5C0B70);
+    RH_ScopedInstall(Load, 0x5C0B70);
     RH_ScopedInstall(ProcessEmissionInfo, 0x4A4960);
     RH_ScopedInstall(ProcessMovementInfo, 0x4A4A10);
     RH_ScopedInstall(ProcessRenderInfo, 0x4A4A80);
@@ -137,9 +137,6 @@ constexpr struct { int32 type; const char* name; } FXINFOMANAGER_C_LOAD_MAPPING[
 
 // 0x5C0B70
 void FxInfoManager_c::Load(FILESTREAM file, int32 version) {
-    plugin::CallMethod<0x5C0B70, FxInfoManager_c*, FILESTREAM, int32>(this, file, version);
-    return;
-
     ReadField<void>(file);
     m_nNumInfos = ReadField<int32>(file, "NUM_INFOS:");
     m_MovementOffset = -1;
@@ -149,7 +146,7 @@ void FxInfoManager_c::Load(FILESTREAM file, int32 version) {
     assert(m_pInfos);
 
     char line[256], field[128];
-    for (auto& info : GetInfos()) {
+    for (auto&& [i, info] : rngv::enumerate(GetInfos())) {
         ReadLine(file, line, sizeof(line));
         VERIFY(sscanf(line, "%s", field) == 1);
 
@@ -159,13 +156,14 @@ void FxInfoManager_c::Load(FILESTREAM file, int32 version) {
                     return type;
                 }
             }
-            NOTSA_UNREACHABLE("Unknown FX Info: %s", field); // NOTSA
+            NOTSA_UNREACHABLE("Unknown FX Info: {}", field); // NOTSA - The original code would use an uninitialized pointer in this case
         };
         auto infoType = GetType();
 
+        // Only movement and render infos have this field (And only in newer versions)
         bool bTimeModePrt = true;
-        if ((infoType & 0xF000) > 0x1000 && version >= 0.7f) {
-            bTimeModePrt = ReadField<bool>(file, "TIMEMODEPRT:");
+        if ((infoType & 0xF000) > 0x1000 && (float)version >= 0.7f) {
+            bTimeModePrt = ReadField<bool>(file); // "TIMEMODEPRT:" (The name isn't checked by the original code)
         }
 
         info = AddFxInfo(infoType);
@@ -174,6 +172,17 @@ void FxInfoManager_c::Load(FILESTREAM file, int32 version) {
         ReadField<void>(file);
 
         info->m_bTimeModeParticle = bTimeModePrt;
+
+        // 0x5C1680 - Infos are sorted by type (emission, movement, render), so find where each section begins
+        if ((info->m_nType & 0x1000) == 0) {
+            if ((info->m_nType & 0x2000) != 0) {
+                if (m_MovementOffset == -1) {
+                    m_MovementOffset = (int8)i;
+                }
+            } else if ((info->m_nType & 0xC000) != 0 && m_RenderOffset == -1) {
+                m_RenderOffset = (int8)i;
+            }
+        }
     }
 
     if (m_RenderOffset == -1)
