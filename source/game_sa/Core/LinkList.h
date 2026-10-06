@@ -16,12 +16,14 @@ public:
     CLink<T>  freeListTail{};
     CLink<T>* links{};
 
+    // 0x821195 is the CRT's `operator new[](size_t)` (a thunk to `operator new` @ 0x82119A)
     void* operator new(unsigned size) {
-        return ((void*(__cdecl*)(uint32))0x821195)(size);
+        return ::operator new[](size);
     }
 
+    // 0x8213AE is the CRT's `operator delete[](void*)` (a thunk to `operator delete` @ 0x8214BD)
     void operator delete(void* object) {
-        ((void(__cdecl*)(void*))0x8213AE)(object);
+        ::operator delete[](object);
     }
 
     void Init(int32 count) {
