@@ -18,6 +18,7 @@ void CAEAudioHardware::InjectHooks() {
     RH_ScopedInstall(Destructor, 0x4D83A0);
 
     RH_ScopedInstall(AllocateChannels, 0x5B9340);
+    RH_ScopedInstall(PlaySound, 0x4D86B0);
     RH_ScopedInstall(RequestVirtualChannelSoundInfo, 0x4D8E60);
     RH_ScopedInstall(Query3DSoundEffects, 0x4D8490);
     RH_ScopedInstall(GetNumAvailableChannels, 0x4D8810);
@@ -240,8 +241,65 @@ void CAEAudioHardware::Terminate() {
     SAFE_RELEASE(m_pDSDevice);
 }
 
+// 0x4D86B0
 void CAEAudioHardware::PlaySound(int16 channel, uint16 channelSlot, uint16 soundIdInSlot, uint16 bankSlot, int16 playPosition, int16 flags, float speed) {
-    plugin::CallMethod<0x4D86B0, CAEAudioHardware*, int16, uint16, uint16, uint16, int16, int16, float>(this, channel, channelSlot, soundIdInSlot, bankSlot, playPosition, flags, speed);
+    if (channel < 0 || channelSlot >= m_anNumChannelsInSlot[channel]) {
+        return;
+    }
+
+    const auto sfx  = static_cast<eSoundID>(soundIdInSlot);
+    const auto slot = static_cast<eSoundBankSlot>(bankSlot);
+
+    uint32 size{};
+    uint16 sampleRate{};
+    const auto buffer = m_pMP3BankLoader->GetSoundBuffer(sfx, slot, size, sampleRate);
+    if (!buffer) {
+        NOTSA_LOG_ERR("Couldn't get the sound buffer! [SoundID: {}; BankSlot: {}]", soundIdInSlot, bankSlot);
+        return;
+    }
+
+    const auto loopOffset = m_pMP3BankLoader->GetLoopOffset(sfx, slot);
+
+    const auto chIdx = channel + channelSlot;
+    if (chIdx >= MAX_NUM_AUDIO_CHANNELS) { // NOTSA: Original checks `> 64`, which would let an out-of-bounds index through
+        NOTSA_LOG_ERR("Channel index out of range: {}", chIdx);
+        return;
+    }
+
+    // Channel #0 is the streaming channel, all the others are static ones
+    auto* const chan = static_cast<CAEStaticChannel*>(m_aChannels[chIdx]);
+    if (!chan->SetAudioBuffer(
+        reinterpret_cast<IDirectSound3DBuffer*>(buffer),
+        size,
+        sfx,
+        slot,
+        static_cast<int16>(loopOffset),
+        sampleRate
+    )) {
+        return;
+    }
+
+    CAEAudioHardwarePlayFlags playFlags{};
+    playFlags.m_nFlags = static_cast<uint16>(flags);
+
+    const auto length  = static_cast<int32>(chan->GetLength());
+    auto       playPos = std::max<int16>(playPosition, 0);
+    if (playFlags.m_bIsStartPercentage && playPos > 0) {
+        playPos = static_cast<int16>(std::floor((float)(playPos) * 0.01f * (float)(length)));
+    }
+    if (playPos > length) {
+        playPos = static_cast<int16>(length);
+    }
+
+    if (m_n3dEffectsQueryResult & 0xFF) {
+        chan->SetNotInRoom(!playFlags.m_IsPausable);
+    }
+
+    chan->Play(playPos, static_cast<int8>(flags), speed);
+
+    // 0x4D87EA
+    m_awChannelFlags[chIdx] = flags;
+    chan->m_nFlags          = static_cast<uint32>(flags); // Sign extended (as in the original)
 }
 
 // 0x5B9340
