@@ -2,6 +2,7 @@
 
 #include "TaskComplex.h"
 #include "Vector.h"
+#include "TaskTimer.h"
 
 class CPointRoute;
 
@@ -11,11 +12,10 @@ public:
     CVector      m_targetPoint;
     CEntity*     m_object;
     CPointRoute* m_pointRoute;
-    int32        field_24;
-    int32        field_28;
-    int8         field_2C;
-    int8         field_2D;
-    int32        field_30;
+    CTaskTimer   m_timer;          // 0x24
+    CVector      m_objectPos;      // 0x30 - Position of the object when the route was computed
+    CVector      m_objectForward;  // 0x3C - Forward vector of the object when the route was computed
+    CVector      m_objectRight;    // 0x48 - Right vector of the object when the route was computed
 
 public:
     static constexpr auto Type = TASK_COMPLEX_WALK_ROUND_OBJECT;
@@ -30,6 +30,8 @@ public:
     CTask* ControlSubTask(CPed* ped) override;
 
     CTask* CreateRouteTask(CPed* ped);
+    float  ComputeRoute(CPed* ped);                          // 0x6551D0
+    CTask* CreateSubTask(eTaskType taskType, CPed* ped);     // 0x655290
 
 private:
     friend void InjectHooksMain();
@@ -38,4 +40,4 @@ private:
     CTaskComplexWalkRoundObject* Constructor(int32 moveState, const CVector& targetPoint, CEntity* object);
 };
 
-VALIDATE_SIZE(CTaskComplexWalkRoundObject, 0x34);
+VALIDATE_SIZE(CTaskComplexWalkRoundObject, 0x54);
