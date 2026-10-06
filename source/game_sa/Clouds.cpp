@@ -20,7 +20,7 @@ void CClouds::InjectHooks() {
     RH_ScopedInstall(SetUpOneSkyPoly, 0x713060);
     RH_ScopedInstall(Render, 0x713950);
     RH_ScopedInstall(RenderSkyPolys, 0x714650);
-    RH_ScopedInstall(RenderBottomFromHeight, 0x7154B0, { .Reversed = false });
+    RH_ScopedInstall(RenderBottomFromHeight, 0x7154B0);
 
     // Moving fog
     RH_ScopedInstall(MovingFogInit, 0x713660);
@@ -859,41 +859,197 @@ void CClouds::RenderSkyPolys() {
 
 // 0x7154B0
 void CClouds::RenderBottomFromHeight() {
-    /****
-    * Code below should be good
-    * but it isn't complete...
-    *****\
-   
-    const auto camPos = TheCamera.GetPosition();
-    if (camPos.z < -90.f) { // 0x71557D [Moved up here]
+    static auto& s_WindShift   = StaticRef<float>(0xC6E954);
+    static auto& s_Randoms     = StaticRef<std::array<float, 80>>(0x8D5658);
+    static auto& s_SpriteOffsY = StaticRef<std::array<float, 30>>(0x8D57A0);
+    static auto& s_SpriteOffsX = StaticRef<std::array<float, 30>>(0x8D5818);
+
+    const auto GetRandom = [](int32 i) {
+        return s_Randoms[i % 80];
+    };
+
+    const auto& cc = CTimeCycle::m_CurrentColours;
+
+    // Un-modified colors
+    const auto red   = cc.m_nFluffyCloudsBottomRed;
+    const auto green = cc.m_nFluffyCloudsBottomGreen;
+    const auto blue  = cc.m_nFluffyCloudsBottomBlue;
+
+    // Brightened colors (only used for the first vertex of the quads)
+    const auto brightRed   = static_cast<int32>(std::min(static_cast<float>(red) * 2.0f + 20.0f, 255.0f));
+    const auto brightGreen = static_cast<int32>(std::min(static_cast<float>(green) * 1.5f, 255.0f));
+    const auto brightBlue  = static_cast<int32>(std::min(static_cast<float>(blue) * 1.5f, 255.0f));
+
+    if (TheCamera.GetPosition().z < -90.0f) {
         return;
     }
 
-    const auto& cc = CTimeCycle::m_CurrentColours; // cc = color component
-    const auto ClampClr = [](float clr) {
-        return std::min(clr, 255.f);
-    };
-    const auto fcClr = CRGBA{ // fc = fluffy clouds
-        (uint8)ClampClr(cc.m_nFluffyCloudsBottomRed * 2.f + 20.f),
-        (uint8)ClampClr(cc.m_nFluffyCloudsBottomGreen * 1.5f),
-        (uint8)ClampClr(cc.m_nFluffyCloudsBottomBlue * 1.5f),
-        (uint8)255
-    };
+    auto lowZ = 160.0f, highZ = 190.0f;
+    if (const auto shiftZ = (TheCamera.GetPosition().z - 190.0f - 10.0f) * 0.3f; shiftZ > 0.0f) {
+        lowZ  += shiftZ;
+        highZ += shiftZ;
+    }
+    const auto rangeZ = highZ - lowZ;
 
-    auto lowZ = 160.f, highZ = 190.f;
+    s_WindShift += CTimer::GetTimeStep() * CWeather::Wind * 0.25f;
 
-    auto& windShift = StaticRef<float>(0xC6E954);
-
-    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,      RWRSTATE(TRUE));
+    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,      RWRSTATE(FALSE));
     RwRenderStateSet(rwRENDERSTATEZTESTENABLE,       RWRSTATE(TRUE));
     RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, RWRSTATE(TRUE));
-    RwRenderStateSet(rwRENDERSTATEFOGENABLE,         RWRSTATE(TRUE));
+    RwRenderStateSet(rwRENDERSTATEFOGENABLE,         RWRSTATE(FALSE));
     RwRenderStateSet(rwRENDERSTATESRCBLEND,          RWRSTATE(rwBLENDSRCALPHA));
     RwRenderStateSet(rwRENDERSTATEDESTBLEND,         RWRSTATE(rwBLENDINVSRCALPHA));
     RwRenderStateSet(rwRENDERSTATETEXTURERASTER,     RWRSTATE(RwTextureGetRaster(gpCloudMaskTex)));
 
-    // TODO....
-    */
+    const auto cloudAlpha = static_cast<int32>(cc.m_fCloudAlpha);
+
+    // 0x71565F - Big, flat cloud quads
+    if (cloudAlpha != 0) {
+        int32 numIndices = 0, numVerts = 0;
+        uiTempBufferIndicesStored  = 0;
+        uiTempBufferVerticesStored = 0;
+
+        for (int32 i = 0; i < 28; i++) {
+            const auto camPos = TheCamera.GetPosition();
+
+            const auto shift = (GetRandom(i + 6) * 0.5f + 1.0f) * s_WindShift;
+
+            // Wrap around the camera (every 512 units)
+            auto offX = GetRandom(i) * 512.0f + shift - camPos.x;
+            auto offY = GetRandom(i + 1) * 512.0f + shift - camPos.y;
+            offX -= static_cast<float>((static_cast<int32>(offX) & ~0x1FF) + 0x100);
+            offY -= static_cast<float>((static_cast<int32>(offY) & ~0x1FF) + 0x100);
+
+            const CVector pos{
+                offX + camPos.x,
+                offY + camPos.y,
+                rangeZ * GetRandom(i + 2) + lowZ
+            };
+
+            auto alpha = cloudAlpha;
+            if (const auto aboveCam = pos.z - camPos.z; aboveCam > 0.0f) {
+                alpha = static_cast<int32>((1.0f - aboveCam * 0.004f) * static_cast<float>(cloudAlpha));
+            }
+            if (alpha <= 0) {
+                continue;
+            }
+
+            // Fade out towards the edges of the wrap-around area
+            const auto edgeDist = std::max(std::abs(camPos.x - pos.x), std::abs(camPos.y - pos.y)) * (1.0f / 256.0f);
+            if (edgeDist > 0.75f) {
+                alpha = static_cast<int32>((1.0f - (edgeDist - 0.75f) * 4.0f) * static_cast<float>(alpha));
+            }
+            if (alpha <= 0) {
+                continue;
+            }
+
+            const auto sizeX = GetRandom(i + 3) * 100.0f + 60.0f;
+            const auto sizeY = GetRandom(i + 4) * 100.0f + 60.0f;
+
+            auto* const idx = &aTempBufferIndices[numIndices];
+            idx[0] = numVerts + 2;
+            idx[1] = numVerts + 1;
+            idx[2] = numVerts + 0;
+            idx[3] = numVerts + 2;
+            idx[4] = numVerts + 3;
+            idx[5] = numVerts + 1;
+
+            auto* const vtx = &TempBufferVertices.m_3d[numVerts];
+
+            RwIm3DVertexSetRGBA(&vtx[0], (uint8)brightRed, (uint8)brightGreen, (uint8)brightBlue, (uint8)alpha);
+            RwIm3DVertexSetPos(&vtx[0], pos.x - sizeX, pos.y + sizeY, pos.z);
+            RwIm3DVertexSetU(&vtx[0], 0.0f);
+            RwIm3DVertexSetV(&vtx[0], 0.0f);
+
+            RwIm3DVertexSetRGBA(&vtx[1], (uint8)red, (uint8)green, (uint8)blue, (uint8)alpha);
+            RwIm3DVertexSetPos(&vtx[1], pos.x + sizeX, pos.y + sizeY, pos.z);
+            RwIm3DVertexSetU(&vtx[1], 0.0f);
+            RwIm3DVertexSetV(&vtx[1], 1.0f);
+
+            RwIm3DVertexSetRGBA(&vtx[2], (uint8)red, (uint8)green, (uint8)blue, (uint8)alpha);
+            RwIm3DVertexSetPos(&vtx[2], pos.x - sizeX, pos.y - sizeY, pos.z);
+            RwIm3DVertexSetU(&vtx[2], 1.0f);
+            RwIm3DVertexSetV(&vtx[2], 0.0f);
+
+            RwIm3DVertexSetRGBA(&vtx[3], (uint8)red, (uint8)green, (uint8)blue, (uint8)alpha);
+            RwIm3DVertexSetPos(&vtx[3], pos.x + sizeX, pos.y - sizeY, pos.z);
+            RwIm3DVertexSetU(&vtx[3], 1.0f);
+            RwIm3DVertexSetV(&vtx[3], 1.0f);
+
+            numIndices += 6;
+            numVerts   += 4;
+            uiTempBufferIndicesStored  = numIndices;
+            uiTempBufferVerticesStored = numVerts;
+        }
+
+        if (numIndices != 0 && RwIm3DTransform(TempBufferVertices.m_3d, numVerts, nullptr, rwIM3D_VERTEXXYZ | rwIM3D_VERTEXUV | rwIM3D_VERTEXRGBA)) {
+            RwIm3DRenderIndexedPrimitive(rwPRIMTYPETRILIST, aTempBufferIndices, uiTempBufferIndicesStored);
+            RwIm3DEnd();
+        }
+
+        uiTempBufferIndicesStored  = 0;
+        uiTempBufferVerticesStored = 0;
+    }
+
+    // 0x715B43 - Small cloud sprites
+    CSprite::InitSpriteBuffer();
+    if (cloudAlpha > 0) {
+        for (int32 i = 0; i < 30; i++) {
+            const auto camPos = TheCamera.GetPosition();
+
+            // Wrap around the camera (every 256 units)
+            auto offX = s_WindShift * 0.5f + s_SpriteOffsX[i] - camPos.x;
+            auto offY = s_WindShift * 0.5f + s_SpriteOffsY[i] - camPos.y;
+            offX -= static_cast<float>((static_cast<int32>(offX) & ~0xFF) + 0x80);
+            offY -= static_cast<float>((static_cast<int32>(offY) & ~0xFF) + 0x80);
+
+            const CVector pos{
+                offX + camPos.x,
+                offY + camPos.y,
+                rangeZ * GetRandom(i) + lowZ
+            };
+
+            auto alpha = static_cast<int32>((1.0f - std::abs(camPos.z - pos.z) * 0.004f) * static_cast<float>(cloudAlpha));
+            if (alpha <= 0) {
+                continue;
+            }
+
+            const auto size = (GetRandom(i + 1) + 1.0f) * 12.0f;
+
+            auto edgeDist = std::max(std::abs(camPos.x - pos.x), std::abs(camPos.y - pos.y)) * (1.0f / 128.0f);
+            if (edgeDist >= 1.0f) {
+                edgeDist = 1.0f;
+            }
+            if (edgeDist > 0.75f) {
+                alpha = static_cast<int32>((1.0f - (edgeDist - 0.75f) * 4.0f) * static_cast<float>(alpha));
+            }
+            if (edgeDist <= 0.05f) { // Too close to the camera
+                continue;
+            }
+            if (edgeDist < 0.1f) {
+                alpha = static_cast<int32>((edgeDist - 0.05f) * static_cast<float>(alpha) * 20.0f);
+            }
+
+            RwV3d screenPos;
+            float screenW, screenH;
+            if (CSprite::CalcScreenCoors(pos, &screenPos, &screenW, &screenH, false, true)) {
+                CSprite::RenderBufferedOneXLUSprite(
+                    screenPos,
+                    { screenW * size, screenH * size },
+                    (uint8)red, (uint8)green, (uint8)blue,
+                    256,
+                    1.0f / screenPos.z,
+                    (uint8)alpha
+                );
+            }
+        }
+    }
+    CSprite::FlushSpriteBuffer();
+
+    RwRenderStateSet(rwRENDERSTATETEXTURERASTER,     RWRSTATE(NULL));
+    RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, RWRSTATE(FALSE));
+    RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,      RWRSTATE(TRUE));
+    RwRenderStateSet(rwRENDERSTATEZTESTENABLE,       RWRSTATE(TRUE));
 }
 
 //
