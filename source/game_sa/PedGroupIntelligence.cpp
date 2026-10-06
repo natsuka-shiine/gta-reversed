@@ -35,6 +35,7 @@ void CPedGroupIntelligence::InjectHooks() {
     RH_ScopedInstall(SetPrimaryTaskAllocator, 0x5F7410);
     RH_ScopedInstall(SetGroupDecisionMakerType, 0x5F7340);
     RH_ScopedInstall(ComputeEventResponseTasks, 0x5FC440);
+    RH_ScopedInstall(ComputeScriptCommandTasks, 0x5F7800);
     RH_ScopedInstall(Process, 0x5FC4A0);
     RH_ScopedInstall(ReportAllTasksFinished, 0x5F7730);
 }
@@ -437,6 +438,52 @@ CTaskAllocator* CPedGroupIntelligence::ComputeEventResponseTasks() {
     return CGroupEventHandler::ComputeEventResponseTasks(*m_CurrentEvent, m_pPedGroup);
 }
 
+// 0x5F7800
 void CPedGroupIntelligence::ComputeScriptCommandTasks() {
-    plugin::CallMethod<0x5F7800>(this);
+    auto& membership = m_pPedGroup->GetMembership();
+
+    // Re-map the task pairs, so that the `i`-th pair belongs to the `i`-th member of the group
+    PedTaskPairs newPairs{};
+    for (auto i = 0u; i < TOTAL_PED_GROUP_MEMBERS; i++) {
+        const auto& oldPair = m_ScriptCommandPedTaskPairs[i];
+        auto&       newPair = newPairs[i];
+
+        newPair.Ped  = oldPair.Ped;
+        newPair.Task = oldPair.Task;
+
+        const auto member = membership.GetMember(i);
+        if (member == oldPair.Ped) {
+            continue;
+        }
+
+        // Member at this index has changed, find their task (if any)
+        newPair.Ped  = member;
+        newPair.Task = nullptr;
+        for (const auto& pair : m_ScriptCommandPedTaskPairs) {
+            if (pair.Ped == member) {
+                newPair.Task = pair.Task;
+                break;
+            }
+        }
+    }
+
+    // Delete tasks that didn't get carried over (Their peds are no longer in the group)
+    for (auto& oldPair : m_ScriptCommandPedTaskPairs) {
+        if (!oldPair.Task) {
+            continue;
+        }
+        const auto it = rng::find_if(newPairs, [&](const CPedTaskPair& newPair) { return newPair.Ped == oldPair.Ped; });
+        if (it != newPairs.end() && it->Task) {
+            continue;
+        }
+        delete oldPair.Task;
+        oldPair.Ped  = nullptr;
+        oldPair.Task = nullptr;
+    }
+
+    // Now store the new pairs (Only the ped and task are copied)
+    for (auto i = 0u; i < TOTAL_PED_GROUP_MEMBERS; i++) {
+        m_ScriptCommandPedTaskPairs[i].Ped  = newPairs[i].Ped;
+        m_ScriptCommandPedTaskPairs[i].Task = newPairs[i].Task;
+    }
 }
