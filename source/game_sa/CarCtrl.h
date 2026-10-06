@@ -94,6 +94,7 @@ public:
     static void JoinCarWithRoadSystem(CVehicle* vehicle);
     static bool JoinCarWithRoadSystemGotoCoors(CVehicle* vehicle, const CVector& posn, bool unused = true, bool bIsBoat = false);
     static bool PickNextNodeAccordingStrategy(CVehicle* vehicle);
+    static bool MapCouldMoveInThisArea(float x, float y);
     static void PickNextNodeRandomly(CVehicle* vehicle);
     static bool PickNextNodeToChaseCar(CVehicle* vehicle, float destX, float destY, float destZ);
     static bool PickNextNodeToFollowPath(CVehicle* vehicle);
@@ -155,6 +156,7 @@ public:
     static void UpdateCarOnRails(CVehicle* vehicle);
     static void WeaveForObject(CEntity* entity, CVehicle* vehicle, float* arg3, float* arg4);
     static void WeaveForOtherCar(CEntity* entity, CVehicle* vehicle, float* arg3, float* arg4);
+    static void WeaveForPed(CEntity* entity, CVehicle* vehicle, float* leftAngle, float* rightAngle);
     template<typename PtrListType>
     static void WeaveThroughCarsSectorList(PtrListType& ptrList, CVehicle* vehicle, CPhysical* physical, float arg4, float arg5, float arg6, float arg7, float* arg8, float* arg9);
     template<typename PtrListType>
