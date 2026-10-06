@@ -53,6 +53,7 @@ void CPedIntelligence::InjectHooks()
     RH_ScopedInstall(RestorePedDecisionMakerType, 0x600BC0);
     RH_ScopedInstall(SetHearingRange, 0x600BE0);
     RH_ScopedInstall(SetSeeingRange, 0x600BF0);
+    RH_ScopedInstall(IsInHearingRange, 0x600C00);
     RH_ScopedInstall(IsInSeeingRange, 0x600C60);
     RH_ScopedInstall(FindRespectedFriendInInformRange, 0x600CF0);
     RH_ScopedInstall(IsRespondingToEvent, 0x600DB0);
@@ -89,7 +90,9 @@ void CPedIntelligence::InjectHooks()
     RH_ScopedInstall(FlushIntelligence, 0x601DA0);
     RH_ScopedInstall(TestForStealthKill, 0x601E00);
     RH_ScopedInstall(RecordEventForScript, 0x602050);
+    RH_ScopedInstall(HasInterestingEntites, 0x602080);
     RH_ScopedInstall(IsInterestingEntity, 0x6020A0);
+    RH_ScopedInstall(RemoveAllInterestingEntities, 0x602320);
     RH_ScopedInstall(LookAtInterestingEntities, 0x6020D0);
     RH_ScopedInstall(IsPedGoingForCarDoor, 0x602350);
     RH_ScopedInstall(CanSeeEntityWithLights, 0x605550);
@@ -106,8 +109,8 @@ CPedIntelligence::CPedIntelligence(CPed* ped) :
     m_eventHandler{ CEventHandler(ped) },
     m_eventGroup{ CEventGroup(ped) }
 {
-    m_nDecisionMakerType                  = DM_EVENT_UNDEFINED;
-    m_nDecisionMakerTypeInGroup           = -1;
+    m_nDecisionMakerType                  = eDecisionMakerType::UNKNOWN;
+    m_nDecisionMakerTypeInGroup           = eDecisionMakerType::UNKNOWN;
     m_fHearingRange                       = 15.0f;
     m_fSeeingRange                        = 15.0f;
     m_nDmNumPedsToScan                    = 3;
@@ -133,35 +136,32 @@ CPedIntelligence::~CPedIntelligence() {
 }
 
 // 0x600B50
-void CPedIntelligence::SetPedDecisionMakerType(int32 newType) {
-    int32 oldType = m_nDecisionMakerType;
-    if (oldType)
-    {
-        if (!newType)
-        {
-            m_nDecisionMakerTypeInGroup = oldType;
+void CPedIntelligence::SetPedDecisionMakerType(eDecisionMakerType newType) {
+    const auto prev = m_nDecisionMakerType;
+    if (prev != eDecisionMakerType::PED_GROUPMEMBER) {
+        if (newType != eDecisionMakerType::PED_GROUPMEMBER) {
+            m_nDecisionMakerType = newType;
+        } else {
+            m_nDecisionMakerTypeInGroup = prev;
+            m_nDecisionMakerType        = eDecisionMakerType::PED_GROUPMEMBER;
         }
-        m_nDecisionMakerType = newType;
-    }
-    else
-    {
+    } else {
         m_nDecisionMakerTypeInGroup = newType;
     }
-    if (m_nDecisionMakerType == DM_EVENT_PED_ENTERED_MY_VEHICLE)
-    {
-        m_fDmRadius = 5.0f;
+    if (m_nDecisionMakerType == eDecisionMakerType::PED_INDOORS) {
+        m_fDmRadius        = 5.0f;
         m_nDmNumPedsToScan = 15;
     }
 }
 
 // 0x600BB0
-void CPedIntelligence::SetPedDecisionMakerTypeInGroup(int32 newType) {
+void CPedIntelligence::SetPedDecisionMakerTypeInGroup(eDecisionMakerType newType) {
     m_nDecisionMakerTypeInGroup = newType;
 }
 
 // 0x600BC0
 void CPedIntelligence::RestorePedDecisionMakerType() {
-    if (!m_nDecisionMakerType) { // todo: DM_EVENT_DRAGGED_OUT_CAR
+    if (m_nDecisionMakerType == eDecisionMakerType::PED_GROUPMEMBER) {
         m_nDecisionMakerType = m_nDecisionMakerTypeInGroup;
     }
 }
@@ -179,7 +179,8 @@ void CPedIntelligence::SetSeeingRange(float range) {
 // Unused
 // 0x600C00
 bool CPedIntelligence::IsInHearingRange(const CVector& posn) {
-    return plugin::CallMethodAndReturn<bool, 0x600C00, CPedIntelligence*, const CVector&>(this, posn);
+    const auto distance = posn - m_pPed->GetPosition();
+    return m_fHearingRange * m_fHearingRange > distance.SquaredMagnitude();
 }
 
 // 0x600C60
@@ -751,7 +752,7 @@ void CPedIntelligence::RecordEventForScript(int32 eventId, int32 eventPriority) 
 // typo: Entities
 // 0x602080
 bool CPedIntelligence::HasInterestingEntites() {
-    return plugin::CallMethodAndReturn<bool, 0x602080, CPedIntelligence*>(this);
+    return rng::any_of(m_apInterestingEntities, [](CEntity* entity) { return entity != nullptr; });
 }
 
 // 0x6020A0
@@ -824,7 +825,9 @@ void CPedIntelligence::LookAtInterestingEntities() {
 // unused
 // 0x602320
 void CPedIntelligence::RemoveAllInterestingEntities() {
-    plugin::CallMethod<0x602320, CPedIntelligence*>(this);
+    for (auto& entity : m_apInterestingEntities) {
+        CEntity::ClearReference(entity);
+    }
 }
 
 // 0x602350
