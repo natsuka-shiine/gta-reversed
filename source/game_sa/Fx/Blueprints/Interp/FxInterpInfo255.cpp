@@ -3,6 +3,13 @@
 #include "FxInterpInfo255.h"
 #include "FxManager.h"
 
+void FxInterpInfo255_c::InjectHooks() {
+    RH_ScopedClass(FxInterpInfo255_c);
+    RH_ScopedCategory("Fx");
+
+    RH_ScopedInstall(GetVal, 0x4A8B80);
+}
+
 // 0x4A8B50
 FxInterpInfo255_c::FxInterpInfo255_c() : FxInterpInfo_c() {
     m_Keys = nullptr;
@@ -38,5 +45,39 @@ void FxInterpInfo255_c::Allocate(int32 count) {
 
 // 0x4A8B80
 void FxInterpInfo255_c::GetVal(float* outValues, float delta) {
-    plugin::CallMethod<0x4A8B80, FxInterpInfo255_c*, float*, float>(this, outValues, delta);
+    constexpr auto TIME_SCALE = 1.0f / 256.0f; // 0x859AA0
+    constexpr auto KEY_SCALE  = 1.0f / 128.0f; // 0x858B88
+
+    const auto count = (int8)m_nCount; // The game reads this as a signed byte
+
+    if (m_nNumKeys == 1) {
+        for (auto i = 0; i < count; i++) {
+            outValues[i] = (float)m_Keys[i][0] * KEY_SCALE;
+        }
+        return;
+    }
+
+    if (m_bLooped) {
+        const auto totalTime = (float)m_pTimes[m_nNumKeys - 1] * TIME_SCALE;
+        delta -= (float)(int32)(delta / totalTime) * totalTime;
+    }
+
+    for (auto k = 1; k < m_nNumKeys; k++) {
+        const auto time = (float)m_pTimes[k] * TIME_SCALE;
+        if (delta < time) {
+            const auto prevTime = (float)m_pTimes[k - 1] * TIME_SCALE;
+            const auto t        = (delta - prevTime) / (time - prevTime);
+            for (auto i = 0; i < count; i++) {
+                const auto prev = (float)m_Keys[i][k - 1] * KEY_SCALE;
+                const auto curr = (float)m_Keys[i][k] * KEY_SCALE;
+                outValues[i] = (curr - prev) * t + prev;
+            }
+            return;
+        }
+    }
+
+    // Past the last key
+    for (auto i = 0; i < count; i++) {
+        outValues[i] = (float)m_Keys[i][m_nNumKeys - 1] * KEY_SCALE;
+    }
 }
