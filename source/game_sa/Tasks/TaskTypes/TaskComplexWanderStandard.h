@@ -10,6 +10,8 @@ public:
     uint32     m_nMinNextScanTime;
 
 public:
+    static void InjectHooks();
+
     CTaskComplexWanderStandard(eMoveState MoveState, uint8 Dir, bool bWanderSensibly = true);
 
     CTask* Clone() const override { return new CTaskComplexWanderStandard(m_nMoveState, m_nDir); } // 0x48E530
