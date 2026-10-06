@@ -48,6 +48,7 @@ void CFileLoader::InjectHooks() {
     RH_ScopedOverloadedInstall(LoadClumpFile, "1", 0x5372D0, bool (*)(RwStream*, uint32));
     RH_ScopedInstall(LoadClumpObject, 0x5B4040);
     RH_ScopedInstall(LoadCullZone, 0x5B4B40);
+    RH_ScopedInstall(Load2dEffect, 0x5B7670);
     RH_ScopedInstall(LoadObject, 0x5B3C60);
     RH_ScopedOverloadedInstall(LoadObjectInstance, "inst", 0x538090, CEntity * (*)(CFileObjectInstance*, const char*));
     RH_ScopedOverloadedInstall(LoadObjectInstance, "file", 0x538690, CEntity * (*)(const char*));
@@ -962,41 +963,256 @@ int32 CFileLoader::LoadObject(const char* line) {
 
 // 0x5B7670
 void CFileLoader::Load2dEffect(const char* line) {
-    return plugin::Call<0x5B7670, const char*>(line);
-
-    // todo:
-    auto modelId{ MODEL_INVALID };
+    int32   modelId{ MODEL_INVALID };
     CVector pos{};
-    int32 type;
-    VERIFY(sscanf_s(line, "%d %f %f %f %d", &modelId, &pos.x, &pos.y, &pos.z, &type) == 5);
+    int32   type{};
+    (void)sscanf_s(line, "%d %f %f %f %d", &modelId, &pos.x, &pos.y, &pos.z, &type);
 
     CTxdStore::PushCurrentTxd();
     CTxdStore::SetCurrentTxd(CTxdStore::FindTxdSlot("particle"));
 
     auto& effect = CModelInfo::Get2dEffectStore()->AddItem();
     CModelInfo::GetModelInfo(modelId)->Add2dEffect(&effect);
-    effect.m_Pos = pos;
-    effect.m_Type = *reinterpret_cast<e2dEffectType*>(type);
+    effect.m_Pos  = pos;
+    effect.m_Type = static_cast<e2dEffectType>(type);
 
-    switch (type) {
-    case EFFECT_LIGHT:
+    switch (effect.m_Type) {
+    case EFFECT_LIGHT: { // 0x5B78B7
+        auto& fx = effect.light;
+
+        int32 r{}, g{}, b{}, a{};
+        (void)sscanf_s(line, "%d %f %f %f %d %d %d %d %d", &modelId, &pos.x, &pos.y, &pos.z, &type, &r, &g, &b, &a);
+
+        // 0x5B78FA - Read the 2 texture names (They're in quotes)
+        char       coronaTexName[100], shadowTexName[100];
+        const auto ReadQuotedString = [](const char*& p, char* out) {
+            while (*p++ != '"') {} // Find opening quote (and skip it)
+            while (*p != '"') {
+                *out++ = *p++;
+            }
+            *out = 0;
+            p++; // Skip closing quote
+        };
+        const char* p = line;
+        ReadQuotedString(p, coronaTexName);
+        ReadQuotedString(p, shadowTexName);
+
+        // 0x5B7941
+        int32 shadowColorMult{}, flashType{}, enableReflection{}, flareType{}, flags{}, shadowZDist{}, offsetX{}, offsetY{}, offsetZ{};
+        (void)sscanf_s(
+            p,
+            "%f %f %f %f %d %d %d %d %d %d %d %d %d",
+            &fx.m_fCoronaFarClip,
+            &fx.m_fPointlightRange,
+            &fx.m_fCoronaSize,
+            &fx.m_fShadowSize,
+            &shadowColorMult,
+            &flashType,
+            &enableReflection,
+            &flareType,
+            &flags,
+            &shadowZDist,
+            &offsetX,
+            &offsetY,
+            &offsetZ
+        );
+        fx.m_color.red               = static_cast<RwUInt8>(r);
+        fx.m_color.green             = static_cast<RwUInt8>(g);
+        fx.m_color.blue              = static_cast<RwUInt8>(b);
+        fx.m_color.alpha             = static_cast<RwUInt8>(a);
+        fx.m_nShadowColorMultiplier  = static_cast<uint8>(shadowColorMult);
+        fx.m_nCoronaFlareType        = static_cast<uint8>(flareType);
+        fx.m_nCoronaFlashType        = static_cast<e2dCoronaFlashType>(flashType);
+        fx.m_bCoronaEnableReflection = static_cast<bool>(static_cast<uint8>(enableReflection));
+        fx.offsetX                   = static_cast<char>(offsetX);
+        fx.m_nFlags                  = static_cast<uint16>(flags);
+        fx.m_nShadowZDistance        = static_cast<char>(shadowZDist);
+        fx.offsetY                   = static_cast<char>(offsetY);
+        fx.offsetZ                   = static_cast<char>(offsetZ);
+        fx.m_pCoronaTex              = RwTextureRead(coronaTexName, nullptr);
+        fx.m_pShadowTex              = RwTextureRead(shadowTexName, nullptr);
+
+        if (flags & 4) { // 0x5B7A27
+            fx.m_nFlags &= 0xFFFD;
+        }
         break;
-    case EFFECT_PARTICLE:
+    }
+    case EFFECT_PARTICLE: { // 0x5B7A3F
+        (void)sscanf_s(line, "%d %f %f %f %d %s", &modelId, &pos.x, &pos.y, &pos.z, &type, SCANF_S_STR(effect.particle.m_szName));
         break;
-    case EFFECT_ATTRACTOR:
+    }
+    case EFFECT_ATTRACTOR: { // 0x5B7A7B
+        auto& fx = effect.pedAttractor;
+
+        int32 attractorType{}, pedExistingProbability{}, unk{};
+        char  scriptName[128]{};
+        (void)sscanf_s(
+            line,
+            "%d %f %f %f %d %d %f %f %f %f %f %f %f %f %f %d %d %s",
+            &modelId, &pos.x, &pos.y, &pos.z, &type,
+            &attractorType,
+            &fx.m_vecQueueDir.x, &fx.m_vecQueueDir.y, &fx.m_vecQueueDir.z,
+            &fx.m_vecUseDir.x, &fx.m_vecUseDir.y, &fx.m_vecUseDir.z,
+            &fx.m_vecForwardDir.x, &fx.m_vecForwardDir.y, &fx.m_vecForwardDir.z,
+            &pedExistingProbability,
+            &unk,
+            SCANF_S_STR(scriptName)
+        );
+        fx.m_nAttractorType = static_cast<ePedAttractorType>(attractorType);
+        strcpy(fx.m_szScriptName, scriptName); // NOTE: Not bounds checked in the original either
+        fx.m_nPedExistingProbability = static_cast<uint8>(pedExistingProbability);
+        fx.field_36                  = static_cast<uint8>(unk);
         break;
-    case EFFECT_INTERIOR:
+    }
+    case EFFECT_INTERIOR: { // 0x5B7AFC
+        auto& fx = *C2dEffect::Cast<C2dEffectInterior>(&effect);
+
+        int32 interiorType{};
+        float width{}, depth{}, height{};
+        int32 door{}, seed{};
+        int32 status{ 50 };
+        int32 groupId{ -1 };
+        int32 lDoorStart{ -1 }, lDoorEnd{ -1 }, tDoorStart{ -1 }, tDoorEnd{ -1 }, rDoorStart{ -1 }, rDoorEnd{ -1 };
+        int32 lWindowStart{ -1 }, lWindowEnd{ -1 }, tWindowStart{ -1 }, tWindowEnd{ -1 }, rWindowStart{ -1 }, rWindowEnd{ -1 };
+        int32 noGoLeft[3]{ -1, -1, -1 }, noGoBottom[3]{ -1, -1, -1 }, noGoWidth[3]{ -1, -1, -1 }, noGoDepth[3]{ -1, -1, -1 };
+        (void)sscanf_s(
+            line,
+            "%d %f %f %f %d %d %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d  %d %d %d %d  %d %d %d %d  %d %d %d %d",
+            &modelId, &pos.x, &pos.y, &pos.z, &type,
+            &interiorType,
+            &width, &depth, &height,
+            &fx.m_rot,
+            &door,
+            &seed,
+            &groupId,
+            &status,
+            &lDoorStart, &lDoorEnd,
+            &tDoorStart, &tDoorEnd,
+            &rDoorStart, &rDoorEnd,
+            &lWindowStart, &lWindowEnd,
+            &tWindowStart, &tWindowEnd,
+            &rWindowStart, &rWindowEnd,
+            &noGoLeft[0], &noGoBottom[0], &noGoWidth[0], &noGoDepth[0],
+            &noGoLeft[1], &noGoBottom[1], &noGoWidth[1], &noGoDepth[1],
+            &noGoLeft[2], &noGoBottom[2], &noGoWidth[2], &noGoDepth[2]
+        );
+        fx.m_type         = static_cast<uint8>(interiorType);
+        fx.m_width        = static_cast<uint8>(static_cast<int32>(width));
+        fx.m_depth        = static_cast<uint8>(static_cast<int32>(depth));
+        fx.m_height       = static_cast<uint8>(static_cast<int32>(height));
+        fx.m_door         = static_cast<int8>(door);
+        fx.m_seed         = static_cast<uint8>(seed);
+        fx.m_groupId      = static_cast<int8>(groupId);
+        fx.m_status       = static_cast<uint8>(status);
+        fx.m_lDoorStart   = static_cast<int8>(lDoorStart);
+        fx.m_lDoorEnd     = static_cast<int8>(lDoorEnd);
+        fx.m_tDoorStart   = static_cast<int8>(tDoorStart);
+        fx.m_tDoorEnd     = static_cast<int8>(tDoorEnd);
+        fx.m_rDoorStart   = static_cast<int8>(rDoorStart);
+        fx.m_rDoorEnd     = static_cast<int8>(rDoorEnd);
+        fx.m_lWindowStart = static_cast<int8>(lWindowStart);
+        fx.m_lWindowEnd   = static_cast<int8>(lWindowEnd);
+        fx.m_tWindowStart = static_cast<int8>(tWindowStart);
+        fx.m_tWindowEnd   = static_cast<int8>(tWindowEnd);
+        fx.m_rWindowStart = static_cast<int8>(rWindowStart);
+        fx.m_rWindowEnd   = static_cast<int8>(rWindowEnd);
+        for (auto i = 0; i < 3; i++) {
+            fx.m_noGoLeft[i]   = static_cast<int8>(noGoLeft[i]);
+            fx.m_noGoBottom[i] = static_cast<int8>(noGoBottom[i]);
+            fx.m_noGoWidth[i]  = static_cast<int8>(noGoWidth[i]);
+            fx.m_noGoDepth[i]  = static_cast<int8>(noGoDepth[i]);
+        }
         break;
-    case EFFECT_ENEX:
+    }
+    case EFFECT_ENEX: { // 0x5B7DCF
+        auto& fx = effect.enEx;
+
+        int32 interiorId{}, flags{}, skyColor{};
+        char  interiorName[100]{};
+        (void)sscanf_s(
+            line,
+            "%d %f %f %f %d %f %f %f %f %f %f %f %d %d %s %d",
+            &modelId, &pos.x, &pos.y, &pos.z, &type,
+            &fx.m_fEnterAngle,
+            &fx.m_vecRadius.x, &fx.m_vecRadius.y,
+            &fx.m_vecExitPosn.x, &fx.m_vecExitPosn.y, &fx.m_vecExitPosn.z,
+            &fx.m_fExitAngle,
+            &interiorId,
+            &flags,
+            SCANF_S_STR(interiorName),
+            &skyColor
+        );
+        fx.m_nInteriorId = static_cast<eAreaCodes>(static_cast<int16>(interiorId));
+        fx.m_nFlags1     = static_cast<uint8>(flags);
+        fx.m_nSkyColor   = static_cast<uint8>(skyColor);
+        strncpy(fx.m_szInteriorName, interiorName, std::size(fx.m_szInteriorName));
         break;
-    case EFFECT_ROADSIGN:
+    }
+    case EFFECT_ROADSIGN: { // 0x5B7743
+        auto& fx = effect.roadsign;
+
+        // 4 lines, 16 characters each
+        char  lines[4][33]{};
+        float sizeX{}, sizeY{}, rotX{}, rotY{}, rotZ{};
+        int32 flags{};
+        for (auto& l : lines) {
+            l[0] = ' ';
+        }
+        (void)sscanf_s(
+            line,
+            "%d %f %f %f %d %f %f %f %f %f %d %s %s %s %s",
+            &modelId, &pos.x, &pos.y, &pos.z, &type,
+            &sizeX, &sizeY,
+            &rotX, &rotY, &rotZ,
+            &flags,
+            SCANF_S_STR(lines[0]), SCANF_S_STR(lines[1]), SCANF_S_STR(lines[2]), SCANF_S_STR(lines[3])
+        );
+        fx.m_vecSize     = { sizeX, sizeY };
+        fx.m_vecRotation = { rotX, rotY, rotZ };
+        fx.m_nFlags      = std::bit_cast<CRoadsignAttrFlags>(static_cast<uint16>(flags));
+        fx.m_pText       = static_cast<RwChar*>(CMemoryMgr::Malloc(4 * 16));
+        for (auto i = 0; i < 4; i++) {
+            memcpy(fx.m_pText + i * 16, lines[i], 16);
+        }
+        fx.m_pAtomic = nullptr;
         break;
-    case EFFECT_TRIGGER_POINT:
+    }
+    case EFFECT_TRIGGER_POINT: { // 0x5B7E54
+        int32 id{};
+        (void)sscanf_s(line, "%d %f %f %f %d %d", &modelId, &pos.x, &pos.y, &pos.z, &type, &id);
+        effect.slotMachineIndex.m_nId = id;
         break;
-    case EFFECT_COVER_POINT:
+    }
+    case EFFECT_COVER_POINT: { // 0x5B7EA7
+        auto& fx = effect.coverPoint;
+
+        float dirX{}, dirY{};
+        int32 usage{};
+        (void)sscanf_s(line, "%d %f %f %f %d %f %f %d", &modelId, &pos.x, &pos.y, &pos.z, &type, &dirX, &dirY, &usage);
+        fx.m_DirOfCover = { dirX, dirY };
+        fx.m_Usage      = static_cast<CCoverPoint::eUsage>(static_cast<int8>(usage));
         break;
-    case EFFECT_ESCALATOR:
+    }
+    case EFFECT_ESCALATOR: { // 0x5B7F12
+        auto& fx = effect.escalator;
+
+        CVector bottom{}, top{}, end{};
+        int32   direction{};
+        (void)sscanf_s(
+            line,
+            "%d %f %f %f %d %f %f %f %f %f %f %f %f %f %d",
+            &modelId, &pos.x, &pos.y, &pos.z, &type,
+            &bottom.x, &bottom.y, &bottom.z,
+            &top.x, &top.y, &top.z,
+            &end.x, &end.y, &end.z,
+            &direction
+        );
+        fx.m_vecBottom  = bottom;
+        fx.m_vecTop     = top;
+        fx.m_vecEnd     = end;
+        fx.m_nDirection = direction != 0;
         break;
+    }
     default:
         break;
     }
