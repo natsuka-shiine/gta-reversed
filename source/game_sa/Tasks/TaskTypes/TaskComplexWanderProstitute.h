@@ -7,6 +7,8 @@ public:
     uint32 m_nStartTimeInMs;
 
 public:
+    static void InjectHooks();
+
     CTaskComplexWanderProstitute(eMoveState MoveState, uint8 Dir, bool bWanderSensibly = true);
 
     eWanderType GetWanderType() override { return WANDER_TYPE_PROSTITUTE; } // 0x6726C0
