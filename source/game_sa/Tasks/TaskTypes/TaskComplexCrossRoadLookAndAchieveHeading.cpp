@@ -4,9 +4,19 @@
 #include "TaskSimpleRunAnim.h"
 #include "TaskSimpleAchieveHeading.h"
 
+void CTaskComplexCrossRoadLookAndAchieveHeading::InjectHooks() {
+    RH_ScopedClass(CTaskComplexCrossRoadLookAndAchieveHeading);
+    RH_ScopedCategory("Tasks/TaskTypes");
+
+    RH_ScopedInstall(Constructor, 0x631AE0);
+}
+
 // 0x631AE0
-CTaskComplexCrossRoadLookAndAchieveHeading::CTaskComplexCrossRoadLookAndAchieveHeading(int32 durationInMs, float fTargetHeading) : CTaskComplex() {
-    plugin::CallMethodAndReturn<CTaskComplexCrossRoadLookAndAchieveHeading*, 0x631AE0, CTaskComplexCrossRoadLookAndAchieveHeading*, int32, float>(this, durationInMs, fTargetHeading);
+CTaskComplexCrossRoadLookAndAchieveHeading::CTaskComplexCrossRoadLookAndAchieveHeading(int32 durationInMs, float fTargetHeading) :
+    CTaskComplex(),
+    m_nDuration{ durationInMs },
+    m_fTargetHeading{ fTargetHeading }
+{
 }
 
 // 0x631B50
