@@ -239,9 +239,7 @@ public:
     static void RenderIndicatorShadow(uint32 id, eShadowType, RwTexture* texture, const CVector& posn, float frontX, float frontY, float sideX, float sideY, int16 intensity);
 };
 
-#ifdef _MSC_VER
 CVector* ShadowRenderTriangleCB(CVector* normal, CVector* trianglePos, _ProjectionParam* param);
-#endif
 
 constexpr float MAX_DISTANCE_PED_SHADOWS = 15.0f; // 0x8D5240 - TODO: Rename to `MAX_DISTANCE_SHADOWS`
 constexpr float MAX_DISTANCE_PED_SHADOWS_SQR = MAX_DISTANCE_PED_SHADOWS * MAX_DISTANCE_PED_SHADOWS; // 0xC4B6B0 - TODO: Rename to `MAX_DISTANCE_PED_SHADOWS_SQ`
