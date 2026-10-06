@@ -27,13 +27,14 @@ void CTimer::InjectHooks()
     RH_ScopedInstall(GetIsSlowMotionActive, 0x561AD0);
     RH_ScopedInstall(UpdateVariables, 0x5618D0);
     RH_ScopedInstall(Update, 0x561B10);
+
+    RH_ScopedGlobalInstall(GetMillisecondTime, 0x5617C0);
 }
 
 // 64-bit RsTimer wrapper
 // 0x5617C0
 uint64 GetMillisecondTime() {
-    return plugin::CallAndReturn<uint64, 0x5617C0>();
-    // return RsTimer();
+    return RsTimer(); // zero-extended to 64 bits (`xor edx, edx`)
 }
 
 // 0x5617E0
