@@ -24,6 +24,9 @@ public:
     CTask*    CreateFirstSubTask(CPed* ped) override;
     CTask*    ControlSubTask(CPed* ped) override;
 
+    void SetOffset(CVector offset) { m_Offset = offset; } // NOTSA
+    const CVector& GetOffset() const { return m_Offset; } // NOTSA
+
 private: // Wrappers for hooks
     // 0x683240
     CTaskComplexWalkAlongsidePed* Constructor(CPed* a, float b) {
