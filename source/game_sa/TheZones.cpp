@@ -28,6 +28,7 @@ void CTheZones::InjectHooks() {
     RH_ScopedGlobalInstall(SetZoneRadarColours, 0x572CC0);
     RH_ScopedGlobalInstall(FindZoneByLabel, 0x572C40);
     RH_ScopedGlobalInstall(CreateZone, 0x5728A0);
+    RH_ScopedGlobalInstall(SetCurrentZoneAsUnlocked, 0x572800);
     RH_ScopedGlobalInstall(Init, 0x572670);
     RH_ScopedGlobalInstall(AssignZoneInfoForThisZone, 0x572180);
     RH_ScopedGlobalOverloadedInstall(FindZone, "", 0x572B80, bool(*)(CVector*, uint64_t, eZoneType));
@@ -241,7 +242,15 @@ void CTheZones::Init() {
 // Unlock the current zone
 // 0x572800
 void CTheZones::SetCurrentZoneAsUnlocked() {
-    ((void(__cdecl*)())0x572800)();
+    const auto pos = FindPlayerCoors();
+    m_CurrLevel = GetLevelFromPosition(pos);
+    if (CTheScripts::bPlayerIsOffTheMap || CGame::currArea != AREA_CODE_NORMAL_WORLD) {
+        return;
+    }
+    // NOTE: Android clamps the position to [-2999, 2999], Windows doesn't (See `GetZoneWasVisited`)
+    if (SetZoneWasVisited(pos, true)) {
+        ZonesRevealed++;
+    }
 }
 
 // Creates a zone
