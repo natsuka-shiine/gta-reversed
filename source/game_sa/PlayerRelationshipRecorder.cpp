@@ -3,6 +3,13 @@
 #include "PlayerRelationshipRecorder.h"
 #include "TaskCategories.h"
 
+void CPlayerRelationshipRecorder::InjectHooks() {
+    RH_ScopedClass(CPlayerRelationshipRecorder);
+    RH_ScopedCategoryGlobal();
+
+    RH_ScopedInstall(RecordRelationshipWithPlayer, 0x61A1D0);
+}
+
 // 0x61A130
 CPlayerRelationshipRecorder::CPlayerRelationshipRecorder() {
     Flush();
@@ -31,30 +38,29 @@ void CPlayerRelationshipRecorder::AddRelationship(const CPed* ped, int32 value) 
 
 // 0x61A1D0
 void CPlayerRelationshipRecorder::RecordRelationshipWithPlayer(const CPed* ped) {
-    plugin::CallMethod<0x61A1D0, CPlayerRelationshipRecorder*, const CPed*>(this, ped);
-    return;
-
-    // sheeeet
     ClearRelationshipWithPlayer(ped);
 
-    bool outIsKillPedTask[4];
+    const auto task = ped->GetTaskManager().GetActiveTask();
+    if (!task) {
+        return;
+    }
 
-    auto task1 = ped->GetTaskManager().GetActiveTask();
-    if (task1) {
-        outIsKillPedTask[2] = false;
+    bool a{}, b{};
+    CTaskCategories::IsKillPedTask(task, a, b);
+    if (!b) {
+        a = b = false;
+        CTaskCategories::IsFollowPedTask(task, a, b);
+    }
+    if (b) {
+        AddRelationship(ped, 3);
+        return;
+    }
 
-        bool unk = false;
-        CTaskCategories::IsKillPedTask(task1, outIsKillPedTask[2], unk);
-        if (unk || (outIsKillPedTask[3] = 0, outIsKillPedTask[0] = 0, CTaskCategories::IsFollowPedTask(task1, outIsKillPedTask[3], outIsKillPedTask[0]), outIsKillPedTask[0])) {
-            AddRelationship(ped, 3);
-        } else {
-            bool unk1 = false;
-            outIsKillPedTask[1] = false;
-            CTaskCategories::IsKillPedTask(task1, unk1, outIsKillPedTask[1]);
-            if (outIsKillPedTask[1]) {
-                AddRelationship(ped, 7);
-            }
-        }
+    // NOTE: Same call as the first one (so `b` can't be true here), most likely they meant to call something else
+    a = b = false;
+    CTaskCategories::IsKillPedTask(task, a, b);
+    if (b) {
+        AddRelationship(ped, 7);
     }
 }
 
