@@ -18,10 +18,10 @@ void CRopes::InjectHooks() {
     RH_ScopedInstall(Shutdown, 0x556B10);
     RH_ScopedInstall(Update, 0x558D70);
     RH_ScopedInstall(Render, 0x556AE0);
-    RH_ScopedInstall(RegisterRope, 0x556B40, { .Reversed = false });
+    RH_ScopedInstall(RegisterRope, 0x556B40);
     RH_ScopedInstall(FindPickupHeight, 0x556760);
     RH_ScopedInstall(FindRope, 0x556000);
-    RH_ScopedInstall(FindCoorsAlongRope, 0x555E40, { .Reversed = false });
+    RH_ScopedInstall(FindCoorsAlongRope, 0x555E40);
     RH_ScopedInstall(CreateRopeForSwatPed, 0x558D10);
     RH_ScopedInstall(IsCarriedByRope, 0x555F80);
     RH_ScopedInstall(SetSpeedOfTopNode, 0x555DF0);
@@ -71,7 +71,86 @@ void CRopes::Render() {
 // Must be used in loop to make attached to holder
 // 0x556B40
 bool CRopes::RegisterRope(uint32 ropeID, uint32 ropeType, CVector startPos, bool bExpires, uint8 segmentCount, uint8 flags, CPhysical* holder, uint32 timeExpire) {
-    return plugin::CallAndReturn<bool, 0x556B40, uint32, uint32, CVector, bool, uint8, uint8, CPhysical*, uint32>(ropeID, ropeType, startPos, bExpires, segmentCount, flags, holder, timeExpire);
+    // Already registered - Just refresh it
+    for (auto& rope : aRopes) {
+        if (rope.m_nType == eRopeType::NONE || rope.m_nId != ropeID) {
+            continue;
+        }
+        rope.m_aSegments[0] = startPos;
+        rope.m_aSpeed[0]    = CVector{};
+        rope.m_nFlags2 |= 1;
+        rope.m_nSegments = segmentCount;
+        assert(segmentCount < NUM_ROPE_SEGMENTS); // NB: Original code doesn't check this, and writes out of bounds
+        for (auto s = 0; s <= static_cast<int8>(segmentCount); s++) {
+            rope.m_aSegments[s] = startPos;
+            rope.m_aSpeed[s]    = CVector{};
+        }
+        rope.CreateHookObjectForRope();
+        return true;
+    }
+
+    const auto it = rng::find_if(aRopes, [](const CRope& r) { return r.m_nType == eRopeType::NONE; });
+    if (it == aRopes.end()) {
+        return false;
+    }
+    auto* const rope = &*it;
+
+    rope->m_nId               = ropeID;
+    rope->m_aSegments[0]      = startPos;
+    rope->m_aSpeed[0]         = CVector{};
+    rope->m_nSegments         = segmentCount;
+    rope->m_nFlags2           = (rope->m_nFlags2 & 0xF9) | ((flags & 1) << 2) | 1;
+    rope->m_fGroundZ          = 0.0f;
+    rope->m_pAttachedEntity   = nullptr;
+    rope->m_pRopeAttachObject = nullptr;
+    rope->m_fSegmentLength    = holder && holder->GetIsTypeVehicle() ? 0.9f : 0.5f;
+    rope->m_nFlags1           = 0;
+    rope->m_pRopeHolder       = holder;
+    rope->m_nType             = static_cast<eRopeType>(ropeType);
+    if (holder) {
+        holder->RegisterReference(&rope->m_pRopeHolder);
+    }
+    rope->m_nTime = bExpires ? CTimer::GetTimeInMS() + timeExpire : 0;
+
+    // NOTE: `m_fMass` is the total length of the rope, `m_fTotalLength` is the length of one segment (the fields are misnamed)
+    switch (rope->m_nType) {
+    case eRopeType::MAGNET:
+        rope->m_fMass        = 10.0f;
+        rope->m_fTotalLength = 10.0f / 31.0f;
+        break;
+    case eRopeType::CRANE_MAGNO:
+        rope->m_fMass        = 50.0f;
+        rope->m_fTotalLength = 50.0f / 31.0f;
+        break;
+    case eRopeType::WRECKING_BALL:
+    case eRopeType::QUARRY_CRANE_ARM:
+    case eRopeType::CRANE_TROLLEY:
+        rope->m_fMass        = 68.0f;
+        rope->m_fTotalLength = 68.0f / 31.0f;
+        break;
+    default:
+        rope->m_fMass        = 20.0f;
+        rope->m_fTotalLength = 20.0f / 31.0f;
+        break;
+    }
+
+    if (rope->m_nType >= eRopeType::CRANE_MAGNO && rope->m_nType <= eRopeType::CRANE_TROLLEY) {
+        // Crane ropes hang straight down (NB: Their speeds aren't reset)
+        for (auto s = 1u; s < NUM_ROPE_SEGMENTS; s++) {
+            const auto& prev = rope->m_aSegments[s - 1];
+            rope->m_aSegments[s] = CVector{ prev.x, prev.y, prev.z - rope->m_fTotalLength };
+        }
+    } else {
+        // Every other type zigzags along the X axis
+        for (auto s = 1u; s < NUM_ROPE_SEGMENTS; s++) {
+            const auto& prev = rope->m_aSegments[s - 1];
+            rope->m_aSegments[s] = CVector{ (s & 1) ? prev.x + rope->m_fTotalLength : prev.x - rope->m_fTotalLength, prev.y, prev.z };
+            rope->m_aSpeed[s]    = CVector{};
+        }
+    }
+
+    rope->CreateHookObjectForRope();
+    return true;
 }
 
 // 0x556760
@@ -91,8 +170,21 @@ int32 CRopes::FindRope(uint32 id) {
 
 // a4 always nullptr
 // 0x555E40
+// fDistAlongRope is a fraction along the rope (callers pass e.g. m_fCoorAlongRope
+// advanced by CTimer::GetTimeStep() * 0.003f); the binary clamps it into [0, 0.999].
 bool CRopes::FindCoorsAlongRope(uint32 ropeId, float fDistAlongRope, CVector* outPosn, CVector* outSpeed) {
-    return plugin::CallAndReturn<bool, 0x555E40, uint32, float, CVector*, CVector*>(ropeId, fDistAlongRope, outPosn, outSpeed);
+    const auto idx = FindRope(ropeId);
+    if (idx < 0)
+        return false;
+    auto& rope = GetRope(idx);
+    const float t = std::clamp(fDistAlongRope, 0.0f, 0.999f);
+    const float segFloat = t * 31.0f;
+    const auto seg = static_cast<uint32>(segFloat); // binary truncates via float->int conversion
+    const float frac = segFloat - static_cast<float>(seg);
+    *outPosn = rope.m_aSegments[seg] * (1.0f - frac) + rope.m_aSegments[seg + 1] * frac;
+    if (outSpeed)
+        *outSpeed = rope.m_aSpeed[seg + 1];
+    return true;
 }
 
 // 0x558D10
