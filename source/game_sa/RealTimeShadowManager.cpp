@@ -10,9 +10,9 @@ void CRealTimeShadowManager::InjectHooks() {
     RH_ScopedCategory("Shadows");
 
     RH_ScopedInstall(Init, 0x7067C0);
-    RH_ScopedInstall(ReInit, 0x706870, {.Reversed = false});
+    RH_ScopedInstall(ReInit, 0x706870);
     RH_ScopedInstall(ReturnRealTimeShadow, 0x705B30);
-    RH_ScopedInstall(GetRealTimeShadow, 0x706970, { .Reversed = false });
+    RH_ScopedInstall(GetRealTimeShadow, 0x706970);
     RH_ScopedInstall(Update, 0x706AB0);
     RH_ScopedInstall(DoShadowThisFrame, 0x706BA0);
     RH_ScopedInstall(Exit, 0x706A60);
@@ -64,7 +64,22 @@ void CRealTimeShadowManager::ReturnRealTimeShadow(CRealTimeShadow* shdw) {
 
 // 0x706870
 void CRealTimeShadowManager::ReInit() {
-    plugin::CallMethod<0x706870, CRealTimeShadowManager*>(this);
+    const auto ReCreateRaster = [](CShadowCamera& camera) {
+        auto* const raster = RwCameraGetRaster(camera.m_pRwCamera);
+        const auto  width  = RwRasterGetWidth(raster);
+        RwCameraSetRaster(camera.m_pRwCamera, nullptr);
+        RwRasterDestroy(raster);
+        const auto newRaster = RwRasterCreate(width, width, 0, rwRASTERTYPECAMERATEXTURE);
+        RwCameraSetRaster(camera.m_pRwCamera, newRaster);
+        RwTextureSetRaster(camera.m_pRwRenderTexture, newRaster);
+    };
+    for (auto* shadow : m_apShadows) {
+        ReCreateRaster(shadow->m_camera);
+        ReCreateRaster(shadow->m_blurCamera);
+    }
+    ReCreateRaster(m_BlurCamera);
+    ReCreateRaster(m_GradientCamera);
+    m_GradientCamera.MakeGradientRaster();
 }
 
 // 0x706AB0
@@ -117,24 +132,43 @@ void CRealTimeShadowManager::Update() {
     }
 }
 
+// 0x706970
 CRealTimeShadow& CRealTimeShadowManager::GetRealTimeShadow(CPhysical* physical) {
-    return plugin::CallMethodAndReturn<CRealTimeShadow&, 0x706970, CRealTimeShadowManager*, CPhysical*>(this, physical);
-    /*
-    * Unfinished
-    if (m_bInitialised) {
-        return;
-    }
+    // The (main) player ped always uses the first (reserved) slot
+    const bool isPlayer = physical->GetIsTypePed() && physical->AsPed()->m_nPedType == PED_TYPE_PLAYER1;
 
-    bool isFirstPlayer{};
-
-    if (!physical->GetIsTypePed() || physical->AsPed()->IsPlayer()) {
-        if (FindPlayerPed()->IsInVehicle()) { // Maybe wrong?
-            if (FindPlayerPed()->m_pVehicle->GetMoveSpeed().SquaredMagnitude() < sq(0.3f)) {
-                return;
-            }
+    // No shadows (for anything but the player) if the player is driving fast
+    bool allowShadow = true;
+    if (!isPlayer) {
+        const auto* const plyrPed = CWorld::Players[CWorld::PlayerInFocus].m_pPed;
+        const auto* const plyrVeh = plyrPed->m_pVehicle;
+        if (plyrPed->bInVehicle && plyrVeh && plyrVeh->m_vecMoveSpeed.SquaredMagnitude() > sq(0.3f)) {
+            allowShadow = false;
         }
     }
-    */
+
+    CRealTimeShadow* shadow = nullptr;
+    if (m_bInitialised && allowShadow) {
+        if (isPlayer) {
+            shadow = m_apShadows[0];
+        } else {
+            // NOTE: Original code doesn't stop at the first free one, so the last free one is used
+            for (auto i = 1u; i < std::size(m_apShadows); i++) {
+                if (!m_apShadows[i]->m_pOwner) {
+                    shadow = m_apShadows[i];
+                }
+            }
+        }
+
+        if (shadow) {
+            shadow->SetupForThisEntity(physical);
+            physical->m_pShadowData = shadow;
+            shadow->m_bKeepAlive    = true;
+            shadow->m_nIntensity    = 0;
+        }
+    }
+
+    return *shadow; // NOTE: Might be null! (Original function returns a pointer)
 }
 
 // 0x706BA0
