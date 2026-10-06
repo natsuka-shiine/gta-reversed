@@ -4,13 +4,13 @@
 #include "TaskSimpleStandStill.h"
 
 void CTaskSimpleSlideToCoord::InjectHooks() {
-    // + RH_ScopedVirtualClass(CTaskSimpleSlideToCoord, 0x86FFEC, 9); // todo (Pirulax): Make it working
-    // + RH_ScopedCategory("Tasks/TaskTypes");
+    RH_ScopedVirtualClass(CTaskSimpleSlideToCoord, 0x86FFEC, 9);
+    RH_ScopedCategory("Tasks/TaskTypes");
 
     // + RH_ScopedOverloadedInstall(Constructor, "NoAnim", 0x66C3E0, CTaskSimpleSlideToCoord*(CTaskSimpleSlideToCoord::*)(CVector const&, float, float));
     // + RH_ScopedOverloadedInstall(Constructor, "Anim", 0x66C450, CTaskSimpleSlideToCoord*(CTaskSimpleSlideToCoord::*)(CVector const&, float, float, char const*, char const*, int32, float, bool, int32));
     // + RH_ScopedVmtInstall(MakeAbortable, 0x66C4D0);
-    // RH_ScopedVmtInstall(ProcessPed, 0x66C4E0);
+    RH_ScopedVMTInstall(ProcessPed, 0x66C4E0);
 }
 
 // 0x66C3E0
@@ -51,53 +51,47 @@ bool CTaskSimpleSlideToCoord::MakeAbortable(CPed* ped, eAbortPriority priority, 
 
 // 0x66C4E0
 bool CTaskSimpleSlideToCoord::ProcessPed(CPed* ped) {
-    return plugin::CallMethodAndReturn<bool, 0x66C4E0, CTaskSimpleSlideToCoord*, CPed*>(this, ped); // untested/review
+    const bool bAnimFinished = m_bRunningAnim
+        ? CTaskSimpleRunNamedAnim::ProcessPed(ped)
+        : true;
 
-    const bool hasSuccessfullyProcessedRunAnim = m_bRunningAnim ? CTaskSimpleRunNamedAnim::ProcessPed(ped) : true; // Yeah could be simplified, but this is easier to understand.
-
-    if (m_Time == (uint32)-1) {
-        if (m_bRunningAnim) {
-            if (hasSuccessfullyProcessedRunAnim) {
-                m_Time = CTimer::GetTimeInMS() + 500;
-            }
-        } else {
-            m_Time = CTimer::GetTimeInMS() + 2000;
+    if (m_Timer == -1) {
+        if (!m_bRunningAnim) {
+            m_Timer = CTimer::GetTimeInMS() + 2000;
+        } else if (bAnimFinished) {
+            m_Timer = CTimer::GetTimeInMS() + 500;
         }
     }
 
-    // The same standstill stuff has been used in `CTaskSimpleWaitUntilPedIsOutCar` as well.. weird.
     if (m_bFirstTime) {
-        m_bFirstTime = false;
-
-        CTaskSimpleStandStill standStillTask{ STAND_STILL_TIME };
+        CTaskSimpleStandStill standStillTask{ STAND_STILL_TIME, false, false, 8.0f };
         standStillTask.ProcessPed(ped);
         if (ped->IsPlayer()) {
             ped->GetTaskManager().GetTaskPrimary(TASK_PRIMARY_DEFAULT)->MakeAbortable(ped, ABORT_PRIORITY_IMMEDIATE, nullptr);
         }
         ped->m_fAimingRotation = m_fAimingRotation;
+        m_bFirstTime = false;
     }
 
-    const auto pedToSlidePosDir = (m_SlideToPos - ped->GetPosition()) * m_Speed; // Originally they calculated this twice, but thats a waste of performance, so.. :D
-    const auto pedToSlidePosDistSq2D = pedToSlidePosDir.SquaredMagnitude2D();
-    if (pedToSlidePosDir.SquaredMagnitude2D() < sq(0.05f)) {
-        ped->m_vecAnimMovingShiftLocal = CVector2D{};
+    const auto& pedPos   = ped->GetPosition();
+    const auto  distSq2D = sq(pedPos.x - m_SlideToPos.x) + sq(pedPos.y - m_SlideToPos.y);
+    const auto  bArrived = distSq2D < sq(0.05f);
+    if (bArrived) {
+        ped->m_vecAnimMovingShiftLocal = CVector2D{ 0.0f, 0.0f };
     } else {
-        const auto& pedMat = ped->GetMatrix();
-        ped->m_vecAnimMovingShiftLocal = {
-            DotProduct(pedToSlidePosDir, pedMat.GetForward()), // Originally Y was calculated first, but I swapped it!
-            DotProduct(pedToSlidePosDir, pedMat.GetRight())
+        const auto  slide = (m_SlideToPos - pedPos) * m_Speed;
+        const auto& mat   = ped->GetMatrix();
+        ped->m_vecAnimMovingShiftLocal = CVector2D{
+            slide.Dot(mat.GetRight()),
+            slide.Dot(mat.GetForward())
         };
     }
 
-    if (m_Time < CTimer::GetTimeInMS()) {
+    if ((uint32)m_Timer < CTimer::GetTimeInMS()) {
         return true;
     }
 
-    if (hasSuccessfullyProcessedRunAnim && pedToSlidePosDistSq2D < sq(0.05f)) {
-        if (std::abs(ped->m_fCurrentRotation - ped->m_fAimingRotation) < 0.1f) {
-            return true;
-        }
-    }
-
-    return false;
+    return bAnimFinished
+        && bArrived
+        && std::abs(CGeneral::LimitRadianAngle(ped->m_fCurrentRotation - ped->m_fAimingRotation)) < 0.1f;
 }
