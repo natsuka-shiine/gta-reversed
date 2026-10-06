@@ -20,7 +20,7 @@ void CPhysical::InjectHooks()
     RH_ScopedInstall(Constructor, 0x542260);
     RH_ScopedInstall(Destructor, 0x542450);
 
-    RH_ScopedInstall(RemoveAndAdd, 0x542560, { .Reversed = false });
+    RH_ScopedInstall(RemoveAndAdd, 0x542560);
     RH_ScopedInstall(ApplyTurnForce, 0x542A50);
     RH_ScopedInstall(ApplyForce, 0x542B50);
     RH_ScopedInstall(GetSpeed, 0x542CE0);
@@ -30,7 +30,7 @@ void CPhysical::InjectHooks()
     RH_ScopedInstall(SetDamagedPieceRecord, 0x5428C0);
     RH_ScopedInstall(RemoveFromMovingList, 0x542860);
     RH_ScopedInstall(AddToMovingList, 0x542800);
-    RH_ScopedVMTInstall(Add, 0x544A30, { .Reversed = false });
+    RH_ScopedVMTInstall(Add, 0x544A30);
     RH_ScopedVMTInstall(Remove, 0x5424C0);
     RH_ScopedVMTInstall(GetBoundRect, 0x5449B0);
     RH_ScopedVMTInstall(ProcessControl, 0x5485E0);
@@ -40,6 +40,7 @@ void CPhysical::InjectHooks()
     RH_ScopedVMTInstall(ProcessEntityCollision, 0x546D00);
     RH_ScopedInstall(ApplyGravity, 0x542FE0);
     RH_ScopedInstall(ApplyFrictionMoveForce, 0x5430A0);
+    RH_ScopedInstall(ApplyFrictionTurnForce, 0x543100);
     RH_ScopedInstall(ApplyFrictionForce, 0x543220);
     RH_ScopedInstall(SkipPhysics, 0x5433B0);
     RH_ScopedInstall(AddCollisionRecord, 0x543490);
@@ -50,6 +51,7 @@ void CPhysical::InjectHooks()
     RH_ScopedInstall(ApplySpringCollision, 0x543C90);
     RH_ScopedInstall(ApplySpringCollisionAlt, 0x543D60);
     RH_ScopedInstall(ApplySpringDampening, 0x543E90);
+    RH_ScopedInstall(ApplySpringDampeningOld, 0x544100);
     RH_ScopedInstall(RemoveRefsToEntity, 0x544280);
     RH_ScopedInstall(DettachEntityFromEntity, 0x5442F0);
     RH_ScopedInstall(DettachAutoAttachedEntity, 0x5446A0);
@@ -73,6 +75,7 @@ void CPhysical::InjectHooks()
     RH_ScopedInstall(CheckCollision, 0x54D920);
     RH_ScopedInstall(CheckCollision_SimpleCar, 0x54DAB0);
     RH_ScopedInstall(PlacePhysicalRelativeToOtherPhysical, 0x546DB0);
+    RH_ScopedInstall(ApplyScriptCollision, 0x546ED0);
     RH_ScopedInstall(PositionAttachedEntity, 0x546FF0);
 }
 
@@ -138,48 +141,45 @@ CPhysical::~CPhysical()
     m_pCollisionList.Flush();
 }
 
+// NOTSA - Get the list of the repeat sector this physical should be in (based on it's type)
+// NOTE: The lists are layout compatible, they only differ in the type of the stored pointer
+static CPtrListDoubleLink<CPhysical*>* GetRepeatSectorListForPhysical(CRepeatSector& rs, eEntityType type) {
+    switch (type) {
+    case ENTITY_TYPE_VEHICLE: return reinterpret_cast<CPtrListDoubleLink<CPhysical*>*>(&rs.Vehicles);
+    case ENTITY_TYPE_PED:     return reinterpret_cast<CPtrListDoubleLink<CPhysical*>*>(&rs.Peds);
+    case ENTITY_TYPE_OBJECT:  return reinterpret_cast<CPtrListDoubleLink<CPhysical*>*>(&rs.Objects);
+    default:                  return nullptr;
+    }
+}
+
 // 0x544A30
 void CPhysical::Add()
 {
-    // TODO: Refactor `CEntryInfoNode` to be templated then use it here
-#if 0
     if (m_bIsBIGBuilding) {
         CEntity::Add();
         return;
     }
 
-    const auto boundRect = GetBoundRect();
-    int32 startSectorX = CWorld::GetSectorX(boundRect.left);
-    int32 startSectorY = CWorld::GetSectorY(boundRect.bottom);
-    int32 endSectorX = CWorld::GetSectorX(boundRect.right);
-    int32 endSectorY = CWorld::GetSectorY(boundRect.top);
-    for (int32 sectorY = startSectorY; sectorY <= endSectorY; ++sectorY) {
-        for (int32 sectorX = startSectorX; sectorX <= endSectorX; ++sectorX) {
-            CPtrListDoubleLink* list = nullptr;
-            CRepeatSector* repeatSector = GetRepeatSector(sectorX, sectorY);
-            switch (m_nType) {
-            case ENTITY_TYPE_VEHICLE:
-                list = &repeatSector.Vehicles;
-                break;
-            case ENTITY_TYPE_PED:
-                list = &repeatSector.Peds;
-                break;
-            case ENTITY_TYPE_OBJECT:
-                list = &repeatSector.Objects;
-                break;
-            }
+    const auto boundRect    = GetBoundRect();
+    const auto startSectorX = CWorld::GetSectorX(boundRect.left);
+    const auto startSectorY = CWorld::GetSectorY(boundRect.bottom);
+    const auto endSectorX   = CWorld::GetSectorX(boundRect.right);
+    const auto endSectorY   = CWorld::GetSectorY(boundRect.top);
+    for (auto sectorY = startSectorY; sectorY <= endSectorY; ++sectorY) {
+        for (auto sectorX = startSectorX; sectorX <= endSectorX; ++sectorX) {
+            auto* const repeatSector = &CWorld::GetRepeatSector(sectorX, sectorY);
+            auto* const list         = GetRepeatSectorListForPhysical(*repeatSector, GetType());
+            assert(list); // The original code would use the list from the previous iteration in this case (Or an uninitialized one...)
 
-            auto newEntityInfoNode = new CEntryInfoNode();
-            if (newEntityInfoNode) {
-                newEntityInfoNode->m_doubleLink = list->AddItem(this);
-                newEntityInfoNode->m_repeatSector = repeatSector;
-                newEntityInfoNode->m_doubleLinkList = list;
-            }
-            newEntityInfoNode->AddToList(m_pCollisionList.m_node);
-            m_pCollisionList.m_node = newEntityInfoNode;
+            auto* const node = new CEntryInfoNode();
+            node->m_doubleLink     = list->AddItem(this);
+            node->m_repeatSector   = repeatSector;
+            node->m_doubleLinkList = list;
+
+            node->AddToList(m_pCollisionList.m_node);
+            m_pCollisionList.m_node = node;
         }
     }
-#endif
 }
 
 // 0x5424C0
@@ -599,61 +599,59 @@ int32 CPhysical::ProcessEntityCollision(CEntity* entity, CColPoint* colPoint) {
 
 // 0x542560
 void CPhysical::RemoveAndAdd() {
-// TODO: Refactor `CEntryInfoNode` to be templated, otherwise this function will be a mess
-#if 0
     if (m_bIsBIGBuilding) {
         CEntity::Remove();
         CEntity::Add();
         return;
     }
 
-    CEntryInfoNode* entryInfoNode = m_pCollisionList.m_node;
-    CRect boundRect = GetBoundRect();
-    int32 startSectorX = CWorld::GetSectorX(boundRect.left);
-    int32 startSectorY = CWorld::GetSectorY(boundRect.bottom);
-    int32 endSectorX = CWorld::GetSectorX(boundRect.right);
-    int32 endSectorY = CWorld::GetSectorY(boundRect.top);
-    for (int32 sectorY = startSectorY; sectorY <= endSectorY; ++sectorY) {
-        for (int32 sectorX = startSectorX; sectorX <= endSectorX; ++sectorX) {
-            CRepeatSector* const rs = GetRepeatSector(sectorX, sectorY);
-            const auto ProcessSectorList = [&]<typename PtrListType>(PtrListType& list) {
-                if (entryInfoNode) {
-                    auto* doubleLink = reinterpret_cast<typename PtrListType::NodeType*>(entryInfoNode->m_doubleLink);
+    // Nodes are re-used for as long as possible, the remaining ones are deleted at the end
+    auto* entryInfoNode = m_pCollisionList.m_node;
 
-                    entryInfoNode->m_doubleLinkList->UnlinkNode(doubleLink);
-                    list.AddNode(doubleLink);
-   
-                    entryInfoNode->m_repeatSector = rs;
-                    entryInfoNode->m_doubleLinkList = &list;
-                    entryInfoNode = entryInfoNode->m_next;
-                } else {
-                    auto newEntityInfoNode = new CEntryInfoNode();
-                    if (newEntityInfoNode) {
-                        newEntityInfoNode->m_doubleLink = list.AddItem(this);
-                        newEntityInfoNode->m_repeatSector = rs;
-                        newEntityInfoNode->m_doubleLinkList = &list;
-                    }
-                    newEntityInfoNode->AddToList(m_pCollisionList.m_node);
-                    m_pCollisionList.m_node = newEntityInfoNode;
-                }
-            };
-            switch (m_nType) {
-            case ENTITY_TYPE_VEHICLE: ProcessSectorList(rs->Vehicles); break;
-            case ENTITY_TYPE_PED:     ProcessSectorList(rs->Peds);     break;
-            case ENTITY_TYPE_OBJECT:  ProcessSectorList(rs->Objects);  break;
+    const auto boundRect    = GetBoundRect();
+    const auto startSectorX = CWorld::GetSectorX(boundRect.left);
+    const auto startSectorY = CWorld::GetSectorY(boundRect.bottom);
+    const auto endSectorX   = CWorld::GetSectorX(boundRect.right);
+    const auto endSectorY   = CWorld::GetSectorY(boundRect.top);
+    for (auto sectorY = startSectorY; sectorY <= endSectorY; ++sectorY) {
+        for (auto sectorX = startSectorX; sectorX <= endSectorX; ++sectorX) {
+            auto* const repeatSector = &CWorld::GetRepeatSector(sectorX, sectorY);
+            auto* const list         = GetRepeatSectorListForPhysical(*repeatSector, GetType());
+            assert(list); // The original code would use the list from the previous iteration in this case (Or an uninitialized one...)
+
+            if (entryInfoNode) { // Re-use existing node: Move its link to the new list
+                auto* const link = entryInfoNode->m_doubleLink;
+
+                entryInfoNode->m_doubleLinkList->UnlinkNode(link);
+                list->AddNode(link);
+
+                entryInfoNode->m_repeatSector   = repeatSector;
+                entryInfoNode->m_doubleLinkList = list;
+
+                entryInfoNode = entryInfoNode->m_next;
+            } else {
+                auto* const link = list->AddItem(this);
+
+                auto* const node = new CEntryInfoNode();
+                node->m_repeatSector   = repeatSector;
+                node->m_doubleLinkList = list;
+                node->m_doubleLink     = link;
+
+                node->AddToList(m_pCollisionList.m_node);
+                m_pCollisionList.m_node = node;
             }
         }
     }
 
+    // Delete unused nodes
     while (entryInfoNode) {
-        CEntryInfoNode* nextEntryInfoNode = entryInfoNode->m_next;
+        auto* const next = entryInfoNode->m_next;
 
         entryInfoNode->m_doubleLinkList->DeleteNode(entryInfoNode->m_doubleLink);
         m_pCollisionList.DeleteNode(entryInfoNode);
 
-        entryInfoNode = nextEntryInfoNode;
+        entryInfoNode = next;
     }
-#endif
 }
 
 // 0x542800
@@ -845,9 +843,26 @@ void CPhysical::ApplyFrictionMoveForce(CVector moveForce)
 
 // Unused
 // 0x543100
-void CPhysical::ApplyFrictionTurnForce(CVector posn, CVector velocity)
+void CPhysical::ApplyFrictionTurnForce(CVector force, CVector point)
 {
-    ((void(__thiscall*)(CPhysical*, CVector, CVector))0x543100)(this, posn, velocity);
+    if (physicalFlags.bDisableTurnForce)
+        return;
+
+    CVector vecCentreOfMassMultiplied{};
+    float fTurnMass = m_fTurnMass;
+    if (physicalFlags.bInfiniteMass)
+        fTurnMass += m_vecCentreOfMass.z * m_fMass * m_vecCentreOfMass.z * 0.5f;
+    else
+        vecCentreOfMassMultiplied = GetMatrix().TransformVector(m_vecCentreOfMass);
+
+    if (physicalFlags.bDisableMoveForce)
+    {
+        point.z = 0.0f;
+        force.z = 0.0f;
+    }
+
+    CVector vecDifference = point - vecCentreOfMassMultiplied;
+    m_vecFrictionTurnSpeed += CrossProduct(vecDifference, force) * (1.0f / fTurnMass);
 }
 
 // 0x543220
@@ -1187,9 +1202,34 @@ bool CPhysical::ApplySpringDampening(float fDampingForce, float fSpringForceDamp
 }
 
 // Unused
-bool CPhysical::ApplySpringDampeningOld(float arg0, float arg1, CVector& arg2, CVector& arg3, CVector& arg4)
+// 0x544100
+bool CPhysical::ApplySpringDampeningOld(float fDampingForce, float fSpringForce, CVector& direction, CVector& collisionPoint, CVector& collisionPos)
 {
-    return ((bool(__thiscall*)(CPhysical*, float, float, CVector&, CVector&, CVector&))0x544100)(this, arg0, arg1, arg2, arg3, arg4);
+    // NOTE: `fSpringForce` is never read by the original code.
+    const float fCollisionPosDotProduct = DotProduct(collisionPos, direction);
+    const CVector vecCollisionPointSpeed = GetSpeed(collisionPoint);
+    const float fCollisionPointSpeedDotProduct = DotProduct(vecCollisionPointSpeed, direction);
+
+    float fTimeStep = CTimer::GetTimeStep();
+    if (CTimer::GetTimeStep() >= 3.0f)
+        fTimeStep = 3.0f;
+
+    float fDampingImpulse = (fCollisionPointSpeedDotProduct + fCollisionPosDotProduct) * 0.5f * (fTimeStep * m_fMass) * fDampingForce * -0.53f;
+    if (physicalFlags.bMakeMassTwiceAsBig)
+        fDampingImpulse *= 2.0f;
+
+    // Squared magnitude (no sqrt) in the original code.
+    float fLimit = m_fTurnMass / ((collisionPoint.SquaredMagnitude() + 1.0f) * m_fMass * 2.0f);
+    if (fLimit > 1.0f)
+        fLimit = 1.0f;
+
+    // Division by zero (when the point has no speed along `direction`) is present in the original code too.
+    const float fSpeedChange = std::fabs(fDampingImpulse / (fCollisionPointSpeedDotProduct * m_fMass));
+    if (fSpeedChange > fLimit)
+        fDampingImpulse *= fLimit / fSpeedChange;
+
+    ApplyForce(fDampingImpulse * direction, collisionPoint, true);
+    return true;
 }
 
 // 0x544280
@@ -2148,9 +2188,26 @@ void CPhysical::PlacePhysicalRelativeToOtherPhysical(CPhysical* relativeToPhysic
 
 // Unused
 // 0x546ED0
-float CPhysical::ApplyScriptCollision(CVector arg0, float arg1, float arg2, CVector* arg3)
+float CPhysical::ApplyScriptCollision(CVector vecColNormal, float fElasticity, float fAdhesiveLimit, CVector* pVecColPos)
 {
-    return ((float(__thiscall*)(CPhysical*, CVector, float, float, CVector*))0x546ED0)(this, arg0, arg1, arg2, arg3);
+    CColPoint colPoint{};
+    float fDamageIntensity = 0.0f;
+    const float fOriginalElasticity = m_fElasticity;
+
+    colPoint.m_vecNormal = vecColNormal;
+    if (pVecColPos)
+        colPoint.m_vecPoint = *pVecColPos;
+    else
+        colPoint.m_vecPoint = GetPosition() - vecColNormal * GetColModel()->GetBoundRadius();
+
+    m_fElasticity = fElasticity;
+    if (ApplyCollision(this, colPoint, fDamageIntensity))
+    {
+        if (fAdhesiveLimit > 0.0f)
+            ApplyFriction(fAdhesiveLimit, colPoint);
+    }
+    m_fElasticity = fOriginalElasticity;
+    return fDamageIntensity;
 }
 
 // 0x546FF0

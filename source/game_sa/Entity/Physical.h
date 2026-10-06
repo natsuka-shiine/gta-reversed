@@ -181,7 +181,7 @@ public:
     void ApplyTurnSpeed();
     void ApplyGravity();
     void ApplyFrictionMoveForce(CVector moveForce);
-    void ApplyFrictionTurnForce(CVector posn, CVector velocity);
+    void ApplyFrictionTurnForce(CVector force, CVector point);
     void ApplyFrictionForce(CVector vecMoveForce, CVector point);
 
     void SkipPhysics();
@@ -194,7 +194,7 @@ public:
     bool ApplySpringCollision(float fSuspensionForceLevel, CVector& direction, CVector& collisionPoint, float fSpringLength, float fSuspensionBias, float& fSpringForceDampingLimit);
     bool ApplySpringCollisionAlt(float fSuspensionForceLevel, CVector& direction, CVector& collisionPoint, float fSpringLength, float fSuspensionBias, CVector& normal, float& fSpringForceDampingLimit);
     bool ApplySpringDampening(float fDampingForce, float fSpringForceDampingLimit, CVector& direction, CVector& collisionPoint, CVector& collisionPos);
-    bool ApplySpringDampeningOld(float arg0, float arg1, CVector& arg2, CVector& arg3, CVector& arg4);
+    bool ApplySpringDampeningOld(float fDampingForce, float fSpringForce, CVector& direction, CVector& collisionPoint, CVector& collisionPos);
 
     void RemoveRefsToEntity(CEntity* entity);
     void DettachEntityFromEntity(float x, float y, float z, bool bApplyTurnForce);
@@ -211,7 +211,7 @@ public:
     bool ProcessShiftSectorList(int32 sectorX, int32 sectorY);
     static void PlacePhysicalRelativeToOtherPhysical(CPhysical* relativeToPhysical, CPhysical* physicalToPlace, CVector offset);
 
-    float ApplyScriptCollision(CVector arg0, float arg1, float arg2, CVector* arg3);
+    float ApplyScriptCollision(CVector vecColNormal, float fElasticity, float fAdhesiveLimit, CVector* pVecColPos);
     void PositionAttachedEntity();
     void ApplySpeed();
     void UnsetIsInSafePosition();
