@@ -9,6 +9,8 @@ public:
     uint32     m_nMinNextScanTime;
 
 public:
+    static void InjectHooks();
+
     CTaskComplexWanderCriminal(eMoveState MoveState, uint8 Dir, bool bWanderSensibly = true);
     ~CTaskComplexWanderCriminal() override = default; // 0x48E720
 
