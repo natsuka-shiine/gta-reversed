@@ -1245,7 +1245,7 @@ void InjectHooksMain() {
         CTaskComplexFallAndGetUp::InjectHooks();
         CTaskComplexFollowNodeRoute::InjectHooks();
         CTaskComplexFollowLeaderInFormation::InjectHooks();
-        // CTaskSimpleTriggerLookAt::InjectHooks();
+        CTaskSimpleTriggerLookAt::InjectHooks();
         CTaskSimpleHitHead::InjectHooks();
         CTaskUtilityLineUpPedWithCar::InjectHooks();
         CTaskSimpleLand::InjectHooks();
