@@ -308,7 +308,7 @@ void CVehicleModelInfo::GetWheelPosn(int32 wheel, CVector& outVec, bool local) c
         outVec = *RwMatrixGetPos(RwFrameGetMatrix(frame));
     else {
         auto matrix = RwMatrixCreate();
-        memcpy(matrix, RwFrameGetMatrix(frame), sizeof(CMatrix));
+        *matrix = *RwFrameGetMatrix(frame);
         auto parent = RwFrameGetParent(frame);
         while (parent) {
             RwMatrixTransform(matrix, RwFrameGetMatrix(parent), RwOpCombineType::rwCOMBINEPOSTCONCAT);
