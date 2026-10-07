@@ -391,6 +391,9 @@ void MainLoop(INT nCmdShow) {
 
 // 0x748710
 INT WINAPI NOTSA_WinMain(HINSTANCE instance, HINSTANCE hPrevInstance, LPSTR cmdLine, INT nCmdShow) {
+#ifdef NOTSA_NO_ORIGINAL_CODE
+    notsa::StaticData::ConstructGlobals(); // (The original's start-up code has done this by now, if it ran)
+#endif
     SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0u, nullptr, 2);
     if (IsAlreadyRunning()) {
         return false;

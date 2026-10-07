@@ -197,7 +197,13 @@ T& StaticRef() {
     alignas(T) static uint8 buf[sizeof(T)]{};
     return *reinterpret_cast<T*>(buf);
 #elif defined(NOTSA_OWN_STATIC_DATA) && !defined(NOTSA_STANDALONE)
-    static T* const s_Ptr = static_cast<T*>(notsa::StaticData::Resolve(Addr, notsa::StaticData::detail::SizeOf<T>::Get()));
+    static T* const s_Ptr = [] {
+        auto* const ptr = const_cast<std::remove_cv_t<T>*>(static_cast<T*>(notsa::StaticData::Resolve(Addr, notsa::StaticData::detail::SizeOf<T>::Get())));
+#ifdef NOTSA_NO_ORIGINAL_CODE
+        notsa::StaticData::detail::ConstructIfOriginalDidnt<T>(Addr, ptr);
+#endif
+        return static_cast<T*>(ptr);
+    }();
     return *s_Ptr;
 #else
     return *reinterpret_cast<T*>(Addr);

@@ -1,4 +1,5 @@
 #include "StdInc.h"
+#include "dllmain.h"
 
 #include <extensions/CommandLine.h>
 
@@ -1503,6 +1504,11 @@ void InjectHooksMain() {
 
 #ifdef NOTSA_LIBRW
     ReversibleHooks::RedirectOriginalsOfVirtualHooks();
+#endif
+#ifdef NOTSA_NO_ORIGINAL_CODE
+    if (!notsa::IsOriginalCodeAvailable()) {
+        ReversibleHooks::ReplaceOriginalVTables();
+    }
 #endif
 
     NOTSA_LOG_INFO("InjectedHooksMain(): Finished in {} ms", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - now).count());

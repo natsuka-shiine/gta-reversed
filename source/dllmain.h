@@ -11,4 +11,10 @@ HMODULE GetDLLHandle();
 * @note Usable before `DllMain` (in static initializers) too.
 */
 bool IsAnotherBuildWanted();
+
+/*!
+* Whether the code of the original executable can be called. Not if the inverted loader runs the game standalone
+* (the `GTA_REVERSED_STANDALONE` environment variable): the original is only there for its data then.
+*/
+bool IsOriginalCodeAvailable();
 };

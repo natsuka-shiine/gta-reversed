@@ -6,6 +6,7 @@
 #include <source_location>
 #include <string>
 #include <algorithm>
+#include "VMTInfo.h"
 #include <bit>
 #include <cstdarg>
 #include <filesystem>
@@ -254,5 +255,19 @@ private:
 * Call once all hooks are installed.
 */
 void RedirectOriginalsOfVirtualHooks();
+#endif
+
+#ifdef NOTSA_NO_ORIGINAL_CODE
+//! Remember the two vtables of a class (the original's, and ours) for `ReplaceOriginalVTables`
+void RegisterVirtualClass(const char* name, Utility::VMTInfo gta, Utility::VMTInfo our);
+
+/*!
+* Make the vtables of the original the same as ours, all of every class that has virtual hooks: not just the entries that are hooked.
+* For a game that can't run the original's code: there are objects with the original's vtable pointer in them that we don't
+* construct ourselves (In what its start-up code leaves in its data: for example the audio entities inside of `AudioEngine`),
+* and the functions that aren't hooked would be the original's.
+* Call once all hooks are installed.
+*/
+void ReplaceOriginalVTables();
 #endif
 }; // namespace ReversibleHooks

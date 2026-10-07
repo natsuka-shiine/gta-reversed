@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cassert>
+#include <cstddef>
+
 namespace ReversibleHooks {
 namespace Utility {
 class VMTInfo {

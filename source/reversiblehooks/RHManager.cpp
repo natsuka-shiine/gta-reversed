@@ -61,6 +61,34 @@ void RedirectOriginalsOfVirtualHooks() {
 }
 #endif
 
+#ifdef NOTSA_NO_ORIGINAL_CODE
+namespace {
+struct VirtualClass {
+    const char*      name;
+    Utility::VMTInfo gta, our;
+};
+std::vector<VirtualClass> s_VirtualClasses;
+};
+
+void RegisterVirtualClass(const char* name, Utility::VMTInfo gta, Utility::VMTInfo our) {
+    s_VirtualClasses.emplace_back(name, gta, our);
+}
+
+void ReplaceOriginalVTables() {
+    size_t numFns{};
+    for (const auto& c : s_VirtualClasses) {
+        if (!c.gta.GetAddress() || !c.our.GetAddress()) {
+            NOTSA_LOG_WARN("No vtable of `{}` to replace the original's with", c.name);
+            continue;
+        }
+        Utility::VirtualCopy(c.gta.GetAddress(), c.our.GetAddress(), c.gta.GetSize() * sizeof(void*));
+        numFns += c.gta.GetSize();
+    }
+    NOTSA_LOG_INFO("Replaced the original's vtables of {} classes with ours ({} functions)", s_VirtualClasses.size(), numFns);
+    s_VirtualClasses.clear();
+}
+#endif
+
 void RHManager::CheckAll() {
     if (const auto now = HooksCheckClock::now(); now - m_LastHooksCheckTime > HOOKS_CHECK_INTERVAL) {
         m_LastHooksCheckTime = now;

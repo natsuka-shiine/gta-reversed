@@ -227,6 +227,11 @@ void cHandlingDataMgr::LoadHandlingData() {
     NOTSA_LOG_DEBUG("Successfully loaded {}x handlings for {}x vehicles!", nLoadedHandlings, nLoadedVehHandlings);
 }
 
+// (Inlined into the original's start-up code, at 0x8543C0: constructs the handling entries, then zeroes all of it)
+cHandlingDataMgr::cHandlingDataMgr() {
+    memset(static_cast<void*>(this), 0, sizeof(*this));
+}
+
 // 0x005BF3D0
 void cHandlingDataMgr::Initialise() {
     LoadHandlingData();

@@ -27,6 +27,14 @@ void LoadConfigurations() {
     // ...
 }
 
+bool notsa::IsOriginalCodeAvailable() {
+    static const bool s_IsAvailable = [] {
+        char buf[8]{};
+        return GetEnvironmentVariableA("GTA_REVERSED_STANDALONE", buf, sizeof(buf)) == 0;
+    }();
+    return s_IsAvailable;
+}
+
 bool notsa::IsAnotherBuildWanted() {
     // No C++ runtime here (strings, statics with constructors): this is used before it's up
     char wanted[MAX_PATH]{}, self[MAX_PATH]{};

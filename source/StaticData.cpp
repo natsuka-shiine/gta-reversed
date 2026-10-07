@@ -160,6 +160,12 @@ void LoadConfig() {
         return;
     }
 
+    // Standalone there's nothing of the original left to keep away from the data, and the data has pointers
+    // into itself (set by the original's start-up code, or by what stands in for it), which moving parts of it would break.
+    if (!notsa::IsOriginalCodeAvailable()) {
+        return;
+    }
+
     for (const auto& r : GENERATED_RANGES) {
         AddRange(r.begin, r.end, r.name, true, r.init, r.initSize);
     }
@@ -321,4 +327,70 @@ void* Resolve(uintptr addr, size_t) { return reinterpret_cast<void*>(addr); }
 void Init() {}
 void Verify() {}
 #endif
+
+/*
+* Constructing the globals the original's start-up code would have (See `StaticData.h`)
+* NOTE: Used during static initialization, so nothing here may depend on anything that isn't constant-initialized.
+*/
+namespace detail {
+namespace {
+struct ConstructedRange {
+    uintptr begin, end;
+};
+constexpr auto   MAX_CONSTRUCTED = 8192u;
+ConstructedRange s_Constructed[MAX_CONSTRUCTED];
+uint32           s_NumConstructed;
+};
+
+bool ShouldConstructGlobals() {
+    return !notsa::IsOriginalCodeAvailable();
+}
+
+bool ClaimForConstruction(uintptr addr, size_t size) {
+    for (auto i = 0u; i < s_NumConstructed; i++) {
+        if (addr < s_Constructed[i].end && addr + size > s_Constructed[i].begin) {
+            return false; // Declared more than once (as another type, or as a part of something bigger), once is enough
+        }
+    }
+    if (s_NumConstructed == MAX_CONSTRUCTED) {
+        return false;
+    }
+    s_Constructed[s_NumConstructed++] = { addr, addr + size };
+    return true;
+}
+
+namespace {
+struct DeferredConstruction {
+    void (*fn)(void*);
+    void* p;
+};
+DeferredConstruction s_Deferred[MAX_CONSTRUCTED];
+uint32               s_NumDeferred;
+bool                 s_IsConstructionTime; //!< `ConstructGlobals` has been called
+};
+
+bool DeferConstruction(void (*fn)(void*), void* p) {
+    if (s_IsConstructionTime || s_NumDeferred == MAX_CONSTRUCTED) {
+        return false;
+    }
+    s_Deferred[s_NumDeferred++] = { fn, p };
+    return true;
+}
+
+bool IsAllZero(const void* p, size_t size) {
+    const auto* const b = static_cast<const uint8*>(p);
+    return std::all_of(b, b + size, [](uint8 v) { return v == 0; });
+}
+};
+
+void ConstructGlobals() {
+    if (std::exchange(detail::s_IsConstructionTime, true) || !detail::ShouldConstructGlobals()) {
+        return;
+    }
+    // (Constructors may refer to more globals: those are constructed right away by now, not added to this list)
+    for (auto i = 0u; i < detail::s_NumDeferred; i++) {
+        detail::s_Deferred[i].fn(detail::s_Deferred[i].p);
+    }
+    NOTSA_LOG_INFO("StaticData: The original's start-up code hasn't run, constructed the global objects ({} candidates so far)", detail::s_NumDeferred);
+}
 };

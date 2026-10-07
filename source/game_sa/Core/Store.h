@@ -12,7 +12,9 @@ public:
     ObjectType m_aObjects[Capacity];
 
 public:
-    CStore() {
+    // (Only if the objects can be constructed too: the body can't be compiled otherwise, and asking whether a store
+    // can be default constructed has to give the right answer, see `StaticData.h`)
+    CStore() requires std::is_default_constructible_v<ObjectType> {
         m_nCount = 0;
     }
 

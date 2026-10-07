@@ -33,6 +33,12 @@
     RH_InstallProlouge(name) \
     using RHCurrentNS = cls;
 
+#ifdef NOTSA_NO_ORIGINAL_CODE
+#define RH_RegisterVirtualClass(name, gta, our) ReversibleHooks::RegisterVirtualClass(name, gta, our)
+#else
+#define RH_RegisterVirtualClass(name, gta, our) (void)0
+#endif
+
 #ifdef NOTSA_STANDALONE_DUMP_HOOKS_ONLY
 #define RH_ScopedVirtualClass(cls, addrGTAVtbl, nVirtFns_) \
     RH_InstallProlouge(#cls) \
@@ -44,6 +50,7 @@
     RH_InstallProlouge(#cls) \
     const auto pGTAVTbl = ReversibleHooks::Utility::VMTInfo{ (void**)addrGTAVtbl, nVirtFns_ }; \
     const auto pOurVTbl = ReversibleHooks::Utility::VMTInfo::FindByClassName(#cls, nVirtFns_); \
+    RH_RegisterVirtualClass(#cls, pGTAVTbl, pOurVTbl); \
     using RHCurrentNS = cls;
 #endif
 
