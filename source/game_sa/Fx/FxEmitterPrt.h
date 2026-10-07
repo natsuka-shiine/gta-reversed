@@ -5,7 +5,6 @@
 #include "Particle.h"
 #include "extensions/FixedFloat.hpp"
 
-struct RwRGBA;
 class FxSystem_c;
 
 // NB: Only `Particle_c` is a list item (SA allocates these with a stride of 0x3C - see `FxManager_c::Init` @ 0x4A98E0)

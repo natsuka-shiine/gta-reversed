@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rphanim.h"
+#else
 /******************************************
  *                                        *
  *    RenderWare(TM) Graphics Library     *
@@ -671,3 +675,5 @@ typedef RpHAnimKeyFrame RpHAnimStdKeyFrame;
         RpHAnimHierarchyAddAnimTime((hierarchy),(time))
 
 #endif                          /* RPHANIM_H */
+
+#endif // !NOTSA_LIBRW

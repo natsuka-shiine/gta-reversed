@@ -35,8 +35,8 @@ bool CCustomCarPlateMgr::Initialise() {
 
     const auto FindTXDAndSetFlags = [](const char* name, RwTextureFilterMode filterMode) {
         const auto tex =RwTextureRead(name, nullptr);
-        RwTextureSetAddressingU(tex, rwFILTERMIPNEAREST);
-        RwTextureSetAddressingV(tex, rwFILTERMIPNEAREST);
+        RwTextureSetAddressingU(tex, (RwTextureAddressMode)rwFILTERMIPNEAREST);
+        RwTextureSetAddressingV(tex, (RwTextureAddressMode)rwFILTERMIPNEAREST);
         RwTextureSetFilterMode(tex, filterMode);
         return tex;
     };

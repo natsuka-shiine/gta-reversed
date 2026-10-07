@@ -336,3 +336,45 @@ if (${RE_PROJECT}_INSTALL)
         install(FILES $<TARGET_PDB_FILE:${RE_PROJECT_LIB_NAME}> DESTINATION "." OPTIONAL)
     endif()
 endif()
+
+#--------------------------------------------------------------------
+# librw adapter check
+#
+# Compiles (but doesn't link) all the game code against the RenderWare adapter for librw (`game_sa/RenderWare/librw`),
+# to see how far that is from building. Not part of the default build:
+#   cmake --build build --target gta_reversed_librw_check
+#--------------------------------------------------------------------
+if (${RE_PROJECT}_WITH_LIBRW)
+    set(RE_PROJECT_LIBRW_CHECK_NAME gta_reversed_librw_check)
+
+    add_library(${RE_PROJECT_LIBRW_CHECK_NAME} OBJECT EXCLUDE_FROM_ALL ${SOURCE_FILES_WITHOUT_MODULES_LIST})
+    set_source_files_properties(${SOURCE_FILES_WITHOUT_MODULES_LIST} PROPERTIES CXX_SCAN_FOR_MODULES OFF)
+
+    target_include_directories(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE
+        $<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},INCLUDE_DIRECTORIES>
+    )
+    target_compile_definitions(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE
+        $<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},COMPILE_DEFINITIONS>
+        NOTSA_LIBRW
+    )
+    # Exactly the options of the main target (Not the directory's: `add_dependency` above adds things to those that aren't options)
+    set_target_properties(${RE_PROJECT_LIBRW_CHECK_NAME} PROPERTIES
+        COMPILE_OPTIONS "$<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},COMPILE_OPTIONS>"
+    )
+    target_link_libraries(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE
+        $<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},LINK_LIBRARIES>
+        librw
+    )
+    target_compile_features(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE cxx_std_23)
+    target_precompile_headers(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE StdInc.cpp)
+
+    if (${RE_PROJECT}_UNITY_BUILD)
+        target_compile_definitions(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE NOTSA_UNITY_BUILD)
+        set_target_properties(${RE_PROJECT_LIBRW_CHECK_NAME}
+            PROPERTIES
+            UNITY_BUILD TRUE
+            UNITY_BUILD_MODE BATCH
+            UNITY_BUILD_BATCH_SIZE 16
+        )
+    endif()
+endif()

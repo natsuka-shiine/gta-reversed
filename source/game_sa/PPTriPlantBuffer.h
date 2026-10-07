@@ -2,7 +2,6 @@
 
 class CVector;
 class CRGBA;
-struct RwTexture;
 
 class PPTriPlant {
 public:

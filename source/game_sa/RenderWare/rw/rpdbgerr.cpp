@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 /*
  * Debug handling
  *
@@ -86,3 +87,5 @@ rwPLUGIN_ERRFUNC(RwInt32 code,...)
 
 #endif /* RWDEBUG */
 
+
+#endif // !NOTSA_LIBRW

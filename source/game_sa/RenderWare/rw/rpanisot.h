@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rpanisot.h"
+#else
 /**
  * Anisotropic Texture Sampling Plugin for RenderWare.
  */
@@ -52,3 +56,5 @@ extern RwBool       RpAnisotPluginAttach(void);
 #endif
 
 #endif                          /* RPANISOTPLUGIN_H */
+
+#endif // !NOTSA_LIBRW

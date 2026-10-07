@@ -182,7 +182,7 @@ RpAtomic* SkinAtomicGetHAnimHierarchCB(RpAtomic* atomic, void* data) {
 RpAtomic* AtomicRemoveAnimFromSkinCB(RpAtomic* atomic, void* data) {
     if (RpSkinGeometryGetSkin(RpAtomicGetGeometry(atomic))) {
         if (RpHAnimHierarchy* hier = RpSkinAtomicGetHAnimHierarchy(atomic)) {
-            RtAnimAnimation*& currAnim = hier->currentAnim->pCurrentAnim;
+            RtAnimAnimation*& currAnim = RtAnimInterpolatorGetCurrentAnim(RpHAnimHierarchyGetInterpolator(hier));
             if (currAnim) {
                 RtAnimAnimationDestroy(currAnim);
             }
@@ -281,7 +281,7 @@ bool SetFilterModeOnClumpsTextures(RpClump* clump, RwTextureFilterMode filtering
 // 0x734DE0
 bool RpGeometryReplaceOldMaterialWithNewMaterial(RpGeometry* geometry, RpMaterial* oldMaterial, RpMaterial* newMaterial) {
     auto       replaced   = false;
-    auto*      meshHeader = geometry->mesh;
+    auto*      meshHeader = RpGeometryGetMeshHeader(geometry);
     auto*      meshes     = reinterpret_cast<RpMesh*>(meshHeader + 1);
     for (auto i = 0u; i < meshHeader->numMeshes; i++) {
         auto& mesh = meshes[i];
@@ -300,13 +300,23 @@ bool RpGeometryReplaceOldMaterialWithNewMaterial(RpGeometry* geometry, RpMateria
 
 // 0x734E50
 RwTexture* RwTexDictionaryFindHashNamedTexture(RwTexDictionary* txd, uint32 hash) {
-    for (auto* link = rwLinkListGetFirstLLLink(&txd->texturesInDict); link != rwLinkListGetTerminator(&txd->texturesInDict); link = rwLLLinkGetNext(link)) {
-        auto* const texture = rwLLLinkGetData(link, RwTexture, lInDictionary);
-        if (CKeyGen::GetUppercaseKey(texture->name) == hash) {
+    struct Context {
+        uint32     hash;
+        RwTexture* found;
+    } ctx{ hash, nullptr };
+    RwTexDictionaryForAllTextures(
+        txd,
+        [](RwTexture* texture, void* data) -> RwTexture* {
+            auto* const ctx = static_cast<Context*>(data);
+            if (CKeyGen::GetUppercaseKey(texture->name) == ctx->hash) {
+                ctx->found = texture;
+                return nullptr; // Stop
+            }
             return texture;
-        }
-    }
-    return nullptr;
+        },
+        &ctx
+    );
+    return ctx.found;
 }
 
 static auto& s_BoundingSphereUseLTM = StaticRef<bool, 0x8D60BC>();
@@ -414,7 +424,7 @@ static void ForEachSkinBonePosition(RpClump* clump, Fn&& fn) {
 
         fn(i, parent, pos);
 
-        const auto flags = hier->pNodeInfo[i].flags;
+        const auto flags = RpHAnimHierarchyGetNodeFlags(hier, i);
         if (flags & rpHANIMPUSHPARENTMATRIX) {
             *++sp = parent;
         }

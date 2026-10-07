@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rpskin.h"
+#else
 
 #ifndef RPSKIN_H
 #define RPSKIN_H
@@ -289,3 +293,5 @@ _rxD3D9SkinVertexShaderSetEndCallBack(RxPipelineNode *node,
 #endif /* RPSKIN_H */
 
 
+
+#endif // !NOTSA_LIBRW

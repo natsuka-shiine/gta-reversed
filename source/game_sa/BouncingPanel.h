@@ -3,7 +3,6 @@
 #include "Vector.h"
 
 class CVehicle;
-struct RwFrame;
 
 class  CBouncingPanel {
     static inline auto& BOUNCE_SPRING_DAMP_MULT = StaticRef<float, 0x8D3954>(); // 0.95

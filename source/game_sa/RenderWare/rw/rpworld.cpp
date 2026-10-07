@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rpworld.h"
@@ -1194,3 +1195,5 @@ _rwD3D9EnableClippingIfNeeded(void *object,
 
     RWRETURNVOID();
 }
+
+#endif // !NOTSA_LIBRW

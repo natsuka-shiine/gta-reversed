@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rtquat.h"
@@ -21,3 +22,5 @@ RwV3d* RtQuatTransformVectors(RwV3d* vectorsOut, const RwV3d* vectorsIn, const R
 RwReal RtQuatModulus(RtQuat* q) {
     return ((RwReal(__cdecl *)(RtQuat*))0x7EBD10)(q);
 }
+
+#endif // !NOTSA_LIBRW

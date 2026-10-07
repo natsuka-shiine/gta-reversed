@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rtdict.h"
+#else
 #ifndef RTDICT_H
 #define RTDICT_H
 
@@ -302,3 +306,5 @@ _rtDictDestruct(RtDict *dictionary);
 
 
 #endif /* RTDICT_H */
+
+#endif // !NOTSA_LIBRW

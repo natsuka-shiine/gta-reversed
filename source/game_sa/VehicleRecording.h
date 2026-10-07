@@ -53,7 +53,6 @@ public:
 };
 VALIDATE_SIZE(CPath, 0x10);
 
-struct RwStream;
 
 class CVehicleRecording {
 public:

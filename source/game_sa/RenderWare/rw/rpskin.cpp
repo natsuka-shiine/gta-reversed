@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rpskin.h"
@@ -93,3 +94,5 @@ RwBool _rpSkinSplitDataDestroy(RpSkin* skin) {
 RxNodeDefinition* RxNodeDefinitionGetD3D9SkinAtomicAllInOne() {
     return ((RxNodeDefinition*(__cdecl *)(void))0x7CB2A0)();
 }
+
+#endif // !NOTSA_LIBRW

@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rwcore.h"
@@ -1177,3 +1178,5 @@ void _rwObjectHasFrameReleaseFrame(void *object) {
 RwUInt32 RwRGBAToPixel(RwRGBA* rgbIn, RwInt32 rasterFormat) {
     return plugin::CallAndReturn<RwUInt32, 0x803740, RwRGBA*, RwInt32>(rgbIn, rasterFormat);
 }
+
+#endif // !NOTSA_LIBRW

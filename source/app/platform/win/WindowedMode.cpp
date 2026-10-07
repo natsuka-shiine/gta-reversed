@@ -1,6 +1,7 @@
 
 #include "StdInc.h"
-#ifdef NOTSA_WINDOWED_MODE
+// (librw does the device and window handling itself, none of this applies to it)
+#if defined(NOTSA_WINDOWED_MODE) && !defined(NOTSA_LIBRW)
 
 #include "WindowedMode.hpp"
 #include "PostEffects.h"

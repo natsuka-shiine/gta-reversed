@@ -3,7 +3,6 @@
 class CAnimBlendClumpData;
 class AnimBlendFrameData;
 class CAnimBlendAssociation;
-struct RtAnimAnimation;
 
 /*!
 * @brief RpAnimBlend plugin unique rwID

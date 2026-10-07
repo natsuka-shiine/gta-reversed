@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rpworld.h"
+#else
 /*
     Plugin-SDK file
     Authors: GTA Community. See more here
@@ -2680,3 +2684,5 @@ macro/inline functionality
     RpWorldSectorGetVerticesMacro(_sector)
 
 #endif /* ((!defined(RWDEBUG)) && (!defined(RWSUPPRESSINLINE))) */
+
+#endif // !NOTSA_LIBRW

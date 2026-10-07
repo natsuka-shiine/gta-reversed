@@ -38,7 +38,6 @@ class CDummy;
 class CPhysical;
 class CBaseModelInfo;
 
-struct RwObject;
 
 class NOTSA_EXPORT_VTABLE CEntity : public CPlaceable {
 public:

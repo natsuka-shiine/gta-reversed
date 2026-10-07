@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rpmatfx.h"
@@ -133,3 +134,5 @@ const RpMaterial* RpMatFXMaterialGetUVTransformMatrices(const RpMaterial* materi
 RxPipeline* RpMatFXGetD3D9Pipeline(RpMatFXD3D9Pipeline d3d9Pipeline) {
     return ((RxPipeline*(__cdecl *)(RpMatFXD3D9Pipeline))0x8162F0)(d3d9Pipeline);
 }
+
+#endif // !NOTSA_LIBRW

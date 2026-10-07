@@ -41,7 +41,7 @@ bool CCustomBuildingRenderer::PluginAttach() {
 // 0x5D7F00
 void CCustomBuildingRenderer::AtomicSetup(RpAtomic* atomic) {
     const auto* const geometry = RpAtomicGetGeometry(atomic);
-    if (CCustomBuildingDNPipeline::GetExtraVertColourPtr(geometry)->NightColors && geometry->preLitLum) {
+    if (CCustomBuildingDNPipeline::GetExtraVertColourPtr(geometry)->NightColors && RpGeometryGetPreLightColors(geometry)) {
         CCustomBuildingDNPipeline::CustomPipeAtomicSetup(atomic);
     } else {
         CCustomBuildingPipeline::CustomPipeAtomicSetup(atomic);
@@ -54,7 +54,7 @@ bool CCustomBuildingRenderer::IsCBPCPipelineAttached(RpAtomic* atomic) {
     if (pipelineId == 0x53F2009C || pipelineId == 0x53F20098)
         return true;
     const auto* const geometry = RpAtomicGetGeometry(atomic);
-    return CCustomBuildingDNPipeline::GetExtraVertColourPtr(geometry)->NightColors && geometry->preLitLum;
+    return CCustomBuildingDNPipeline::GetExtraVertColourPtr(geometry)->NightColors && RpGeometryGetPreLightColors(geometry);
 }
 
 // 0x5D7F80

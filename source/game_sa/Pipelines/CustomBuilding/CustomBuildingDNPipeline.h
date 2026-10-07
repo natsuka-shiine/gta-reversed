@@ -2,7 +2,6 @@
 
 #include "RenderWare.h"
 
-struct RxOpenGLMeshInstanceData;
 struct CustomEnvMapPipeMaterialData;
 
 /*!

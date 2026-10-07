@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rpanisot.h"
@@ -17,3 +18,5 @@ RwInt8 RpAnisotTextureGetMaxAnisotropy(RwTexture* tex) {
 RwBool RpAnisotPluginAttach() {
     return ((RwBool(__cdecl *)())0x748F70)();
 }
+
+#endif // !NOTSA_LIBRW

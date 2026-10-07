@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rwtexdict.h"
@@ -33,3 +34,5 @@ bool RpClumpGtaStreamRead1(RwStream* stream) {
 RpClump* RpClumpGtaStreamRead2(RwStream* stream) {
     return plugin::CallAndReturn<RpClump*, 0x72E620, RwStream*>(stream);
 }
+
+#endif // !NOTSA_LIBRW

@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rpmatfx.h"
+#else
 
 #ifndef RPMATFX_H
 #define RPMATFX_H
@@ -345,3 +349,5 @@ RpMatFXGetD3D9Pipeline( RpMatFXD3D9Pipeline d3d9Pipeline );
 #endif /* RPMATFX_H */
 
 
+
+#endif // !NOTSA_LIBRW

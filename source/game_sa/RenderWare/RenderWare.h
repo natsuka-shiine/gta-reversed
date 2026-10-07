@@ -20,10 +20,20 @@
 #endif
 
 static inline auto& RwInitialized = StaticRef<bool, 0xC920E8>();
-static inline auto& RwEngineInstance =  StaticRef<RwGlobals*, 0xC97B24>();
 static inline auto& RsGlobal =  StaticRef<RsGlobalType, 0xC17040>();
+#ifndef NOTSA_LIBRW
+static inline auto& RwEngineInstance =  StaticRef<RwGlobals*, 0xC97B24>();
 static inline auto& geometryTKList =  StaticRef<RwPluginRegistry, 0x8D628C>();
 static inline auto& RpUVAnimDictSchema =  StaticRef<RtDictSchema, 0x8DED50>();
+
+// Accessors for fields that are named differently in librw (the adapter has its own versions of these)
+#define RpHAnimHierarchyGetNodeFlags(_hier, _index) ((_hier)->pNodeInfo[_index].flags)
+#define RpHAnimHierarchyGetNodeID(_hier, _index)    ((_hier)->pNodeInfo[_index].nodeID)
+#define RpHAnimHierarchyGetInterpolator(_hier)      ((_hier)->currentAnim)
+#define RpGeometryGetMeshHeader(_geometry)          ((_geometry)->mesh)
+#define RxPipelineSetPluginId(_pipe, _id)           ((_pipe)->pluginId = (_id))
+#define RxPipelineGetPluginId(_pipe)                ((_pipe)->pluginId)
+#endif
 static inline auto& AmbientSaturated = StaticRef<RwRGBAReal, 0x8E2418>();
 
 inline IDirect3DDevice9 *GetD3D9Device() {

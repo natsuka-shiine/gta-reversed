@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rphanim.h"
@@ -108,3 +109,5 @@ RwBool RpHAnimFrameSetID(RwFrame* frame, RwInt32 id) {
 RwInt32 RpHAnimFrameGetID(RwFrame* frame) {
     return ((RwInt32(__cdecl *)(RwFrame*))0x7C5190)(frame);
 }
+
+#endif // !NOTSA_LIBRW

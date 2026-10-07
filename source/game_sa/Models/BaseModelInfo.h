@@ -76,7 +76,6 @@ class CPedModelInfo;
 class CTimeModelInfo;
 class CVehicleModelInfo;
 class CWeaponModelInfo;
-struct RwObject;
 
 // originally an abstract class
 class NOTSA_EXPORT_VTABLE CBaseModelInfo {

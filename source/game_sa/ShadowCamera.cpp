@@ -44,10 +44,11 @@ void CShadowCamera::SetLight(RpLight* light) {
     auto* lightFrame  = RpLightGetFrame(light);
     auto* lightMatrix = RwFrameGetMatrix(lightFrame);
     auto* cameraFrame = RwCameraGetFrame(m_pRwCamera);
-    cameraFrame->modelling.right = lightMatrix->right;
-    cameraFrame->modelling.up = lightMatrix->up;
-    cameraFrame->modelling.at = lightMatrix->at;
-    RwMatrixUpdate(&cameraFrame->modelling);
+    auto* cameraMatrix = RwFrameGetMatrix(cameraFrame);
+    cameraMatrix->right = lightMatrix->right;
+    cameraMatrix->up = lightMatrix->up;
+    cameraMatrix->at = lightMatrix->at;
+    RwMatrixUpdate(cameraMatrix);
     RwFrameUpdateObjects(cameraFrame);
 }
 
@@ -57,7 +58,7 @@ void CShadowCamera::SetCenter(const CVector& center) {
     auto frame = RwCameraGetFrame(m_pRwCamera);
     auto mat = RwFrameGetMatrix(frame);
     *RwMatrixGetPos(mat) = m_pRwCamera->farPlane / -2.0f * mat->at + center;
-    RwMatrixUpdate(&frame->modelling);
+    RwMatrixUpdate(mat);
     RwFrameUpdateObjects(frame);
     RwFrameOrthoNormalize(frame);
 }
@@ -189,7 +190,7 @@ RwCamera* CShadowCamera::Create(int32 rasterSizePower) {
         goto fail;
     }
 
-    RwTextureSetAddressing(m_pRwRenderTexture, rwFILTERMIPNEAREST | rwFILTERMIPNEAREST);
+    RwTextureSetAddressing(m_pRwRenderTexture, (RwTextureAddressMode)(rwFILTERMIPNEAREST | rwFILTERMIPNEAREST));
     RwTextureSetFilterMode(m_pRwRenderTexture, rwFILTERLINEAR);
 
     RwCameraSetProjection(m_pRwCamera, rwPARALLEL);

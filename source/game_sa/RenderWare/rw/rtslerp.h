@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rtslerp.h"
+#else
 /* 
  * Data Structures for Slerps/Spherical Linear Interpolations
  * See also GemsIII/quatspin.c in
@@ -260,3 +264,5 @@ RtQuatSlerpArgand(RtQuat * qpResult,
 
 #endif                          /* RTSLERP_H */
 
+
+#endif // !NOTSA_LIBRW

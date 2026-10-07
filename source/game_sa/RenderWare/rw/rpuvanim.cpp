@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rpuvanim.h"
@@ -118,3 +119,5 @@ RpMaterial* RpMaterialUVAnimApplyUpdate(RpMaterial* material)
 RwBool RpMaterialUVAnimExists(const RpMaterial* material) {
     return ((RwBool(__cdecl *)(const RpMaterial*))0x7CC530)(material);
 }
+
+#endif // !NOTSA_LIBRW

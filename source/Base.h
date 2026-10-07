@@ -23,9 +23,15 @@ namespace fs = std::filesystem;
 
 #define PLUGIN_API
 
+#ifdef NOTSA_LIBRW
+// With librw the engine's types (and so everything containing them) don't have the original's layout
+#define VALIDATE_SIZE(struc, size) static_assert(sizeof(struc) > 0)
+#define VALIDATE_OFFSET(struc, member, offset) static_assert(sizeof(struc) > 0)
+#else
 #define VALIDATE_SIZE(struc, size) static_assert(sizeof(struc) == size, "Invalid structure size of " #struc)
 #define VALIDATE_OFFSET(struc, member, offset) \
 	static_assert(offsetof(struc, member) == offset, "The offset of " #member " in " #struc " is not " #offset "...")
+#endif
 
 VALIDATE_SIZE(bool, 1);
 VALIDATE_SIZE(char, 1);
@@ -275,4 +281,10 @@ struct std::formatter<Enum> : std::formatter<std::string> {
 #define _SWSTRING_STATIC_FROM(id, src) for (size_t i = 0; i < strlen(src); i++) my_ws##id[i] = src[i]
 #define _SWSTRING_STATIC_TO(id, dst) for (size_t i = 0; i < wcslen(my_ws##id); i++) dst[i] = static_cast<char>(my_ws##id[i])
 
+#ifdef NOTSA_LIBRW
+namespace rw { // Has to be in the namespace of the type
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RGBAf, red, blue, green, alpha);
+};
+#else
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RwRGBAReal, red, blue, green, alpha);
+#endif

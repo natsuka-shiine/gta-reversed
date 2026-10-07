@@ -14,7 +14,6 @@
 #include "Enums/AnimationEnums.h"
 
 class CAnimBlock;
-struct RpClump;
 
 /*!
  * @brief Animation group (block)

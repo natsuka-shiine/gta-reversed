@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rtbmp.h"
@@ -9,3 +10,5 @@ RwImage* RtBMPImageWrite(RwImage* image, const RwChar* imageName) {
 RwImage* RtBMPImageRead(const RwChar* imageName) {
     return ((RwImage*(__cdecl *)(const RwChar*))0x7CDF60)(imageName);
 }
+
+#endif // !NOTSA_LIBRW

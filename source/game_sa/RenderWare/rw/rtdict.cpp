@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rtdict.h"
@@ -73,3 +74,5 @@ RtDict* _rtDictSchemaInitDict(RtDictSchema* schema, RtDict* dictionary) {
 RwBool _rtDictDestruct(RtDict* dictionary) {
     return ((RwBool(__cdecl *)(RtDict*))0x7CEF60)(dictionary);
 }
+
+#endif // !NOTSA_LIBRW

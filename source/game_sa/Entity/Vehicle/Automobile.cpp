@@ -2360,7 +2360,7 @@ void CAutomobile::BlowUpCar_Impl(CEntity* dmgr, bool bDontShakeCam, bool bDontSp
         }
         if (!bNoExplosion) {
             if (const auto obj = GetCurrentAtomicObject(m_aCarNodes[CAR_WHEEL_LF])) {
-                RpAtomicSetFlags(obj, 0); // TODO: Use appropriate enum (if any?)
+                RpAtomicSetFlags((RpAtomic*)obj, 0); // TODO: Use appropriate enum (if any?)
             }
         }
     }
@@ -7359,7 +7359,7 @@ void CAutomobile::Teleport(CVector destination, bool resetRotation) {
 
 // 0x6A0750
 RwObject* GetCurrentAtomicObjectCB(RwObject* object, void* data) {
-    if (RpAtomicGetFlags(object) & rpATOMICRENDER)
+    if (RpAtomicGetFlags((RpAtomic*)object) & rpATOMICRENDER)
         *reinterpret_cast<RpAtomic**>(data) = reinterpret_cast<RpAtomic*>(object);
 
     return object;

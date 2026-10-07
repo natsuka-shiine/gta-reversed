@@ -9,7 +9,6 @@
 #include "Entity.h"
 #include "Rect.h"
 
-struct RpAtomic;
 
 struct tTagDesc {
     CEntity* Entity; //!< The physical tag entity (Pretty much just a model with a single atomic and material)

@@ -486,10 +486,7 @@ uint16 CVisibilityPlugins::GetUserValue(const RpAtomic* atomic) {
 // unused
 // 0x732990
 bool CVisibilityPlugins::IsAtomicVisible(RpAtomic* atomic) {
-    if (atomic->interpolator.flags & rpINTERPOLATORDIRTYSPHERE) {
-        _rpAtomicResyncInterpolatedSphere(atomic);
-    }
-    RwSphere sphere = atomic->boundingSphere;
+    RwSphere sphere = *RpAtomicGetBoundingSphere(atomic); // (Resyncs the interpolated sphere if it's dirty)
     RwMatrix* transformMatrix = RwFrameGetMatrix(RpAtomicGetFrame(atomic));
     RwV3d point;
     RwV3dTransformPoints(&point, &sphere.center, 1, transformMatrix);
@@ -1154,7 +1151,7 @@ void CVisibilityPlugins::SetupVehicleVariables(RpClump* clump) {
     RwV3dSub(&distance1, &transformMatrix->pos, ms_pCameraPosn);
     gVehicleDistanceFromCamera = distance1.SquaredMagnitude();
     CVector2D distance2;
-    RwV2dSub(&distance2, ms_pCameraPosn, RwMatrixGetPos(RwFrameGetMatrix(carFrame)));
+    RwV2dSub(&distance2, (RwV2d*)ms_pCameraPosn, (RwV2d*)RwMatrixGetPos(RwFrameGetMatrix(carFrame)));
     gAngleWithHorizontal = atan2(ms_pCameraPosn->z - RwMatrixGetPos(RwFrameGetMatrix(carFrame))->z, distance2.Magnitude());
 }
 

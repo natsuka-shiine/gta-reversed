@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rwcore.h"
+#else
 /******************************************/
 /*                                        */
 /*    RenderWare(TM) Graphics Library     */
@@ -5172,3 +5176,5 @@ extern RwCameraChunkInfo * RwCameraChunkInfoRead(RwStream *stream,
 
 
 #endif /* RWCORE_H */
+
+#endif // !NOTSA_LIBRW

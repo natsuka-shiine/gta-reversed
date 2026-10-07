@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rtanim.h"
+#else
 #ifndef RTANIM_H
 #define RTANIM_H
 
@@ -652,3 +656,5 @@ RtAnimInterpolatorAddSubInterpolator(RtAnimInterpolator *outAnim,
 #endif                          /* __cplusplus */
 
 #endif /* RTANIM_H */
+
+#endif // !NOTSA_LIBRW

@@ -1,3 +1,4 @@
+#ifndef NOTSA_LIBRW // These call into the original executable
 #include "StdInc.h"
 
 #include "rpdbgerr.h"
@@ -218,3 +219,5 @@ void RtAnim::InjectHooks() {
 
     RH_ScopedGlobalInstall(RtAnimInterpolatorSetCurrentAnim, 0x7CD5A0);
 }
+
+#endif // !NOTSA_LIBRW

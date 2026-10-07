@@ -1095,7 +1095,7 @@ void CBoat::BlowUpCar(CEntity* culprit, bool inACutscene) {
 
 // 0x6F00D0
 RwObject* GetBoatAtomicObjectCB(RwObject* object, void* data) {
-    if (RpAtomicGetFlags(object) & rpATOMICRENDER) {
+    if (RpAtomicGetFlags((RpAtomic*)object) & rpATOMICRENDER) {
         *static_cast<RpAtomic**>(data) = reinterpret_cast<RpAtomic*>(object);
     }
 

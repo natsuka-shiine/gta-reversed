@@ -96,7 +96,7 @@ RwObject* CClumpModelInfo::CreateInstance()
         auto hierarchy = GetAnimHierarchyFromClump(clonedClump);
         RpClumpForAllAtomics(clonedClump, SetHierarchyForSkinAtomic, hierarchy);
         auto anim = RpAnimBlendCreateAnimationForHierarchy(hierarchy);
-        RtAnimInterpolatorSetCurrentAnim(hierarchy->currentAnim, anim);
+        RtAnimInterpolatorSetCurrentAnim(RpHAnimHierarchyGetInterpolator(hierarchy), anim);
         hierarchy->flags = rpHANIMHIERARCHYUPDATEMODELLINGMATRICES | rpHANIMHIERARCHYUPDATELTMS;
     }
 
@@ -117,7 +117,7 @@ RwObject* CClumpModelInfo::CreateInstance(RwMatrix* matrix)
         return nullptr;
 
     auto clump = CreateInstance();
-    memcpy(RpClumpGetFrame(clump), matrix, sizeof(RwMatrix));
+    memcpy(RpClumpGetFrame((RpClump*)clump), matrix, sizeof(RwMatrix));
     return clump;
 }
 

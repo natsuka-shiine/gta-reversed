@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rpuvanim.h"
+#else
 /*****************************************************************************
  *
  * File :     rpuvanim.h
@@ -525,3 +529,5 @@ extern const RwV3d rpUVAnimInvPivot;
 
 #endif /* RPUVANIM_H */
 
+
+#endif // !NOTSA_LIBRW

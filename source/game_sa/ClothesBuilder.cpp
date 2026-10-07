@@ -262,7 +262,7 @@ void CClothesBuilder::StoreBoneArray(RpClump* clump, int32 idx) {
     
     rng::fill(gBoneIndices[idx], -1);
     for (auto i = h->numNodes; i-- > 0;) {
-        gBoneIndices[idx][i] = static_cast<int16>(h->pNodeInfo[i].nodeID);
+        gBoneIndices[idx][i] = static_cast<int16>(RpHAnimHierarchyGetNodeID(h, i));
     }
 }
 
@@ -818,8 +818,9 @@ void CClothesBuilder::ConstructGeometryAndSkinArrays(RpHAnimHierarchy* animHiera
         }
         for (auto t = 0; t < numSrcTris; t++) {
             RpTriangle* dstTri = &outTris[triBase + t];
-            RpGeometryTriangleSetVertexIndices(out, dstTri,
-                srcTris[t].vertIndex[0] + vertBase, srcTris[t].vertIndex[1] + vertBase, srcTris[t].vertIndex[2] + vertBase);
+            RwUInt16 v1, v2, v3;
+            RpGeometryTriangleGetVertexIndices(src, &srcTris[t], &v1, &v2, &v3);
+            RpGeometryTriangleSetVertexIndices(out, dstTri, v1 + vertBase, v2 + vertBase, v3 + vertBase);
             RpGeometryTriangleSetMaterial(out, dstTri, materials[i]);
         }
         vertBase += numSrcVerts;
@@ -985,7 +986,7 @@ RpClump* CClothesBuilder::CreateSkinnedClump(RpClump* bones, RwTexDictionary* di
     const auto hier = RpHAnimHierarchyCreateFromHierarchy(
         boneAnimHr,
         (RpHAnimHierarchyFlag)boneAnimHr->flags,       // TODO: Use function to access
-        boneAnimHr->currentAnim->maxInterpKeyFrameSize // TODO: Use function to access
+        RpHAnimHierarchyGetInterpolator(boneAnimHr)->maxInterpKeyFrameSize
     );
 
     const auto childFrame = RwFrameCreate();

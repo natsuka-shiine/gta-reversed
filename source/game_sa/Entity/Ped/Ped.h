@@ -38,7 +38,6 @@ class CEmergencyPed;
 class CCoverPoint;
 class CEntryExit;
 class CAnimBlendClumpData;
-struct RpHAnimHierarchy;
 
 enum ePedNode : int32 {
     PED_NODE_NULL            = 0,

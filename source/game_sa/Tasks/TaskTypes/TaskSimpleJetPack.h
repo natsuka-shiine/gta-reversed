@@ -9,7 +9,6 @@
 #include "TaskSimple.h"
 #include "Vector.h"
 
-struct RpClump;
 class  FxSystem_c;
 class  CAnimBlendAssociation;
 class  CEntity;

@@ -1,3 +1,7 @@
+// With librw this whole header is replaced by the adapter's one
+#ifdef NOTSA_LIBRW
+#include "../librw/rtquat.h"
+#else
 /*
  * Data structures for Quaternions
  * See http://www-groups.dcs.st-and.ac.uk/~history/Mathematicians/Hamilton.html
@@ -644,3 +648,5 @@ typedef RtQuat RpQuat;
 
 #endif                          /* RTQUAT_H */
 
+
+#endif // !NOTSA_LIBRW

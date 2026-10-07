@@ -79,6 +79,16 @@ bool RpAnimBlendPluginAttach() {
         return false;
     }
 
+#ifdef NOTSA_LIBRW
+    // Same as below, with librw's names (And it keeps the pointer, instead of copying it)
+    static RtAnimInterpolatorInfo rtInfo = *rw::AnimInterpolatorInfo::find(1); // Everything else is as for standard key-frames (`rpHANIMSTDKEYFRAMETYPEID`)
+    rtInfo.id                 = rwID_RPANIMBLENDPLUGIN;
+    rtInfo.interpKeyFrameSize = sizeof(RpHAnimBlendInterpFrame);
+    rtInfo.animKeyFrameSize   = sizeof(RpHAnimKeyFrame);
+    rtInfo.applyCB            = RtAnimBlendKeyFrameApply;
+    rtInfo.interpCB           = RpAnimBlendKeyFrameInterpolate;
+    rtInfo.customDataSize     = 0;
+#else
     RtAnimInterpolatorInfo rtInfo{
         .typeID                  = rwID_RPANIMBLENDPLUGIN,
 
@@ -96,6 +106,7 @@ bool RpAnimBlendPluginAttach() {
 
         .customDataSize          = 0
     };
+#endif
     RtAnimRegisterInterpolationScheme(&rtInfo);
 
     return true;
@@ -143,7 +154,7 @@ void RpAnimBlendClumpInitSkinned(RpClump* clump) { // Can't hook, `clump` passed
             );
 
             // Handle node stack now
-            const auto nodeFlags = rpHAHier->pNodeInfo[i].flags;
+            const auto nodeFlags = RpHAnimHierarchyGetNodeFlags(rpHAHier, i);
             if (nodeFlags & rpHANIMPUSHPARENTMATRIX) {
                 *++nodeStkPtr = currNodeIdx;
             }
@@ -157,8 +168,8 @@ void RpAnimBlendClumpInitSkinned(RpClump* clump) { // Can't hook, `clump` passed
     for (size_t i = 0; i < nBones; i++) {
         const auto fd = &bd->m_FrameDatas[i]; // Frame blend data
             
-        fd->KeyFrame = (RpHAnimBlendInterpFrame*)rtANIMGETINTERPFRAME(rpHAHier->currentAnim, i);
-        fd->BoneTag  = rpHAHier->pNodeInfo[i].nodeID;
+        fd->KeyFrame = (RpHAnimBlendInterpFrame*)rtANIMGETINTERPFRAME(RpHAnimHierarchyGetInterpolator(rpHAHier), i);
+        fd->BoneTag  = RpHAnimHierarchyGetNodeID(rpHAHier, i);
         fd->BonePos  = bonePositions[i];
     }
 

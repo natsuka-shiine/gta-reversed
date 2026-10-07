@@ -55,6 +55,11 @@ if (MSVC AND NOT ${RE_PROJECT}_STANDALONE)
     add_subdirectory(launcher)
 endif()
 
+option(${RE_PROJECT}_WITH_LIBRW "Fetch and build librw (RenderWare re-implementation, for the standalone executable)" ON)
+if (${RE_PROJECT}_WITH_LIBRW)
+    add_subdirectory(thirdparty/librw)
+endif()
+
 function(create_source_group target)
     get_property(sources TARGET ${target} PROPERTY SOURCES)
     foreach (filename ${sources})
