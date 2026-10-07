@@ -1,6 +1,7 @@
 #include "StdInc.h"
 
 #include "StaticData.h"
+#include "dllmain.h"
 
 /*
 * Format of the config file (`CONFIG_FILE_NAME`, next to the game executable):
@@ -153,6 +154,11 @@ const Range* FindRange(uintptr addr) {
 //! Decide what's owned, and move it. Happens on the first use of any global, which is before any game code of ours runs.
 void LoadConfig() {
     s_IsConfigLoaded = true;
+
+    // Another build of this module is going to run the game: own nothing, and above all don't overwrite the original
+    if (notsa::IsAnotherBuildWanted()) {
+        return;
+    }
 
     for (const auto& r : GENERATED_RANGES) {
         AddRange(r.begin, r.end, r.name, true, r.init, r.initSize);

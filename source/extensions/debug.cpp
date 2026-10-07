@@ -6,6 +6,7 @@
 #include <format>
 #include <extensions/CommandLine.h>
 #include "debug.hpp"
+#include "dllmain.h"
 
 
 namespace notsa {
@@ -75,9 +76,14 @@ std::string GetFunctionInfoAtAddress(uintptr_t address, bool compact, HANDLE hPr
 }
 
 void LoadSymbols() {
+    // Next to the executable, and next to this module (which isn't necessarily in the game's directory)
+    auto searchPath = CommandLine::GetExePath().parent_path().string();
+    if (char self[MAX_PATH]{}; GetModuleFileNameA(notsa::GetDLLHandle(), self, sizeof(self))) {
+        searchPath += ";" + fs::path{ self }.parent_path().string();
+    }
     SymInitialize(
         GetCurrentProcess(),
-        CommandLine::GetExePath().parent_path().string().c_str(),
+        searchPath.c_str(),
         TRUE
     );
 }

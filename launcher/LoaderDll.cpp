@@ -25,6 +25,7 @@
 #include <format>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace {
 constexpr uintptr_t GAME_IMAGE_BASE  = 0x400000;
@@ -34,6 +35,9 @@ constexpr uint32_t  GAME_WIN_MAIN    = 0x748710; // Called by the above, once th
 
 //! Environment variable to override the path of the original executable
 constexpr auto ENV_ORIGINAL_EXE = "GTA_REVERSED_ORIGINAL_EXE";
+
+//! Name of the environment variable that can be used to load another module in place of `gta_reversed.asi` (For trying other builds of it)
+constexpr auto ENV_ASI = "GTA_REVERSED_ASI";
 
 //! Tried in this order (relative to the current directory, which is the launcher's)
 constexpr const char* ORIGINAL_EXE_CANDIDATES[]{
@@ -48,7 +52,144 @@ constexpr const char* ASI_CANDIDATES[]{
     "gta_reversed.asi",
 };
 
+//! Written next to the launcher, started over on each run. For when the game dies before (or without) its own logging
+constexpr auto TRACE_FILE_NAME = "gta_reversed_loader.log";
+
+HANDLE s_TraceFile = INVALID_HANDLE_VALUE;
+
+void Trace(const std::string& msg) {
+    if (s_TraceFile == INVALID_HANDLE_VALUE) {
+        s_TraceFile = CreateFileA(TRACE_FILE_NAME, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (s_TraceFile == INVALID_HANDLE_VALUE) {
+            return;
+        }
+    }
+    const auto line = std::format("[{:>8}] {}\r\n", GetTickCount(), msg);
+    DWORD      written{};
+    WriteFile(s_TraceFile, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+    FlushFileBuffers(s_TraceFile);
+}
+
+//! `module+offset` of an address
+std::string DescribeAddress(uintptr_t addr) {
+    if (addr >= GAME_IMAGE_BASE && addr < GAME_IMAGE_BASE + GAME_IMAGE_SIZE) {
+        return std::format("0x{:08X} (original game code)", addr);
+    }
+    HMODULE mod{};
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(addr), &mod) && mod) {
+        char path[MAX_PATH]{};
+        GetModuleFileNameA(mod, path, sizeof(path));
+        const std::string_view sv{ path };
+        const auto             slash = sv.find_last_of('\\');
+        return std::format("0x{:08X} ({}+0x{:X})", addr, slash == sv.npos ? sv : sv.substr(slash + 1), addr - reinterpret_cast<uintptr_t>(mod));
+    }
+    return std::format("0x{:08X}", addr);
+}
+
+/*!
+* List everything on the stack that points into code: that's the return addresses, and some stale or unrelated values.
+* For where there are no frame pointers to walk (the original game's code), so a regular stack trace stops short.
+*/
+void TraceCodePointersOnStack(uintptr_t esp, int maxListed) {
+    auto       numListed = 0;
+    const auto sp        = reinterpret_cast<const uintptr_t*>(esp);
+    for (auto i = 0; i < 2048 && numListed < maxListed; i++) {
+        MEMORY_BASIC_INFORMATION mbi{};
+        if (!VirtualQuery(&sp[i], &mbi, sizeof(mbi)) || mbi.State != MEM_COMMIT || (mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
+            break; // End of the stack
+        }
+        const auto value = sp[i];
+        if (!VirtualQuery(reinterpret_cast<void*>(value), &mbi, sizeof(mbi)) || mbi.State != MEM_COMMIT) {
+            continue;
+        }
+        if (!(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
+            continue;
+        }
+        Trace(std::format("    [esp+0x{:04X}] {}", i * sizeof(uintptr_t), DescribeAddress(value)));
+        numListed++;
+    }
+}
+
+//! Records the exceptions that usually mean the end (They may still be handled by somebody, so only the first few are recorded)
+LONG CALLBACK TraceExceptions(EXCEPTION_POINTERS* info) {
+    static LONG s_NumRecorded = 0;
+
+    const auto* const rec = info->ExceptionRecord;
+    switch (rec->ExceptionCode) {
+    case EXCEPTION_ACCESS_VIOLATION:
+    case EXCEPTION_STACK_OVERFLOW:
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+    case EXCEPTION_PRIV_INSTRUCTION:
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+    case EXCEPTION_BREAKPOINT:
+    case 0xC0000374: // Heap corruption
+    case 0xC0000409: // Fail fast (e.g.: `abort`, `std::terminate`, stack cookie)
+    case 0xE06D7363: // C++ exception
+        break;
+    default:
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    if (rec->ExceptionCode == 0xE06D7363) { // These are usually caught, don't let them use up the limit below
+        static LONG s_NumCppRecorded = 0;
+        if (InterlockedIncrement(&s_NumCppRecorded) <= 3) {
+            Trace(std::format("C++ exception thrown at {} (Only the first 3 are recorded)", DescribeAddress(reinterpret_cast<uintptr_t>(rec->ExceptionAddress))));
+        }
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    if (InterlockedIncrement(&s_NumRecorded) > 16) {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    auto msg = std::format("Exception 0x{:08X} at {}", rec->ExceptionCode, DescribeAddress(reinterpret_cast<uintptr_t>(rec->ExceptionAddress)));
+    if (rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2) {
+        msg += std::format(", {} 0x{:08X}", rec->ExceptionInformation[0] ? "writing" : "reading", rec->ExceptionInformation[1]);
+    }
+    Trace(msg);
+
+    if (rec->ExceptionCode != EXCEPTION_STACK_OVERFLOW) { // (No stack left to do this with)
+        void*      frames[24]{};
+        const auto n = CaptureStackBackTrace(0, static_cast<DWORD>(std::size(frames)), frames, nullptr);
+        for (auto i = 0u; i < n; i++) {
+            Trace("    " + DescribeAddress(reinterpret_cast<uintptr_t>(frames[i])));
+        }
+
+        // The above walks frame pointers, which the original game's code doesn't keep
+        const auto eip = reinterpret_cast<uintptr_t>(rec->ExceptionAddress);
+        if (eip >= GAME_IMAGE_BASE && eip < GAME_IMAGE_BASE + GAME_IMAGE_SIZE) {
+            Trace("  In the original game's code, code pointers on the stack at the time:");
+            TraceCodePointersOnStack(info->ContextRecord->Esp, 32);
+        }
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+HANDLE s_MainThread{};
+
+//! Where the main thread is (and roughly how it got there): for when the game hangs without a word
+void TraceMainThread(const char* when) {
+    if (SuspendThread(s_MainThread) == static_cast<DWORD>(-1)) {
+        return;
+    }
+    CONTEXT ctx{};
+    ctx.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+    if (GetThreadContext(s_MainThread, &ctx)) {
+        Trace(std::format("Main thread {}: at {}", when, DescribeAddress(ctx.Eip)));
+
+        TraceCodePointersOnStack(ctx.Esp, 48);
+    }
+    ResumeThread(s_MainThread);
+}
+
+DWORD WINAPI TraceMainThreadLater(void*) {
+    Sleep(8'000);
+    TraceMainThread("after 8 seconds");
+    Sleep(22'000);
+    TraceMainThread("after 30 seconds");
+    return 0;
+}
+
 [[noreturn]] void LoaderFail(const std::string& msg) {
+    Trace("FAILED: " + msg);
     MessageBoxA(nullptr, msg.c_str(), "gta_reversed inverted loader", MB_ICONERROR | MB_OK);
     ExitProcess(1);
 }
@@ -214,8 +355,15 @@ int WINAPI OnGameWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLi
     // Might have been loaded already (if there's an ASI loader among the game's DLLs), that's fine
     HMODULE     asi{};
     std::string errors;
+    char        envPath[MAX_PATH]{};
+    if (const auto n = GetEnvironmentVariableA(ENV_ASI, envPath, sizeof(envPath)); n > 0 && n < sizeof(envPath)) {
+        Trace(std::format("`{}` is set, loading `{}`", ENV_ASI, envPath));
+        if ((asi = LoadLibraryA(envPath)) == nullptr) {
+            LoaderFail(std::format("Couldn't load `{}` (set in `{}`), error {}", envPath, ENV_ASI, GetLastError()));
+        }
+    }
     for (const auto path : ASI_CANDIDATES) {
-        if ((asi = LoadLibraryA(path)) != nullptr) {
+        if (asi || (asi = LoadLibraryA(path)) != nullptr) {
             break;
         }
         errors += std::format("\n  {} (error {})", path, GetLastError());
@@ -224,8 +372,16 @@ int WINAPI OnGameWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLi
         LoaderFail("Couldn't load `gta_reversed.asi`. Tried:" + errors);
     }
 
+    {
+        char path[MAX_PATH]{};
+        GetModuleFileNameA(asi, path, sizeof(path));
+        Trace(std::format("Loaded `{}` at 0x{:08X}, calling `WinMain`", path, reinterpret_cast<uintptr_t>(asi)));
+    }
+
     // `WinMain` is hooked by the ASI now, so this ends up in ours
-    return reinterpret_cast<int(WINAPI*)(HINSTANCE, HINSTANCE, LPSTR, int)>(GAME_WIN_MAIN)(instance, prevInstance, cmdLine, cmdShow);
+    const auto ret = reinterpret_cast<int(WINAPI*)(HINSTANCE, HINSTANCE, LPSTR, int)>(GAME_WIN_MAIN)(instance, prevInstance, cmdLine, cmdShow);
+    Trace(std::format("`WinMain` returned {}", ret));
+    return ret;
 }
 
 //! Redirect the game's `WinMain` to `OnGameWinMain`
@@ -242,18 +398,25 @@ void HookGameWinMain() {
 * Called by the launcher (on the main thread, right after this DLL was loaded). Never returns.
 */
 extern "C" __declspec(dllexport) void __cdecl NotsaInvertedLoaderRun() {
+    Trace("Inverted loader started");
+    AddVectoredExceptionHandler(1, &TraceExceptions);
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &s_MainThread, 0, FALSE, DUPLICATE_SAME_ACCESS);
+    CloseHandle(CreateThread(nullptr, 0, &TraceMainThreadLater, nullptr, 0, nullptr));
     {
         const auto file = FindOriginalExecutable();
         MapImage(file, *GetValidatedHeaders(file));
         VirtualFree(const_cast<uint8_t*>(file.data()), 0, MEM_RELEASE);
     }
+    Trace("Original executable mapped, resolving its imports (This loads the game's DLLs, and with them an ASI loader if there's one)");
     ResolveImports();
     HookGameWinMain();
     FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void*>(GAME_IMAGE_BASE), GAME_IMAGE_SIZE);
 
     // Run the original entry point: it initializes the game's C runtime, runs its static constructors,
     // and then calls `WinMain` (0x748710), which goes to `OnGameWinMain` (above)
+    Trace("Running the original entry point");
     reinterpret_cast<void(__cdecl*)()>(GAME_ENTRY_POINT)();
 
+    Trace("The original entry point returned");
     ExitProcess(0);
 }

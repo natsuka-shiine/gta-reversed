@@ -14,6 +14,9 @@ static constexpr auto DEFAULT_INI_FILENAME = "gta-reversed.ini";
 
 HMODULE s_HandleOfDLL{};
 
+//! Another build of this module was asked for (`GTA_REVERSED_ASI`): this one stays loaded, but does nothing
+static bool s_IsInert{};
+
 void LoadConfigurations() {
     // Firstly load the INI into the memory.
     g_ConfigurationMgr.Load(DEFAULT_INI_FILENAME);
@@ -24,10 +27,38 @@ void LoadConfigurations() {
     // ...
 }
 
+bool notsa::IsAnotherBuildWanted() {
+    // No C++ runtime here (strings, statics with constructors): this is used before it's up
+    char wanted[MAX_PATH]{}, self[MAX_PATH]{};
+    if (const auto n = GetEnvironmentVariableA("GTA_REVERSED_ASI", wanted, sizeof(wanted)); n == 0 || n >= sizeof(wanted)) {
+        return false;
+    }
+    HMODULE mod{};
+    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(&notsa::IsAnotherBuildWanted), &mod)) {
+        return false;
+    }
+    GetModuleFileNameA(mod, self, sizeof(self));
+    const auto FileNameOf = [](const char* path) {
+        const char* name = path;
+        for (const char* p = path; *p; p++) {
+            if (*p == '\\' || *p == '/') {
+                name = p + 1;
+            }
+        }
+        return name;
+    };
+    return _stricmp(FileNameOf(wanted), FileNameOf(self)) != 0;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
     switch (ul_reason_for_call) {
         case DLL_PROCESS_ATTACH: {
         s_HandleOfDLL = hModule;
+
+        if (notsa::IsAnotherBuildWanted()) {
+            s_IsInert = true;
+            return TRUE; // (Not `FALSE`: that runs our static destructors under the loader lock, and whoever loaded us might make a fuss too)
+        }
 
         // Fail if RenderWare has already been started
         if (*(RwCamera**)0xC1703C) {
@@ -55,6 +86,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         break;
     }
     case DLL_PROCESS_DETACH: {
+        if (s_IsInert) {
+            break;
+        }
         if (lpReserved == nullptr) {
             NOTSA_LOG_INFO("DLL_PROCESS_DETACH: Shutting down normally...");
 
