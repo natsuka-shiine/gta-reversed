@@ -98,6 +98,29 @@ void AbsStore(T& value) {
 }
 
 //
+// BIT OPS
+//
+
+// COMMAND_IS_GLOBAL_VAR_BIT_SET_CONST - 0x475244
+bool IsVarBitSetConst(int32 value, int32 bit) {
+    return ((uint32)(value) & (1u << (bit & 31))) != 0; // x86 `shl` only uses the low 5 bits of the count
+}
+
+// COMMAND_SET_GLOBAL_VAR_BIT_CONST - 0x475274
+void SetVarBitConst(int32& var, int32 bit) {
+    var = (int32)((uint32)(var) | (1u << (bit & 31)));
+}
+
+//
+// TIMER
+//
+
+// COMMAND_GET_GAME_TIMER - 0x47D69E
+uint32 GetGameTimer() {
+    return CTimer::m_snTimeInMilliseconds;
+}
+
+//
 // GOTO
 //
 auto GoTo(CRunningScript& S, int32 address) {
@@ -113,6 +136,56 @@ auto GoToIfFalse(CRunningScript& S, int32 goToAddress) {
 auto GoToSub(CRunningScript& S, int32 goToAddress) { // 0x050 
     S.m_IPStack[S.m_StackDepth++] = S.m_IP;
     S.UpdatePC(goToAddress);
+}
+
+//
+// SWITCH
+//
+
+/*!
+ * Common part of `SWITCH_START` and `SWITCH_CONTINUED` (0x4717C4):
+ * Reads `numParams` parameters (value + label pairs) of which only the ones still expected are added to the jump table.
+ * Once all the cases of the switch have been read the jump is done.
+ */
+void ReadSwitchCasesAndJump(CRunningScript& S, uint16 numParams) {
+    S.CollectParameters((int16)(numParams));
+
+    auto& numStillToRead = CTheScripts::NumberOfEntriesStillToReadForSwitch; // NOTE: Number of params (2 per case), not cases
+
+    const auto AddCases = [](uint32 n) {
+        for (uint32 i = 0; i < n; i += 2) {
+            CTheScripts::AddToSwitchJumpTable(ScriptParams[i].iParam, ScriptParams[i + 1].iParam);
+        }
+    };
+
+    if (numStillToRead > numParams) { // More cases follow in `SWITCH_CONTINUED` command(s)
+        AddCases(numParams);
+        numStillToRead -= numParams;
+        if (numStillToRead != 0) {
+            return;
+        }
+    } else {
+        AddCases(numStillToRead);
+        numStillToRead = 0;
+    }
+
+    int32 address;
+    CTheScripts::UseSwitchJumpTable(address);
+    S.UpdatePC(address);
+}
+
+// COMMAND_SWITCH_START - 0x47176C
+void SwitchStart(CRunningScript& S, int32 value, int32 numCases, int32 hasDefault, int32 defaultAddress) {
+    CTheScripts::ValueToCheckInSwitchStatement       = value;
+    CTheScripts::NumberOfEntriesStillToReadForSwitch = (uint16)(numCases * 2);
+    CTheScripts::SwitchDefaultExists                 = hasDefault != 0;
+    CTheScripts::SwitchDefaultAddress                = defaultAddress;
+    ReadSwitchCasesAndJump(S, 14); // 7 cases
+}
+
+// COMMAND_SWITCH_CONTINUED - 0x4717B6
+void SwitchContinued(CRunningScript& S) {
+    ReadSwitchCasesAndJump(S, 18); // 9 cases
 }
 
 //
@@ -277,6 +350,8 @@ void notsa::script::commands::basic::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_IS_INT_LVAR_EQUAL_TO_NUMBER, IsEqual<int32>);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_INT_VAR_EQUAL_TO_INT_VAR, IsEqual<int32>);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_INT_LVAR_EQUAL_TO_INT_LVAR, IsEqual<int32>);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_INT_VAR_EQUAL_TO_CONSTANT, IsEqual<int32>);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_INT_LVAR_EQUAL_TO_CONSTANT, IsEqual<int32>);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_FLOAT_VAR_EQUAL_TO_FLOAT_LVAR, IsEqual<float>);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_FLOAT_VAR_EQUAL_TO_NUMBER, IsEqual<float>);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_FLOAT_LVAR_EQUAL_TO_NUMBER, IsEqual<float>);
@@ -376,9 +451,16 @@ void notsa::script::commands::basic::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_ABS_VAR_FLOAT, AbsStore<float>);
     REGISTER_COMMAND_HANDLER(COMMAND_ABS_LVAR_FLOAT, AbsStore<float>);
 
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_GLOBAL_VAR_BIT_SET_CONST, IsVarBitSetConst);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_GLOBAL_VAR_BIT_CONST, SetVarBitConst);
+
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_GAME_TIMER, GetGameTimer);
+
     REGISTER_COMMAND_HANDLER(COMMAND_GOTO, GoTo);
     REGISTER_COMMAND_HANDLER(COMMAND_GOTO_IF_FALSE, GoToIfFalse);
     REGISTER_COMMAND_HANDLER(COMMAND_GOSUB,  GoToSub);
+    REGISTER_COMMAND_HANDLER(COMMAND_SWITCH_START, SwitchStart);
+    REGISTER_COMMAND_HANDLER(COMMAND_SWITCH_CONTINUED, SwitchContinued);
     REGISTER_COMMAND_HANDLER(COMMAND_RETURN_TRUE, ReturnTrue);
     REGISTER_COMMAND_HANDLER(COMMAND_RETURN_FALSE, ReturnFalse);
     REGISTER_COMMAND_HANDLER(COMMAND_RETURN, Return);

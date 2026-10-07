@@ -65,6 +65,31 @@ void PlayMissionAudio(uint32 slotId) {
     AudioEngine.PlayLoadedMissionAudio(slotId - 1);
 }
 
+// 0x4851C7
+bool HasMissionAudioLoaded(uint32 slotId) {
+    return AudioEngine.GetMissionAudioLoadingStatus(slotId - 1) == 1;
+}
+
+// 0x485228
+bool HasMissionAudioFinished(uint32 slotId) {
+    return AudioEngine.IsMissionAudioSampleFinished(slotId - 1);
+}
+
+// 0x4898CB
+void ClearMissionAudio(uint32 slotId) {
+    AudioEngine.ClearMissionAudio(slotId - 1);
+}
+
+// 0x478805
+void ReportMissionAudioEventAtPosition(CVector pos, int32 eventId) {
+    AudioEngine.ReportMissionAudioEvent(static_cast<uint16>(eventId), pos);
+}
+
+// 0x4806FB
+void LoadCutscene(const char* name) {
+    CCutsceneMgr::LoadCutsceneData(name);
+}
+
 void SetPhotoCameraEffect(bool enable) {
     CTheScripts::bDrawCrossHair = enable ? eCrossHairType::FIXED_DRAW_1STPERSON_WEAPON : eCrossHairType::NONE;
 }
@@ -95,6 +120,11 @@ void notsa::script::commands::script::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_REPORT_MISSION_AUDIO_EVENT_AT_CHAR, ReportMissionAudioEventAtChar);
     REGISTER_COMMAND_HANDLER(COMMAND_REPORT_MISSION_AUDIO_EVENT_AT_CAR, ReportMissionAudioEventAtCar);
     REGISTER_COMMAND_HANDLER(COMMAND_PLAY_MISSION_AUDIO, PlayMissionAudio);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_MISSION_AUDIO_LOADED, HasMissionAudioLoaded);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_MISSION_AUDIO_FINISHED, HasMissionAudioFinished);
+    REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_MISSION_AUDIO, ClearMissionAudio);
+    REGISTER_COMMAND_HANDLER(COMMAND_REPORT_MISSION_AUDIO_EVENT_AT_POSITION, ReportMissionAudioEventAtPosition);
+    REGISTER_COMMAND_HANDLER(COMMAND_LOAD_CUTSCENE, LoadCutscene);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PHOTO_CAMERA_EFFECT, SetPhotoCameraEffect);
     REGISTER_COMMAND_HANDLER(COMMAND_DRAW_ODDJOB_TITLE_BEFORE_FADE, DrawOddJobTitleBeforeFade);
     REGISTER_COMMAND_HANDLER(COMMAND_DRAW_SUBTITLES_BEFORE_FADE, DrawSubtitlesBeforeFade);

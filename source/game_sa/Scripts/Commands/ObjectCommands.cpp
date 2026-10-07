@@ -42,6 +42,31 @@ CObject& CreateObject(CRunningScript& S, script::Model model, CVector posn) {
     return *object;
 }
 
+/// CREATE_OBJECT_NO_OFFSET(029B)
+CObject& CreateObjectNoOffset(CRunningScript& S, script::Model model, CVector posn) {
+    const auto mi = CModelInfo::GetModelInfo(model);
+    mi->m_nAlpha  = 255u;
+
+    auto* object = CObject::Create(model, false);
+    object->m_nObjectType = (S.m_IsExternal || S.m_ScriptBrainType != -1) ? OBJECT_MISSION2 : OBJECT_MISSION;
+    CWorld::PutToGroundIfTooLow(posn);
+    object->SetPosn(posn);
+    object->SetOrientation(CVector{0.0f});
+    object->UpdateRwMatrix();
+    object->UpdateRwFrame();
+    if (mi->AsLodAtomicModelInfoPtr()) {
+        object->SetupBigBuilding();
+    }
+
+    CTheScripts::ClearSpaceForMissionEntity(posn, object);
+    CWorld::Add(object);
+
+    if (S.m_UsesMissionCleanup) {
+        CTheScripts::MissionCleanUp.AddEntityToList(*object);
+    }
+    return *object;
+}
+
 void RemoveObject(CRunningScript& S, CObject* object) {
     if (object) {
         CWorld::Remove(object);
@@ -80,6 +105,16 @@ void SetObjectCoordinates(CObject& object, CVector posn) {
 
 CVector GetObjectVelocity(CObject& object) {
     return object.GetMoveSpeed() * 50.0f;
+}
+
+/// PLACE_OBJECT_RELATIVE_TO_CAR(035C)
+void PlaceObjectRelativeToCar(CObject& object, CVehicle& vehicle, CVector offset) {
+    CPhysical::PlacePhysicalRelativeToOtherPhysical(&vehicle, &object, offset);
+}
+
+/// GET_OFFSET_FROM_OBJECT_IN_WORLD_COORDS(0400)
+CVector GetOffsetFromObjectInWorldCoords(CObject& object, CVector offset) {
+    return object.GetMatrix().TransformPoint(offset);
 }
 
 void SetObjectVelocity(CObject& object, CVector velocity) {
@@ -131,6 +166,53 @@ void LoadAllModelsNow() {
 
 bool IsModelAvailable(eModelID model) {
     return CModelInfo::GetModelInfo(model) != nullptr;
+}
+
+// 0x47EDA9
+void LoadSpecialCharacter(CRunningScript* S, int32 slot, std::string_view name) {
+    slot -= 1;
+
+    // The original reads the name into a buffer of 8 chars, and makes all of them lower case
+    char lowered[8 + 1]{};
+    name.copy(lowered, std::min<size_t>(name.size(), 8));
+    for (auto& c : lowered) {
+        if (c >= 'A' && c <= 'Z') {
+            c += 'a' - 'A';
+        }
+    }
+
+    CStreaming::RequestSpecialChar(slot, lowered, STREAMING_MISSION_REQUIRED | STREAMING_KEEP_IN_MEMORY);
+    CTheScripts::ScriptResourceManager.AddToResourceManager(slot + SPECIAL_MODELS_RESOURCE_ID, RESOURCE_TYPE_MODEL_OR_SPECIAL_CHAR, S);
+}
+
+// 0x47F40D
+void UnloadSpecialCharacter(CRunningScript* S, int32 slot) {
+    slot -= 1;
+    if (CTheScripts::ScriptResourceManager.RemoveFromResourceManager(slot + SPECIAL_MODELS_RESOURCE_ID, RESOURCE_TYPE_MODEL_OR_SPECIAL_CHAR, S)) {
+        CStreaming::SetMissionDoesntRequireSpecialChar(slot);
+    }
+}
+
+// 0x48C351
+void RequestAnimation(CRunningScript* S, const char* blockName) {
+    // The original doesn't check whether the block exists either
+    const auto blockIdx = CAnimManager::GetAnimationBlockIndex(blockName);
+    CStreaming::RequestModel(IFPToModelId(blockIdx), STREAMING_MISSION_REQUIRED);
+    CTheScripts::ScriptResourceManager.AddToResourceManager(blockIdx, RESOURCE_TYPE_ANIMATION, S);
+}
+
+// 0x48C391
+bool HasAnimationLoaded(const char* blockName) {
+    // The original doesn't check whether the block exists either
+    return CAnimManager::GetAnimationBlock(blockName)->IsLoaded;
+}
+
+// 0x48C3D5
+void RemoveAnimation(CRunningScript* S, const char* blockName) {
+    const auto blockIdx = CAnimManager::GetAnimationBlockIndex(blockName);
+    if (CTheScripts::ScriptResourceManager.RemoveFromResourceManager(blockIdx, RESOURCE_TYPE_ANIMATION, S)) {
+        CStreaming::SetMissionDoesntRequireAnim(blockIdx);
+    }
 }
 } // namespace Model
 
@@ -254,6 +336,7 @@ void notsa::script::commands::object::RegisterHandlers() {
     using namespace Animation;
 
     REGISTER_COMMAND_HANDLER(COMMAND_CREATE_OBJECT, CreateObject);
+    REGISTER_COMMAND_HANDLER(COMMAND_CREATE_OBJECT_NO_OFFSET, CreateObjectNoOffset);
     REGISTER_COMMAND_HANDLER(COMMAND_DELETE_OBJECT, RemoveObject);
     REGISTER_COMMAND_HANDLER(COMMAND_DOES_OBJECT_EXIST, DoesObjectExists);
     REGISTER_COMMAND_HANDLER(COMMAND_MARK_OBJECT_AS_NO_LONGER_NEEDED, MarkObjectNoLongerNeeded);
@@ -261,6 +344,8 @@ void notsa::script::commands::object::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_GET_OBJECT_COORDINATES, GetObjectCoordinates);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_OBJECT_COORDINATES, SetObjectCoordinates);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_OBJECT_VELOCITY, GetObjectVelocity);
+    REGISTER_COMMAND_HANDLER(COMMAND_PLACE_OBJECT_RELATIVE_TO_CAR, PlaceObjectRelativeToCar);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_OFFSET_FROM_OBJECT_IN_WORLD_COORDS, GetOffsetFromObjectInWorldCoords);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_OBJECT_VELOCITY, SetObjectVelocity);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_OBJECT_HEADING, GetObjectHeading);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_OBJECT_HEADING, SetObjectHeading);
@@ -273,6 +358,11 @@ void notsa::script::commands::object::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_MARK_MODEL_AS_NO_LONGER_NEEDED, MarkModelNotNeeded);
     REGISTER_COMMAND_HANDLER(COMMAND_LOAD_ALL_MODELS_NOW, LoadAllModelsNow);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_MODEL_AVAILABLE, IsModelAvailable);
+    REGISTER_COMMAND_HANDLER(COMMAND_LOAD_SPECIAL_CHARACTER, LoadSpecialCharacter);
+    REGISTER_COMMAND_HANDLER(COMMAND_UNLOAD_SPECIAL_CHARACTER, UnloadSpecialCharacter);
+    REGISTER_COMMAND_HANDLER(COMMAND_REQUEST_ANIMATION, RequestAnimation);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_ANIMATION_LOADED, HasAnimationLoaded);
+    REGISTER_COMMAND_HANDLER(COMMAND_REMOVE_ANIMATION, RemoveAnimation);
 
     REGISTER_COMMAND_HANDLER(COMMAND_ADD_SET_PIECE, CSetPieces::AddOne);
     REGISTER_COMMAND_HANDLER(COMMAND_DRAW_LIGHT, DrawLight);

@@ -4,6 +4,7 @@ namespace notsa {
 namespace script {
 namespace commands {
 namespace basic { void RegisterHandlers(); };
+namespace blip { void RegisterHandlers(); };
 namespace camera { void RegisterHandlers(); };
 namespace character { void RegisterHandlers(); };
 namespace clock { void RegisterHandlers(); };
@@ -17,6 +18,7 @@ namespace object { void RegisterHandlers(); };
 namespace pad { void RegisterHandlers(); };
 namespace path { void RegisterHandlers(); };
 namespace ped { void RegisterHandlers(); };
+namespace pickup { void RegisterHandlers(); };
 namespace player { void RegisterHandlers(); };
 namespace script { void RegisterHandlers(); };
 namespace sequence { void RegisterHandlers(); };

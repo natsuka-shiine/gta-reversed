@@ -102,6 +102,7 @@ void CRunningScript::InjectCustomCommandHooks() {
 
     namespace c = ::notsa::script::commands;
     c::basic::RegisterHandlers();
+    c::blip::RegisterHandlers();
     c::camera::RegisterHandlers();
     c::character::RegisterHandlers();
     c::clock::RegisterHandlers();
@@ -113,6 +114,7 @@ void CRunningScript::InjectCustomCommandHooks() {
     c::object::RegisterHandlers();
     c::pad::RegisterHandlers();
     c::ped::RegisterHandlers();
+    c::pickup::RegisterHandlers();
     c::player::RegisterHandlers();
     c::script::RegisterHandlers();
     c::sequence::RegisterHandlers();

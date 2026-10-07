@@ -14,6 +14,11 @@
 #include "Garages.h"
 #include "MenuSystem.h"
 #include "Shadows.h"
+#include "Game.h"
+#include "Streaming.h"
+#include "UserDisplay.h"
+#include "EntryExit.h"
+#include "EntryExitManager.h"
 
 /*!
 * Various game related commands
@@ -105,6 +110,42 @@ void DoWeaponStuffAtStartOf2PlayerGame() {
 void DisplayRadar(bool enable) {
     // izzotop: CTheScripts::HideAllFrontEndMapBlips = enable;
     CHud::bScriptDontDisplayRadar = !enable;
+}
+
+/// CLEAR_ONSCREEN_COUNTER(0151) - 0x47C2F1
+void ClearOnscreenCounter(CRunningScript& S) {
+    // The parameter isn't collected, it's the global variable itself that identifies the counter
+    CUserDisplay::OnscnTimer.ClearCounter(S.GetIndexOfGlobalVariable());
+}
+
+/// CLEAR_AREA(0395) - 0x4842EC
+void ClearArea(CVector pos, float radius, int32 clearParticles) {
+    if (pos.z <= MAP_Z_LOW_LIMIT) {
+        pos.z = CWorld::FindGroundZForCoord(pos.x, pos.y);
+    }
+    CWorld::ClearExcitingStuffFromArea(pos, radius, (uint8)clearParticles); // Original passes the low byte
+}
+
+/// SET_AREA_VISIBLE(04BB) - 0x48B98D
+void SetAreaVisible(eAreaCodes area) {
+    CGame::currArea = area;
+    CStreaming::RemoveBuildingsNotInArea(area);
+}
+
+/// SWITCH_ENTRY_EXIT(07FB) - 0x4730A8
+void SwitchEntryExit(const char* name, int32 state) {
+    // Inlined `CEntryExitManager::SetEnabledByName` (0x43F9B0) => `SetEntryExitFlag(name, 0x4000, enable)` (0x43EF20)
+    // NOTE: Doesn't stop at the first match
+    for (auto& enex : CEntryExitManager::GetPool()->GetAllValid()) {
+        if (!_strnicmp(enex.m_szName, name, std::size(enex.m_szName))) {
+            enex.bEnableAccess = state != 0;
+        }
+    }
+}
+
+/// DELETE_MENU(08DA) - 0x475693
+void DeleteScriptMenu(int32 menu) {
+    CMenuSystem::SwitchOffMenu((MenuId)menu); // Original takes the low byte
 }
 
 void RegisterBestPosition(uint8 stat, int32 position) {
@@ -212,6 +253,11 @@ void notsa::script::commands::game::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CURRENT_LANGUAGE, GetCurrentLanguage);
     REGISTER_COMMAND_HANDLER(COMMAND_DO_WEAPON_STUFF_AT_START_OF_2P_GAME, DoWeaponStuffAtStartOf2PlayerGame);
     REGISTER_COMMAND_HANDLER(COMMAND_DISPLAY_RADAR, DisplayRadar);
+    REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_ONSCREEN_COUNTER, ClearOnscreenCounter);
+    REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_AREA, ClearArea);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_AREA_VISIBLE, SetAreaVisible);
+    REGISTER_COMMAND_HANDLER(COMMAND_SWITCH_ENTRY_EXIT, SwitchEntryExit);
+    REGISTER_COMMAND_HANDLER(COMMAND_DELETE_MENU, DeleteScriptMenu);
     REGISTER_COMMAND_HANDLER(COMMAND_REGISTER_BEST_POSITION, RegisterBestPosition);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_EXPLOSION_IN_AREA, IsExplosionInArea);
     REGISTER_COMMAND_HANDLER(COMMAND_SHAKE_PAD, ShakePad);

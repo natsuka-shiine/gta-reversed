@@ -299,6 +299,11 @@ void AddNextMessageToPreviousBriefs(bool state) {
     CTheScripts::bAddNextMessageToPreviousBriefs = state;
 }
 
+/// IS_MESSAGE_BEING_DISPLAYED(076F) - 0x46B571
+bool IsMessageBeingDisplayed() {
+    return CMessages::BriefMessages[0].Text != nullptr;
+}
+
 /// DISPLAY_NON_MINIGAME_HELP_MESSAGES(0A44)
 void DisplayNonMiniGameHelpMessages(bool state) {
     CTheScripts::bDisplayNonMiniGameHelpMessages = state;
@@ -312,6 +317,7 @@ void notsa::script::commands::text::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_SMALL_PRINTS, ClearSmallPrints);
     REGISTER_COMMAND_HANDLER(COMMAND_PRINT_HELP, PrintHelp);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_HELP, ClearHelp);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_MESSAGE_BEING_DISPLAYED, IsMessageBeingDisplayed);
     REGISTER_COMMAND_HANDLER(COMMAND_FLASH_HUD_OBJECT, FlashHudObject);
     REGISTER_COMMAND_HANDLER(COMMAND_PRINT_BIG, PrintBig);
     REGISTER_COMMAND_HANDLER(COMMAND_PRINT, Print);

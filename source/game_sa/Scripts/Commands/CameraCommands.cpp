@@ -45,6 +45,25 @@ void DoCamFade(CRunningScript* S, uint32 time, eFadeFlag direction) {
     }
 }
 
+// SET_FADING_COLOUR (0169) - 0x47C78C
+void SetFadingColour(int32 r, int32 g, int32 b) {
+    TheCamera.SetFadeColour((uint8)r, (uint8)g, (uint8)b); // Original takes the low byte of each
+}
+
+// GET_FADING_STATUS (016B) - 0x47C831
+bool GetFadingStatus() {
+    return TheCamera.GetFading();
+}
+
+// SWITCH_WIDESCREEN (02A3) - 0x47F684
+void SwitchWidescreen(int32 state) {
+    if (state) {
+        TheCamera.SetWideScreenOn();
+    } else {
+        TheCamera.SetWideScreenOff();
+    }
+}
+
 
 // POINT_CAMERA_AT_CAR - 0x47C3FD
 void PointCameraAtCar(CVehicle* car, eCamMode mode, eSwitchType switchType) {
@@ -313,6 +332,9 @@ void notsa::script::commands::camera::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_ATTACH_CAMERA_TO_VEHICLE_LOOK_AT_VEHICLE, AttachCameraToVehicleLookAtVehicle);
     REGISTER_COMMAND_HANDLER(COMMAND_DO_CAMERA_BUMP, DoCameraBump);
     REGISTER_COMMAND_HANDLER(COMMAND_DO_FADE, DoCamFade);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_FADING_COLOUR, SetFadingColour);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_FADING_STATUS, GetFadingStatus);
+    REGISTER_COMMAND_HANDLER(COMMAND_SWITCH_WIDESCREEN, SwitchWidescreen);
 
     REGISTER_COMMAND_HANDLER(COMMAND_POINT_CAMERA_AT_CAR, PointCameraAtCar);
     REGISTER_COMMAND_HANDLER(COMMAND_POINT_CAMERA_AT_CHAR, PointCameraAtChar);

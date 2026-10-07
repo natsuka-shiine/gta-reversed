@@ -19,12 +19,27 @@
 #include <TaskTypes/TaskComplexEnterCarAsDriver.h>
 #include <TaskTypes/TaskComplexEnterCarAsPassenger.h>
 #include <TaskTypes/TaskSimpleCarSetPedOut.h>
+#include <TaskTypes/TaskComplexFacial.h>
+#include <TaskTypes/TaskSimplePause.h>
+#include <TaskTypes/TaskSimpleDuckToggle.h>
+#include <TaskTypes/TaskSimpleAchieveHeading.h>
+#include <TaskTypes/TaskSimpleSetStayInSamePlace.h>
+#include <TaskTypes/TaskSimpleRunNamedAnim.h>
+#include <TaskTypes/TaskComplexGoToPointAndStandStill.h>
+#include <TaskTypes/TaskComplexGoToPointAndStandStillTimed.h>
+#include <TaskTypes/TaskComplexFollowNodeRoute.h>
+#include <TaskTypes/TaskComplexDriveToPoint.h>
+#include <TaskTypes/TaskComplexLeaveAnyCar.h>
+#include <TaskTypes/TaskSimpleGangDriveBy.h>
+#include <TaskTypes/TaskSimpleClearLookAt.h>
+#include <Ragdoll/IKChainManager.h>
 
 #include <Attractors/PedAttractorPedPlacer.h>
 
 #include "DecisionMakers/DecisionMakerTypesFileLoader.h"
 
 #include <FireManager.h>
+#include <PedType.h>
 #include <World.h>
 #include <EntryExitManager.h>
 #include <TimeCycle.h>
@@ -1548,6 +1563,28 @@ auto SetCharAmmo(CPed& ped, eWeaponType wep, int32 nammo) {
 }
 
 /*
+ * @opcode 06AB
+ * @command HIDE_CHAR_WEAPON_FOR_SCRIPTED_CUTSCENE
+ * @class Char
+ * @method HideWeaponForScriptedCutscene
+ *
+ * @brief Hides all of the specified char's weapons
+ *
+ * @param {Char} self
+ * @param {bool} state
+ */
+auto HideCharWeaponForScriptedCutscene(CPed& ped, bool hide) {
+    if (hide) {
+        ped.ReplaceWeaponForScriptedCutscene(); // 0x5E6530
+    } else {
+        ped.RemoveWeaponForScriptedCutscene(); // 0x5E6550
+        if (ped.bInVehicle) {
+            ped.RemoveWeaponWhenEnteringVehicle(0);
+        }
+    }
+}
+
+/*
  * @opcode 0184
  * @command IS_CHAR_HEALTH_GREATER
  * @class Char
@@ -1626,6 +1663,21 @@ auto SetCharHealth(CPed& ped, float health) {
             }
         );
     }
+}
+
+/*
+ * @opcode 08AF
+ * @command SET_CHAR_MAX_HEALTH
+ * @class Char
+ * @method SetMaxHealth
+ *
+ * @brief Sets the characters max health
+ *
+ * @param {Char} self
+ * @param {int} maxHealth
+ */
+auto SetCharMaxHealth(CPed& ped, int32 maxHealth) {
+    ped.m_fMaxHealth = (float)(maxHealth);
 }
 
 /*
@@ -1938,7 +1990,8 @@ auto SetCharVisible(CPed& ped, bool isVisible) {
  * 
  * @param {Char} self
  */
-auto RemoveCharElegantly(CRunningScript& S, CPed* ped) {
+auto RemoveCharElegantly(CRunningScript& S, int32 handle) {
+    const auto ped = GetPedPool()->GetAtRef(handle); // This might be null, but the handle has to be removed from the list even then
     if (ped && ped->IsCreatedBy(PED_MISSION)) {
         if (ped->IsInVehicle()) {
             CTheScripts::RemoveThisPed(ped);
@@ -1955,7 +2008,7 @@ auto RemoveCharElegantly(CRunningScript& S, CPed* ped) {
         }
     }
     if (S.m_UsesMissionCleanup) {
-        CTheScripts::MissionCleanUp.RemoveEntityFromList(*ped);
+        CTheScripts::MissionCleanUp.RemoveEntityFromList(handle, MISSION_CLEANUP_ENTITY_TYPE_PED);
     }
 }
 
@@ -2702,6 +2755,21 @@ auto SetCharAccuracy(CPed& ped, uint8 accuracy) {
     ped.m_nWeaponAccuracy = accuracy;
 }
 
+/*
+ * @opcode 07DD
+ * @command SET_CHAR_SHOOT_RATE
+ * @class Char
+ * @method SetShootRate
+ *
+ * @brief Sets the attack rate of the char
+ *
+ * @param {Char} self
+ * @param {int} rate
+ */
+auto SetCharShootRate(CPed& ped, int32 rate) {
+    ped.m_nWeaponShootingRate = (uint8)(rate);
+}
+
 void DoSetPedIsWaitingForCollision(CRunningScript& S, CPed& ped) {
     if (S.m_UsesMissionCleanup) {
         CWorld::Remove(&ped);
@@ -2772,6 +2840,144 @@ auto TaskKillCharOnFoot(CRunningScript& S, eScriptCommands opcode, CPed& ped, CP
 }
 
 /*
+ * @opcode 05D1
+ * @command TASK_CAR_DRIVE_TO_COORD
+ * @class Task
+ * @method CarDriveToCoord
+ * @static
+ *
+ * @brief Makes the character drive a vehicle to the specified coordinates
+ *
+ * @param {Char} driver
+ * @param {Car} vehicle
+ * @param {Vector} pos
+ * @param {float} speed
+ * @param {int} driveStyle
+ * @param {int} modelId
+ * @param {int} drivingStyle
+ */
+auto TaskCarDriveToCoord(eScriptCommands command, CRunningScript& S, int32 pedHandle, CVehicle* vehicle, CVector pos, float speed, int32 mode, int32 modelId, eCarDrivingStyle drivingStyle) {
+    if (pos.z <= MAP_Z_LOW_LIMIT) {
+        pos.z = CWorld::FindGroundZForCoord(pos.x, pos.y);
+    }
+    switch (modelId) { // Not a regular model argument: no lookup in `UsedObjectArray`
+    case 0: modelId = MODEL_INVALID; break;
+    case 1: modelId = MODEL_CHEETAH; break;
+    }
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskComplexDriveToPoint{ vehicle, pos, speed, mode, (eModelID)(modelId), -1.f, drivingStyle },
+        command
+    );
+}
+
+/*
+ * @opcode 05D3
+ * @command TASK_GO_STRAIGHT_TO_COORD
+ * @class Task
+ * @method GoStraightToCoord
+ * @static
+ *
+ * @brief Makes the character walk to the specified coordinates
+ *
+ * @param {Char} handle
+ * @param {Vector} pos
+ * @param {MoveState} speed
+ * @param {int} time
+ */
+auto TaskGoStraightToCoord(eScriptCommands command, CRunningScript& S, int32 pedHandle, CVector pos, eMoveState moveState, int32 time) {
+    const auto targetRadius = 0.5f, slowDownDist = 2.f; // 0x86FC84, 0x86FC88
+    CTask* task;
+    if (time == -2) { // Not timed
+        task = new CTaskComplexGoToPointAndStandStill{ moveState, pos, targetRadius, slowDownDist, false, true };
+    } else {
+        task = new CTaskComplexGoToPointAndStandStillTimed{ moveState, pos, targetRadius, slowDownDist, time == -1 ? 20'000 : time }; // 0x86FC8C
+    }
+    S.GivePedScriptedTask(pedHandle, task, command);
+}
+
+/*
+ * @opcode 05F5
+ * @command TASK_FOLLOW_PATH_NODES_TO_COORD
+ * @class Task
+ * @method FollowPathNodesToCoord
+ * @static
+ *
+ * @brief Makes the character go to the specified coordinates using the path nodes
+ *
+ * @param {Char} handle
+ * @param {Vector} pos
+ * @param {MoveState} speed
+ * @param {int} time
+ */
+auto TaskFollowPathNodesToCoord(eScriptCommands command, CRunningScript& S, int32 pedHandle, CVector pos, eMoveState moveState, int32 time) {
+    switch (time) {
+    case -1: time = 50'000; break; // 0x86FCAC
+    case -2: time = -1;     break;
+    }
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskComplexFollowNodeRoute{ moveState, pos, 0.5f, 3.f, 2.f, true, time, true }, // 0x86FCA0, 0x86FCA4, 0x86FCA8
+        command
+    );
+}
+
+/*
+ * @opcode 0633
+ * @command TASK_LEAVE_ANY_CAR
+ * @class Task
+ * @method LeaveAnyCar
+ * @static
+ *
+ * @brief Makes the char exit the car, if he is in one
+ *
+ * @param {Char} handle
+ */
+auto TaskLeaveAnyCar(eScriptCommands command, CRunningScript& S, int32 pedHandle) {
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskComplexLeaveAnyCar{ 0, true, false },
+        command
+    );
+}
+
+/*
+ * @opcode 0713
+ * @command TASK_DRIVE_BY
+ * @class Task
+ * @method DriveBy
+ * @static
+ *
+ * @brief Makes the character shoot from the vehicle it's in at a character, a vehicle or a position
+ *
+ * @param {Char} handle
+ * @param {Char} targetChar
+ * @param {Car} targetVehicle
+ * @param {Vector} pos
+ * @param {float} radius
+ * @param {DriveByType} type
+ * @param {bool} rightHandCarSeat
+ * @param {int} fireRate
+ */
+auto TaskDriveBy(eScriptCommands command, CRunningScript& S, int32 pedHandle, int32 targetPedHandle, int32 targetVehicleHandle, CVector pos, float abortRange, int32 drivebyStyle, bool seatRHS, int32 frequencyPercentage) {
+    const auto targetPed = targetPedHandle >= 0
+        ? GetPedPool()->GetAtRef(targetPedHandle)
+        : nullptr;
+    const auto target = targetVehicleHandle >= 0 // The vehicle takes precedence over the ped
+        ? static_cast<CEntity*>(GetVehiclePool()->GetAtRef(targetVehicleHandle))
+        : static_cast<CEntity*>(targetPed);
+    if (pedHandle != -1) { // Nothing to do if the ped is already doing a drive-by on the target ped
+        const auto primary = GetPedPool()->GetAtRef(pedHandle)->GetTaskManager().GetTaskPrimary(TASK_PRIMARY_PRIMARY);
+        if (primary && primary->GetTaskType() == TASK_SIMPLE_GANG_DRIVEBY && static_cast<CTaskSimpleGangDriveBy*>(primary)->m_pTargetEntity == targetPed) {
+            return;
+        }
+    }
+    const auto task = new CTaskSimpleGangDriveBy{ target, &pos, abortRange, (int8)(frequencyPercentage), (eDrivebyStyle)(drivebyStyle), seatRHS };
+    task->m_bFromScriptCommand = true;
+    S.GivePedScriptedTask(pedHandle, task, command);
+}
+
+/*
  * @opcode 0602
  * @command IS_CHAR_IN_TAXI
  * @class Char
@@ -2835,6 +3041,35 @@ auto SetCharDecisionMaker(CPed& ped, int32 scriptHandleOfDM) { // TODO: Use `Scr
 }
 
 /*
+ * @opcode 0709
+ * @command ADD_CHAR_DECISION_MAKER_EVENT_RESPONSE
+ * @class DecisionMakerChar
+ * @method AddEventResponse
+ *
+ * @brief Sets which action should occur according to the event on the following parameters
+ *
+ * @param {DecisionMakerChar} self
+ * @param {Event} event
+ * @param {TaskId} taskId
+ * @param {float} respect
+ * @param {float} hate
+ * @param {float} like
+ * @param {float} dislike
+ * @param {bool} inCar
+ * @param {bool} onFoot
+ */
+auto AddCharDecisionMakerEventResponse(int32 scriptHandleOfDM, eEventType event, eTaskType taskId, float respect, float hate, float like, float dislike, int32 inCar, int32 onFoot) { // TODO: Use `ScriptThing<CDecisionMaker>` instead of `int32` for `scriptHandleOfDM`
+    const auto dm = CTheScripts::GetActualScriptThingIndex(scriptHandleOfDM, SCRIPT_THING_DECISION_MAKER);
+    if (dm < 0 || dm >= (int32)(CDecisionMakerTypes::NUM_TYPES)) {
+        return;
+    }
+    // The original passes them on in this (different from the script's) order
+    float responseChances[]{ dislike, like, respect, hate };
+    int32 flags[]{ onFoot, inCar };
+    CDecisionMakerTypes::GetInstance()->AddEventResponse(dm, event, taskId, responseChances, flags);
+}
+
+/*
  * @opcode 0611
  * @command IS_CHAR_PLAYING_ANIM
  * @class Char
@@ -2847,6 +3082,84 @@ auto SetCharDecisionMaker(CPed& ped, int32 scriptHandleOfDM) { // TODO: Use `Scr
  */
 auto IsCharPlayingAnim(CPed& ped, const char* animName) {
     return RpAnimBlendClumpGetAssociation(ped.GetRpClump(), animName) != nullptr;
+}
+
+//! The part of `CRunningScript::PlayAnimScriptCommand` (0x470150) for `TASK_PLAY_ANIM` and `TASK_PLAY_ANIM_NON_INTERRUPTABLE`
+void GivePedScriptedPlayAnimTask(CRunningScript& S, eScriptCommands command, int32 pedHandle, const char* animName, const char* animBlockName, float blendDelta, bool loop, bool lockX, bool lockY, bool keepLastFrame, int32 time, bool bDontInterrupt) {
+    uint32 flags = ANIMATION_IS_PARTIAL;
+    if (loop || (time > 0 && !keepLastFrame)) {
+        flags |= ANIMATION_IS_LOOPED;
+    }
+    if (lockX) {
+        flags |= ANIMATION_CAN_EXTRACT_VELOCITY;
+    }
+    if (lockY) {
+        flags |= ANIMATION_CAN_EXTRACT_X_VELOCITY;
+    }
+    if (!keepLastFrame) {
+        flags |= ANIMATION_IS_FINISH_AUTO_REMOVE;
+    }
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskSimpleRunNamedAnim{
+            animName,
+            animBlockName,
+            flags,
+            blendDelta,
+            (uint32)(time > 0 ? time : -1),
+            bDontInterrupt,
+            CTaskSequences::ms_iActiveSequence >= 0,
+            false,
+            false
+        },
+        command
+    );
+}
+
+/*
+ * @opcode 0605
+ * @command TASK_PLAY_ANIM
+ * @class Task
+ * @method PlayAnim
+ * @static
+ *
+ * @brief Makes the character perform an animation
+ *
+ * @param {Char} handle
+ * @param {string} animationName
+ * @param {string} animationFile
+ * @param {float} blendSpeed
+ * @param {bool} loop
+ * @param {bool} lockX
+ * @param {bool} lockY
+ * @param {bool} keepLastFrame
+ * @param {int} time
+ */
+auto TaskPlayAnim(eScriptCommands command, CRunningScript& S, int32 pedHandle, const char* animName, const char* animBlockName, float blendDelta, bool loop, bool lockX, bool lockY, bool keepLastFrame, int32 time) {
+    GivePedScriptedPlayAnimTask(S, command, pedHandle, animName, animBlockName, blendDelta, loop, lockX, lockY, keepLastFrame, time, false);
+}
+
+/*
+ * @opcode 0812
+ * @command TASK_PLAY_ANIM_NON_INTERRUPTABLE
+ * @class Task
+ * @method PlayAnimNonInterruptable
+ * @static
+ *
+ * @brief Makes the character perform an animation like TASK_PLAY_ANIM, except it will not be disturbed by any events
+ *
+ * @param {Char} handle
+ * @param {string} animationName
+ * @param {string} animationFile
+ * @param {float} blendSpeed
+ * @param {bool} loop
+ * @param {bool} lockX
+ * @param {bool} lockY
+ * @param {bool} keepLastFrame
+ * @param {int} time
+ */
+auto TaskPlayAnimNonInterruptable(eScriptCommands command, CRunningScript& S, int32 pedHandle, const char* animName, const char* animBlockName, float blendDelta, bool loop, bool lockX, bool lockY, bool keepLastFrame, int32 time) {
+    GivePedScriptedPlayAnimTask(S, command, pedHandle, animName, animBlockName, blendDelta, loop, lockX, lockY, keepLastFrame, time, true);
 }
 
 /*
@@ -2924,6 +3237,37 @@ auto GetCharAnimTotalTime(CPed& ped, const char* animName) {
         return anim->m_BlendHier->m_fTotalTime * 1000.f;
     }
     return 0.f;
+}
+
+/*
+ * @opcode 0967
+ * @command START_CHAR_FACIAL_TALK
+ * @class Char
+ * @method StartFacialTalk
+ *
+ * @brief Makes a character move their mouth as if they were talking
+ *
+ * @param {Char} self
+ * @param {int} duration
+ */
+auto StartCharFacialTalk(CPed& ped, int32 duration) {
+    // 0x478221 - The original doesn't check whether the task exists either
+    ped.GetTaskManager().GetTaskSecondaryFacial()->SetRequest(eFacialExpression::TALKING, duration, eFacialExpression::NONE, 0);
+}
+
+/*
+ * @opcode 0968
+ * @command STOP_CHAR_FACIAL_TALK
+ * @class Char
+ * @method StopFacialTalk
+ *
+ * @brief Stops the character moving their mouth as if they were talking
+ *
+ * @param {Char} self
+ */
+auto StopCharFacialTalk(CPed& ped) {
+    // 0x478266 - The original doesn't check whether the task exists either
+    ped.GetTaskManager().GetTaskSecondaryFacial()->StopAll();
 }
 
 /*
@@ -3019,6 +3363,86 @@ auto TaskTurnCharToFaceChar(eScriptCommands command, CRunningScript& S, int32 pe
         new CTaskComplexTurnToFaceEntityOrCoord{ &target },
         command
     );
+}
+
+/*
+ * @opcode 05B9
+ * @command TASK_PAUSE
+ * @class Task
+ * @method Pause
+ * @static
+ * 
+ * @brief Makes the character pause for the specified amount of time
+ * 
+ * @param {Char} handle
+ * @param {int} time
+ */
+auto TaskPause(eScriptCommands command, CRunningScript& S, int32 pedHandle, int32 time) { // 0x48FB0E
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskSimplePause{ time },
+        command
+    );
+}
+
+/*
+ * @opcode 04EB
+ * @command TASK_TOGGLE_DUCK
+ * @class Task
+ * @method ToggleDuck
+ * @static
+ * 
+ * @brief Makes the character crouch
+ * 
+ * @param {Char} handle
+ * @param {bool} state
+ */
+auto TaskToggleDuck(eScriptCommands command, CRunningScript& S, int32 pedHandle, int32 mode) { // 0x48C2F8
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskSimpleDuckToggle{ (CTaskSimpleDuckToggle::eMode)(mode) }, // The value is passed on as it is (Not as a bool)
+        command
+    );
+}
+
+/*
+ * @opcode 05D4
+ * @command TASK_ACHIEVE_HEADING
+ * @class Task
+ * @method AchieveHeading
+ * @static
+ * 
+ * @brief Rotates a character to the specified angle
+ * 
+ * @param {Char} handle
+ * @param {float} heading
+ */
+auto TaskAchieveHeading(eScriptCommands command, CRunningScript& S, int32 pedHandle, float headingDeg) { // 0x49090B
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskSimpleAchieveHeading{ DegreesToRadians(headingDeg), 0.5f, 0.2f },
+        command
+    );
+}
+
+/*
+ * @opcode 0638
+ * @command TASK_STAY_IN_SAME_PLACE
+ * @class Task
+ * @method StayInSamePlace
+ * @static
+ * 
+ * @brief Makes the character stay in the same place
+ * 
+ * @param {Char} handle
+ * @param {bool} state
+ */
+auto TaskStayInSamePlace(int32 pedHandle, int32 state) { // 0x492975
+    if (pedHandle == -1) {
+        CTaskSequences::AddTaskToActiveSequence(new CTaskSimpleSetStayInSamePlace{ state != 0 });
+    } else { // Not given as a task, the flag is set right away
+        CTaskSimpleSetStayInSamePlace{ state != 0 }.ProcessPed(GetPedPool()->GetAtRef(pedHandle));
+    }
 }
 
 /*
@@ -3490,6 +3914,39 @@ CVehicle* StoreCarCharIsAttachedToNoSave(CPed& ped) {
 }
 
 /*
+ * @opcode 077A
+ * @command SET_CHAR_RELATIONSHIP
+ * @class Char
+ * @method SetRelationship
+ *
+ * @brief Sets the attitude of the character towards peds of the specified pedtype
+ *
+ * @param {Char} self
+ * @param {RelationshipType} relationshipType
+ * @param {PedType} pedType
+ */
+void SetCharRelationship(CPed& ped, AcquaintanceId relationshipType, ePedType pedType) {
+    ped.GetAcquaintance().SetAsAcquaintance(relationshipType, CPedType::GetPedFlag(pedType));
+}
+
+/*
+ * @opcode 0746
+ * @command SET_RELATIONSHIP
+ * @class Char
+ * @method SetRelationship
+ * @static
+ *
+ * @brief Sets the attitude of peds with one pedtype towards peds of another pedtype
+ *
+ * @param {RelationshipType} relationshipType
+ * @param {PedType} ofPedType
+ * @param {PedType} toPedType
+ */
+void SetRelationship(AcquaintanceId relationshipType, ePedType ofPedType, ePedType toPedType) {
+    CPedType::SetPedTypeAsAcquaintance(relationshipType, ofPedType, CPedType::GetPedFlag(toPedType));
+}
+
+/*
  * @opcode 0792
  * @command CLEAR_CHAR_TASKS_IMMEDIATELY
  * @class Char
@@ -3501,6 +3958,20 @@ CVehicle* StoreCarCharIsAttachedToNoSave(CPed& ped) {
  */
 void ClearCharTasksImmediately(CPed& ped) {
     ped.GetIntelligence()->FlushImmediately(true);
+}
+
+/*
+ * @opcode 0687
+ * @command CLEAR_CHAR_TASKS
+ * @class Char
+ * @method ClearTasks
+ * 
+ * @brief Clears the char's task, making them quit whatever they were doing
+ * 
+ * @param {Char} self
+ */
+void ClearCharTasks(CPed& ped) { // 0x49575F
+    ped.GetIntelligence()->ClearTasks(true, true);
 }
 
 /*
@@ -3534,9 +4005,22 @@ void ClearCharTasksImmediately(CPed& ped) {
  * 
  * @returns {Char} handle
  */
-//auto CreateChar(ePedType pedType, eModelID modelId, CVector& ) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+CPed& CreateChar(CRunningScript& S, ePedType pedType, eModelID pedModel, CVector pos) {
+    const auto ped = &CreatePed(S, pedType, pedModel);
+    ped->GetTaskManager().SetTask(new CTaskSimpleStandStill{ 999'999, true, false, 8.f }, TASK_PRIMARY_DEFAULT);
+    if (pos.z <= -100.f) {
+        pos.z = CWorld::FindGroundZForCoord(pos.x, pos.y);
+    }
+    pos.z += 1.f;
+    ped->SetPosn(pos);
+    ped->SetOrientation(0.f, 0.f, 0.f);
+    CTheScripts::ClearSpaceForMissionEntity(pos, ped);
+    if (S.m_UsesMissionCleanup) {
+        ped->m_bIsStaticWaitingForCollision = true;
+    }
+    CWorld::Add(ped);
+    return *ped;
+}
 
 /*
  * @opcode 01B2
@@ -3550,9 +4034,17 @@ void ClearCharTasksImmediately(CPed& ped) {
  * @param {WeaponType} weaponType
  * @param {int} ammo
  */
-//void GiveWeaponToChar(CPed& self, eWeaponType weaponType, int32 ammo) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+void GiveWeaponToChar(CPed& ped, eWeaponType weaponType, int32 ammo) {
+    const auto slot = ped.GiveWeapon(weaponType, (uint32)(ammo), true);
+    if (ped.IsPlayer()) {
+        ped.GetPlayerData()->m_nChosenWeapon = (uint8)(slot);
+        return;
+    }
+    ped.SetCurrentWeapon((int32)(slot));
+    if (ped.IsInVehicle()) {
+        ped.RemoveWeaponModel(CWeaponInfo::GetWeaponInfo(ped.GetActiveWeapon().m_Type, eWeaponSkill::STD)->m_nModelId1);
+    }
+}
 
 /*
  * @opcode 01C8
@@ -3569,9 +4061,18 @@ void ClearCharTasksImmediately(CPed& ped) {
  * 
  * @returns {Char} handle
  */
-//auto CreateCharAsPassenger(CVehicle& vehicle, ePedType pedType, eModelID modelId, eSeatId seat) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+CPed& CreateCharAsPassenger(CRunningScript& S, CVehicle& veh, ePedType pedType, eModelID pedModel, int32 seat) {
+    const auto ped = &CreatePed(S, pedType, pedModel);
+    if (veh.vehicleFlags.bIsBus) {
+        ped->bRenderPedInCar = false;
+    }
+    const auto door = seat >= 0
+        ? CCarEnterExit::ComputeTargetDoorToEnterAsPassenger(&veh, seat)
+        : 0;
+    CTaskSimpleCarSetPedInAsPassenger{ &veh, (eTargetDoor)(door), true, nullptr }.ProcessPed(ped);
+    CWorld::Add(ped);
+    return *ped;
+}
 
 /*
  * @opcode 062E
@@ -3586,9 +4087,12 @@ void ClearCharTasksImmediately(CPed& ped) {
  * 
  * @returns {TaskStatus} status
  */
-//auto GetScriptTaskStatus(CPed& self, eTaskCommand task) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+auto GetScriptTaskStatus(CPed* ped, int32 taskCommand) -> int32 { // 0x49220A
+    const auto status = CPedScriptedTaskRecord::GetStatus(ped, taskCommand);
+    return status == eScriptedTaskStatus::NONE
+        ? 7 // No record of this task for the ped => "finished"
+        : (int32)(status);
+}
 
 /*
  * @opcode 07CB
@@ -3754,9 +4258,12 @@ void ClearCharTasksImmediately(CPed& ped) {
  * 
  * @param {Char} self
  */
-//void DeleteChar(CPed& self) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+void DeleteChar(CRunningScript& S, int32 handle) {
+    CTheScripts::RemoveThisPed(GetPedPool()->GetAtRef(handle)); // The ped might not exist anymore, but the handle still has to be removed from the list
+    if (S.m_UsesMissionCleanup) {
+        CTheScripts::MissionCleanUp.RemoveEntityFromList(handle, MISSION_CLEANUP_ENTITY_TYPE_PED);
+    }
+}
 
 /*
  * @opcode 06EE
@@ -3769,9 +4276,13 @@ void ClearCharTasksImmediately(CPed& ped) {
  * @param {Char} self
  * @param {Group} handle
  */
-//bool IsGroupMember(CPed& self, CGroup& handle) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+bool IsGroupMember(CPed* ped, int32 groupHandle) { // TODO: Use `ScriptThing<CPedGroup>` instead of `int32` for `groupHandle`
+    const auto groupId = CTheScripts::GetActualScriptThingIndex(groupHandle, SCRIPT_THING_PED_GROUP);
+    if (groupId < 0 || groupId >= (int32)(CPedGroups::ms_groups.size()) || !CPedGroups::ms_activeGroups[groupId]) {
+        return false;
+    }
+    return CPedGroups::ms_groups[groupId].GetMembership().IsMember(ped);
+}
 
 /*
  * @opcode 0646
@@ -3816,21 +4327,6 @@ void ClearCharTasksImmediately(CPed& ped) {
  * @param {AnimGroup} animGroup
  */
 //void SetAnimGroupForChar(CPed& self, eAnimGroup animGroup) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
-
-/*
- * @opcode 0618
- * @command PERFORM_SEQUENCE_TASK
- * @class Char
- * @method PerformSequence
- * 
- * @brief Assigns the character to the specified action sequence
- * 
- * @param {Char} self
- * @param {Sequence} sequence
- */
-//void PerformSequenceTask(CPed& self, CSequence& sequence) {
     //NOTSA_UNREACHABLE("Not implemented");
 //}
 
@@ -4062,9 +4558,47 @@ void ClearCharTasksImmediately(CPed& ped) {
  * 
  * @param {Char} self
  */
-//void ClearLookAt(CPed& self) {
-    //NOTSA_UNREACHABLE("Not implemented");
-//}
+auto ClearLookAt(int32 pedHandle) {
+    if (pedHandle != -1) {
+        const auto ped = GetPedPool()->GetAtRef(pedHandle);
+        if (g_ikChainMan.IsLooking(ped)) {
+            g_ikChainMan.AbortLookAt(ped, 500);
+        }
+    } else {
+        CTaskSequences::AddTaskToActiveSequence(new CTaskSimpleClearLookAt{});
+    }
+}
+
+//! The route built by `EXTEND_ROUTE`, for the commands that take a point route
+auto& s_ScriptPointRoute = StaticRef<CPointRoute, 0xC18D50>();
+
+/*
+ * @opcode 05D6
+ * @command FLUSH_ROUTE
+ * @class Task
+ * @method FlushRoute
+ * @static
+ *
+ * @brief Flushes the task route
+ */
+auto FlushRoute() {
+    s_ScriptPointRoute.Clear();
+}
+
+/*
+ * @opcode 05D7
+ * @command EXTEND_ROUTE
+ * @class Task
+ * @method ExtendRoute
+ * @static
+ *
+ * @brief Adds a point to the task route
+ *
+ * @param {Vector} pos
+ */
+auto ExtendRoute(CVector pos) {
+    s_ScriptPointRoute.AddUnlessFull(pos);
+}
 }; // namespace
 
 void notsa::script::commands::character::RegisterHandlers() {
@@ -4072,32 +4606,33 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_ADD_AMMO_TO_CHAR, AddAmmoToChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_ADD_ARMOUR_TO_CHAR, AddArmourToChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_ARE_ANY_CHARS_NEAR_CHAR, AreAnyCharsNearChar);
-    //REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_LOOK_AT, ClearLookAt);
-    //REGISTER_COMMAND_HANDLER(COMMAND_CREATE_CHAR, CreateChar);
-    //REGISTER_COMMAND_HANDLER(COMMAND_CREATE_CHAR_AS_PASSENGER, CreateCharAsPassenger);
+    REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_LOOK_AT, ClearLookAt);
+    REGISTER_COMMAND_HANDLER(COMMAND_FLUSH_ROUTE, FlushRoute);
+    REGISTER_COMMAND_HANDLER(COMMAND_EXTEND_ROUTE, ExtendRoute);
+    REGISTER_COMMAND_HANDLER(COMMAND_CREATE_CHAR, CreateChar);
+    REGISTER_COMMAND_HANDLER(COMMAND_CREATE_CHAR_AS_PASSENGER, CreateCharAsPassenger);
     //REGISTER_COMMAND_HANDLER(COMMAND_CREATE_RANDOM_CHAR, CreateRandomChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_CREATE_SWAT_ROPE, CreateSwatRope);
     //REGISTER_COMMAND_HANDLER(COMMAND_DAMAGE_CHAR, DamageChar);
-    //REGISTER_COMMAND_HANDLER(COMMAND_DELETE_CHAR, DeleteChar);
+    REGISTER_COMMAND_HANDLER(COMMAND_DELETE_CHAR, DeleteChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_DONT_REMOVE_CHAR, DontRemoveChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_DROP_OBJECT, DropObject);
     //REGISTER_COMMAND_HANDLER(COMMAND_DROP_SECOND_OBJECT, DropSecondObject);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_NUMBER_OF_FOLLOWERS, GetNumberOfFollowers);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_PED_TYPE, GetPedType);
-    //REGISTER_COMMAND_HANDLER(COMMAND_GET_SCRIPT_TASK_STATUS, GetScriptTaskStatus);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_SCRIPT_TASK_STATUS, GetScriptTaskStatus);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_SEQUENCE_PROGRESS, GetSequenceProgress);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_SEQUENCE_PROGRESS_RECURSIVE, GetSequenceProgressRecursive);
     //REGISTER_COMMAND_HANDLER(COMMAND_GIVE_MELEE_ATTACK_TO_CHAR, GiveMeleeAttackToChar);
-    //REGISTER_COMMAND_HANDLER(COMMAND_GIVE_WEAPON_TO_CHAR, GiveWeaponToChar);
+    REGISTER_COMMAND_HANDLER(COMMAND_GIVE_WEAPON_TO_CHAR, GiveWeaponToChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_IGNORE_HEIGHT_DIFFERENCE_FOLLOWING_NODES, IgnoreHeightDifferenceFollowingNodes);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_STOPPED_IN_ANGLED_AREA_IN_CAR_2D, IsCharStoppedInAngledAreaInCar2d);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_STOPPED_IN_ANGLED_AREA_IN_CAR_3D, IsCharStoppedInAngledAreaInCar3d);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_GROUP_LEADER, IsGroupLeader);
-    //REGISTER_COMMAND_HANDLER(COMMAND_IS_GROUP_MEMBER, IsGroupMember);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_GROUP_MEMBER, IsGroupMember);
     //REGISTER_COMMAND_HANDLER(COMMAND_LISTEN_TO_PLAYER_GROUP_COMMANDS, ListenToPlayerGroupCommands);
     //REGISTER_COMMAND_HANDLER(COMMAND_LOCATE_CHAR_IN_CAR_OBJECT_2D, LocateCharInCarObject2d);
     //REGISTER_COMMAND_HANDLER(COMMAND_LOCATE_CHAR_IN_CAR_OBJECT_3D, LocateCharInCarObject3d);
-    //REGISTER_COMMAND_HANDLER(COMMAND_PERFORM_SEQUENCE_TASK, PerformSequenceTask);
     //REGISTER_COMMAND_HANDLER(COMMAND_PERFORM_SEQUENCE_TASK_FROM_PROGRESS, PerformSequenceTaskFromProgress);
     //REGISTER_COMMAND_HANDLER(COMMAND_REMOVE_WEAPON_FROM_CHAR, RemoveWeaponFromChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_ANIM_GROUP_FOR_CHAR, SetAnimGroupForChar);
@@ -4178,7 +4713,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_START_CHAR_FIRE, StartCharFire);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_BLEEDING, SetCharBleeding);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_VISIBLE, SetCharVisible);
-    //REGISTER_COMMAND_HANDLER(COMMAND_REMOVE_CHAR_ELEGANTLY, RemoveCharElegantly); // TODO(FIXME): It also needs the pool ref, regardless of whenever the ped was deleted from the pool or not, so taking a simple CPed* won't work...
+    REGISTER_COMMAND_HANDLER(COMMAND_REMOVE_CHAR_ELEGANTLY, RemoveCharElegantly);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_STAY_IN_SAME_PLACE, SetCharStayInSamePlace);
     REGISTER_COMMAND_HANDLER(COMMAND_WARP_CHAR_FROM_CAR_TO_COORD, WarpCharFromCarToCoord);
     REGISTER_COMMAND_HANDLER(COMMAND_HAS_CHAR_SPOTTED_CHAR, HasCharSpottedChar);
@@ -4239,6 +4774,11 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_SET_LOAD_COLLISION_FOR_CHAR_FLAG, SetLoadCollisionForCharFlag);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_DUCKING, IsCharDucking);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_KILL_CHAR_ON_FOOT, TaskKillCharOnFoot);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_CAR_DRIVE_TO_COORD, TaskCarDriveToCoord);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_GO_STRAIGHT_TO_COORD, TaskGoStraightToCoord);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_FOLLOW_PATH_NODES_TO_COORD, TaskFollowPathNodesToCoord);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_LEAVE_ANY_CAR, TaskLeaveAnyCar);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_DRIVE_BY, TaskDriveBy);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANGLED_AREA_2D, IsCharInAngledArea2D);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANGLED_AREA_IN_CAR_2D, IsCharInAngledAreaInCar2D);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANGLED_AREA_3D, IsCharInAngledArea3D);
@@ -4248,6 +4788,8 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_LOAD_CHAR_DECISION_MAKER, LoadCharDecisionMaker);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_DECISION_MAKER, SetCharDecisionMaker);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_PLAYING_ANIM, IsCharPlayingAnim);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_PLAY_ANIM, TaskPlayAnim);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_PLAY_ANIM_NON_INTERRUPTABLE, TaskPlayAnimNonInterruptable);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_ANIM_PLAYING_FLAG, SetCharAnimPlayingFlag);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_ANIM_CURRENT_TIME, GetCharAnimCurrentTime);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_ANIM_CURRENT_TIME, SetCharAnimCurrentTime);
@@ -4256,6 +4798,10 @@ void notsa::script::commands::character::RegisterHandlers() {
     // REGISTER_COMMAND_HANDLER(COMMAND_CREATE_CHAR_AT_ATTRACTOR, CreateCharAtAttractor);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_KILL_CHAR_ON_FOOT_WHILE_DUCKING, TaskKillCharOnFootWhileDucking);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_TURN_CHAR_TO_FACE_CHAR, TaskTurnCharToFaceChar);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_PAUSE, TaskPause);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_TOGGLE_DUCK, TaskToggleDuck);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_ACHIEVE_HEADING, TaskAchieveHeading);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_STAY_IN_SAME_PLACE, TaskStayInSamePlace);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_AT_SCRIPTED_ATTRACTOR, IsCharAtScriptedAttractor);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_MODEL, GetCharModel);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CURRENT_CHAR_WEAPON, SetCurrentCharWeapon);
@@ -4283,13 +4829,13 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_STORE_CAR_CHAR_IS_ATTACHED_TO_NO_SAVE, StoreCarCharIsAttachedToNoSave);
     //REGISTER_COMMAND_HANDLER(COMMAND_CREATE_FX_SYSTEM_ON_CHAR_WITH_DIRECTION, CreateFxSystemOnCharWithDirection);
     //REGISTER_COMMAND_HANDLER(COMMAND_ATTACH_CAMERA_TO_CHAR_LOOK_AT_CHAR, AttachCameraToCharLookAtChar);
-    //REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_CHAR_TASKS, ClearCharTasks);
+    REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_CHAR_TASKS, ClearCharTasks);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_GOTO_CHAR_OFFSET, TaskGotoCharOffset);
-    //REGISTER_COMMAND_HANDLER(COMMAND_HIDE_CHAR_WEAPON_FOR_SCRIPTED_CUTSCENE, HideCharWeaponForScriptedCutscene);
+    REGISTER_COMMAND_HANDLER(COMMAND_HIDE_CHAR_WEAPON_FOR_SCRIPTED_CUTSCENE, HideCharWeaponForScriptedCutscene);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_TURN_CHAR_TO_FACE_COORD, TaskTurnCharToFaceCoord);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_CHAR_ARREST_CHAR, TaskCharArrestChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_CHAR_DECISION_MAKER_EVENT_RESPONSE, ClearCharDecisionMakerEventResponse);
-    //REGISTER_COMMAND_HANDLER(COMMAND_ADD_CHAR_DECISION_MAKER_EVENT_RESPONSE, AddCharDecisionMakerEventResponse);
+    REGISTER_COMMAND_HANDLER(COMMAND_ADD_CHAR_DECISION_MAKER_EVENT_RESPONSE, AddCharDecisionMakerEventResponse);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_WARP_CHAR_INTO_CAR_AS_DRIVER, TaskWarpCharIntoCarAsDriver);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_WARP_CHAR_INTO_CAR_AS_PASSENGER, TaskWarpCharIntoCarAsPassenger);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_HOLDING_OBJECT, IsCharHoldingObject);
@@ -4298,7 +4844,8 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_RESPONDING_TO_EVENT, IsCharRespondingToEvent);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_FLEE_CHAR_ANY_MEANS, TaskFleeCharAnyMeans);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_IS_TARGET_PRIORITY, SetCharIsTargetPriority);
-    //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_RELATIONSHIP, SetCharRelationship);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_RELATIONSHIP, SetCharRelationship);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_RELATIONSHIP, SetRelationship);
     //REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_CHAR_RELATIONSHIP, ClearCharRelationship);
     //REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_ALL_CHAR_RELATIONSHIPS, ClearAllCharRelationships);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_CHAR_TASKS_IMMEDIATELY, ClearCharTasksImmediately);
@@ -4307,7 +4854,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANY_SEARCHLIGHT, IsCharInAnySearchlight);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_SET_CHAR_DECISION_MAKER, TaskSetCharDecisionMaker);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_CHAR_SLIDE_TO_COORD, TaskCharSlideToCoord);
-    //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_SHOOT_RATE, SetCharShootRate);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_SHOOT_RATE, SetCharShootRate);
     //REGISTER_COMMAND_HANDLER(COMMAND_COPY_CHAR_DECISION_MAKER, CopyCharDecisionMaker);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_CHAR_SLIDE_TO_COORD_AND_PLAY_ANIM, TaskCharSlideToCoordAndPlayAnim);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_HIGHEST_PRIORITY_EVENT, GetCharHighestPriorityEvent);
@@ -4317,7 +4864,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_WEAPON_SKILL, SetCharWeaponSkill);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_RANDOM_CHAR_IN_SPHERE_ONLY_DRUGS_BUYERS, GetRandomCharInSphereOnlyDrugsBuyers);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_HAS_USED_ENTRY_EXIT, SetCharHasUsedEntryExit);
-    //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_MAX_HEALTH, SetCharMaxHealth);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_MAX_HEALTH, SetCharMaxHealth);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_CAN_BE_KNOCKED_OFF_BIKE, SetCharCanBeKnockedOffBike);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_COORDINATES_DONT_WARP_GANG, SetCharCoordinatesDontWarpGang);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_RANDOM_CHAR_IN_SPHERE_NO_BRAIN, GetRandomCharInSphereNoBrain);
@@ -4332,8 +4879,8 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_KEEP_TASK, SetCharKeepTask);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_SWIMMING, IsCharSwimming);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_SWIM_STATE, GetCharSwimState);
-    //REGISTER_COMMAND_HANDLER(COMMAND_START_CHAR_FACIAL_TALK, StartCharFacialTalk);
-    //REGISTER_COMMAND_HANDLER(COMMAND_STOP_CHAR_FACIAL_TALK, StopCharFacialTalk);
+    REGISTER_COMMAND_HANDLER(COMMAND_START_CHAR_FACIAL_TALK, StartCharFacialTalk);
+    REGISTER_COMMAND_HANDLER(COMMAND_STOP_CHAR_FACIAL_TALK, StopCharFacialTalk);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_COORDINATES_NO_OFFSET, SetCharCoordinatesNoOffset);
     //REGISTER_COMMAND_HANDLER(COMMAND_COPY_SHARED_CHAR_DECISION_MAKER, CopySharedCharDecisionMaker);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_FORCE_DIE_IN_CAR, SetCharForceDieInCar);
