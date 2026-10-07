@@ -118,9 +118,10 @@ namespace CGeneral { // More like `Math` (Or `Meth`, given how bad the code is, 
     template<std::integral T>
     inline T GetRandomNumberInRange(T min, T max, bool inclusive = false) {
         assert(inclusive ? max >= min : max > min); // Check is not empty range
-        return inclusive
-            ? static_cast<T>(GetRandomNumberInRange<float>(static_cast<float>(min), static_cast<float>(max)))
-            : static_cast<T>(GetRandomNumberInRange<float>(static_cast<float>(min), static_cast<float>(max) - 1.f));
+        // As the original (0x407180): `(int)(rand() / 32768 * (max - min)) + min`, every value of [min, max) is as likely as any other.
+        // (`rand()` is at most 32767, so `max` itself is never reached)
+        const auto numValues = static_cast<double>(max) - static_cast<double>(min) + (inclusive ? 1.0 : 0.0);
+        return static_cast<T>(static_cast<int64>(static_cast<double>(GetRandomNumber()) * (1.0 / 32768.0) * numValues) + static_cast<int64>(min));
     }
 
     /**
