@@ -52,6 +52,13 @@ constexpr const char* ASI_CANDIDATES[]{
     "gta_reversed.asi",
 };
 
+/*!
+* If this environment variable is set, the original's code is made non-executable before the game starts (its data stays).
+* Every function of it that still gets called is recorded in the trace file (once, with who called it), then allowed to run.
+* What's listed there is what's left to do before the original executable isn't needed for its code.
+*/
+constexpr auto ENV_TRAP_ORIGINAL_CODE = "GTA_REVERSED_TRAP_ORIGINAL_CODE";
+
 //! Written next to the launcher, started over on each run. For when the game dies before (or without) its own logging
 constexpr auto TRACE_FILE_NAME = "gta_reversed_loader.log";
 
@@ -110,11 +117,105 @@ void TraceCodePointersOnStack(uintptr_t esp, int maxListed) {
     }
 }
 
+/*
+* Trapping calls into the original's code
+*/
+struct CodeRange {
+    uintptr_t begin, end;
+};
+CodeRange         s_OriginalCode[8]{};
+uint32_t          s_NumOriginalCodeRanges{};
+bool              s_IsTrappingOriginalCode{};
+uintptr_t         s_TrappedEntries[2048]{};
+volatile LONG     s_NumTrappedEntries{};
+
+bool IsOriginalCode(uintptr_t addr) {
+    for (auto i = 0u; i < s_NumOriginalCodeRanges; i++) {
+        if (addr >= s_OriginalCode[i].begin && addr < s_OriginalCode[i].end) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ProtectOriginalCode(bool executable) {
+    for (auto i = 0u; i < s_NumOriginalCodeRanges; i++) {
+        DWORD old{};
+        VirtualProtect(reinterpret_cast<void*>(s_OriginalCode[i].begin), s_OriginalCode[i].end - s_OriginalCode[i].begin, executable ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE, &old);
+    }
+}
+
+//! A call into the original's code was caught. Record where to and from, and let it run (The whole page, until `RearmTrapPeriodically` comes by)
+bool OnOriginalCodeExecuted(EXCEPTION_POINTERS* info) {
+    const auto eip = reinterpret_cast<uintptr_t>(info->ExceptionRecord->ExceptionAddress);
+
+    // A hook of ours (`jmp rel32` to outside of the original): no code of the original runs, go where it leads.
+    // Still of interest: somebody got the address of the original function from somewhere (a vtable or a table of the original's data),
+    // which won't be there without the original. Recorded as `VIA HOOK`.
+    auto viaHook = false;
+    if (const auto* const code = reinterpret_cast<const uint8_t*>(eip); code[0] == 0xE9) {
+        int32_t rel{};
+        memcpy(&rel, code + 1, sizeof(rel));
+        if (const auto target = eip + 5 + rel; !IsOriginalCode(target)) {
+            info->ContextRecord->Eip = target;
+            viaHook                  = true;
+        }
+    }
+
+    auto isNew = true;
+    const LONG numTrapped = s_NumTrappedEntries; // (A copy: it's volatile)
+    const auto n          = std::min(numTrapped, static_cast<LONG>(std::size(s_TrappedEntries)));
+    for (auto i = 0; i < n; i++) {
+        if (s_TrappedEntries[i] == eip) {
+            isNew = false;
+            break;
+        }
+    }
+    if (isNew) {
+        if (const auto idx = InterlockedIncrement(&s_NumTrappedEntries) - 1; idx < static_cast<LONG>(std::size(s_TrappedEntries))) {
+            s_TrappedEntries[idx] = eip;
+        }
+        // At the entry of a function the return address is on the top of the stack, and the frame pointer is still the caller's
+        Trace(std::format("{} 0x{:08X} called from {}", viaHook ? "VIA HOOK" : "ORIGINAL CODE", eip, DescribeAddress(*reinterpret_cast<const uintptr_t*>(info->ContextRecord->Esp))));
+        if (!viaHook) {
+            void*      frames[10]{};
+            const auto numFrames = CaptureStackBackTrace(0, static_cast<DWORD>(std::size(frames)), frames, nullptr);
+            for (auto i = 4u; i < numFrames; i++) { // (The first few are the exception dispatching)
+                Trace("    " + DescribeAddress(reinterpret_cast<uintptr_t>(frames[i])));
+            }
+        }
+    }
+    if (viaHook) {
+        return true; // (The page stays as it is)
+    }
+
+    DWORD old{};
+    VirtualProtect(reinterpret_cast<void*>(eip & ~uintptr_t{ 0xFFF }), 0x1000, PAGE_EXECUTE_READWRITE, &old);
+    return true;
+}
+
+DWORD WINAPI RearmTrapPeriodically(void*) {
+    for (;;) {
+        Sleep(250);
+        ProtectOriginalCode(false);
+    }
+}
+
 //! Records the exceptions that usually mean the end (They may still be handled by somebody, so only the first few are recorded)
 LONG CALLBACK TraceExceptions(EXCEPTION_POINTERS* info) {
     static LONG s_NumRecorded = 0;
 
     const auto* const rec = info->ExceptionRecord;
+    if (s_IsTrappingOriginalCode && rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2 && rec->ExceptionInformation[0] == 8 /* execute */
+        && IsOriginalCode(rec->ExceptionInformation[1])) {
+        if (rec->ExceptionInformation[1] != reinterpret_cast<uintptr_t>(rec->ExceptionAddress)) {
+            // An instruction that started on a page that's allowed to run by now, and continues on the next one, which isn't: just let it
+            DWORD old{};
+            VirtualProtect(reinterpret_cast<void*>(rec->ExceptionInformation[1] & ~uintptr_t{ 0xFFF }), 0x1000, PAGE_EXECUTE_READWRITE, &old);
+            return EXCEPTION_CONTINUE_EXECUTION;
+        }
+        return OnOriginalCodeExecuted(info) ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_CONTINUE_SEARCH;
+    }
     switch (rec->ExceptionCode) {
     case EXCEPTION_ACCESS_VIOLATION:
     case EXCEPTION_STACK_OVERFLOW:
@@ -142,7 +243,7 @@ LONG CALLBACK TraceExceptions(EXCEPTION_POINTERS* info) {
 
     auto msg = std::format("Exception 0x{:08X} at {}", rec->ExceptionCode, DescribeAddress(reinterpret_cast<uintptr_t>(rec->ExceptionAddress)));
     if (rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2) {
-        msg += std::format(", {} 0x{:08X}", rec->ExceptionInformation[0] ? "writing" : "reading", rec->ExceptionInformation[1]);
+        msg += std::format(", {} 0x{:08X}", rec->ExceptionInformation[0] == 8 ? "executing" : rec->ExceptionInformation[0] ? "writing" : "reading", rec->ExceptionInformation[1]);
     }
     Trace(msg);
 
@@ -379,8 +480,40 @@ int WINAPI OnGameWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLi
     }
 
     // `WinMain` is hooked by the ASI now, so this ends up in ours
-    const auto ret = reinterpret_cast<int(WINAPI*)(HINSTANCE, HINSTANCE, LPSTR, int)>(GAME_WIN_MAIN)(instance, prevInstance, cmdLine, cmdShow);
-    Trace(std::format("`WinMain` returned {}", ret));
+    auto winMain = reinterpret_cast<int(WINAPI*)(HINSTANCE, HINSTANCE, LPSTR, int)>(GAME_WIN_MAIN);
+
+    if (char buf[8]{}; GetEnvironmentVariableA(ENV_TRAP_ORIGINAL_CODE, buf, sizeof(buf))) {
+        // Go to ours directly (It's a `jmp rel32` there now), the original is about to be off limits
+        if (const auto* const fn = reinterpret_cast<const uint8_t*>(GAME_WIN_MAIN); fn[0] == 0xE9) {
+            int32_t rel{};
+            memcpy(&rel, fn + 1, sizeof(rel));
+            winMain = reinterpret_cast<decltype(winMain)>(GAME_WIN_MAIN + 5 + rel);
+        }
+
+        const auto* const base     = reinterpret_cast<const uint8_t*>(GAME_IMAGE_BASE);
+        const auto* const nt       = reinterpret_cast<const IMAGE_NT_HEADERS32*>(base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
+        const auto* const sections = IMAGE_FIRST_SECTION(nt);
+        for (auto i = 0u; i < nt->FileHeader.NumberOfSections && s_NumOriginalCodeRanges < std::size(s_OriginalCode); i++) {
+            if (sections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) {
+                const auto begin = GAME_IMAGE_BASE + sections[i].VirtualAddress;
+                s_OriginalCode[s_NumOriginalCodeRanges++] = { begin, begin + ((std::max(sections[i].Misc.VirtualSize, sections[i].SizeOfRawData) + 0xFFF) & ~0xFFFu) };
+                Trace(std::format("Original code: section `{:.8}` [0x{:08X}, 0x{:08X})", reinterpret_cast<const char*>(sections[i].Name), begin, s_OriginalCode[s_NumOriginalCodeRanges - 1].end));
+            }
+        }
+
+        // Data isn't executable only if this is on (The launcher isn't linked as compatible with it, the original game isn't)
+        if (!SetProcessDEPPolicy(PROCESS_DEP_ENABLE)) {
+            Trace(std::format("Couldn't turn on data execution prevention (error {}), calls into the original's code can't be trapped", GetLastError()));
+        } else {
+            s_IsTrappingOriginalCode = true;
+            ProtectOriginalCode(false);
+            CloseHandle(CreateThread(nullptr, 0, &RearmTrapPeriodically, nullptr, 0, nullptr));
+            Trace("Trapping calls into the original's code from here on (`ORIGINAL CODE` lines)");
+        }
+    }
+
+    const auto ret = winMain(instance, prevInstance, cmdLine, cmdShow);
+    Trace(std::format("`WinMain` returned {} ({} functions of the original's code were called)", ret, static_cast<long>(s_NumTrappedEntries)));
     return ret;
 }
 
