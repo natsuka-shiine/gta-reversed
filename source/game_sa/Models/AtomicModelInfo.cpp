@@ -22,8 +22,8 @@ void CAtomicModelInfo::InjectHooks()
     RH_ScopedVMTInstall(Init, 0x4C4430);
     RH_ScopedVMTInstall(DeleteRwObject, 0x4C4440);
     RH_ScopedVMTInstall(GetRwModelType, 0x4C5580);
-    // clang moment: RH_ScopedVirtualOverloadedInstall(CreateInstance, "void", 0x4C4530, RwObject * (CAtomicModelInfo::*)());
-    // clang moment: RH_ScopedVirtualOverloadedInstall(CreateInstance, "rwmat", 0x4C44D0, RwObject * (CAtomicModelInfo::*)(RwMatrix*));
+    RH_ScopedVMTOverloadedInstall(CreateInstance, "void", 0x4C4530, RwObject * (CAtomicModelInfo::*)());
+    RH_ScopedVMTOverloadedInstall(CreateInstance, "mat", 0x4C44D0, RwObject * (CAtomicModelInfo::*)(RwMatrix*));
     RH_ScopedVMTInstall(SetAtomic, 0x4C4360);
 
     RH_ScopedInstall(GetAtomicFromDistance, 0x4C44B0);
