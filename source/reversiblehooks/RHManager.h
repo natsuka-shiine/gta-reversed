@@ -244,4 +244,15 @@ private:
     std::shared_ptr<ReversibleHooks::RootHookCategory> m_RootHookCategory{ std::make_shared<ReversibleHooks::RootHookCategory>() };
     HooksCheckClock::time_point                        m_LastHooksCheckTime{ HooksCheckClock::now() };
 };
+
+#ifdef NOTSA_LIBRW
+/*!
+* A hook on a virtual function replaces the entry in the vtable of that one class in the original, the function itself is left alone.
+* The original vtables of derived classes that don't override it still point to the original function.
+* That's fine as long as the original's RenderWare is there for it, which it isn't with librw:
+* this makes the original functions jump to ours too (for all that don't have a hook of their own on them).
+* Call once all hooks are installed.
+*/
+void RedirectOriginalsOfVirtualHooks();
+#endif
 }; // namespace ReversibleHooks

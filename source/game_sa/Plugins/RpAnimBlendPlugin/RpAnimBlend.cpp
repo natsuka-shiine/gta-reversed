@@ -80,8 +80,10 @@ bool RpAnimBlendPluginAttach() {
     }
 
 #ifdef NOTSA_LIBRW
-    // Same as below, with librw's names (And it keeps the pointer, instead of copying it)
-    static RtAnimInterpolatorInfo rtInfo = *rw::AnimInterpolatorInfo::find(1); // Everything else is as for standard key-frames (`rpHANIMSTDKEYFRAMETYPEID`)
+    // Same as below, with librw's names (And it keeps the pointer, instead of copying it).
+    // The blend/add/stream callbacks of standard key-frames aren't available: librw doesn't have the first two,
+    // and only registers its scheme when the engine is opened. Nothing of the game uses them with this scheme.
+    static RtAnimInterpolatorInfo rtInfo{};
     rtInfo.id                 = rwID_RPANIMBLENDPLUGIN;
     rtInfo.interpKeyFrameSize = sizeof(RpHAnimBlendInterpFrame);
     rtInfo.animKeyFrameSize   = sizeof(RpHAnimKeyFrame);

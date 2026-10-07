@@ -36,6 +36,21 @@ static inline auto& RpUVAnimDictSchema =  StaticRef<RtDictSchema, 0x8DED50>();
 #endif
 static inline auto& AmbientSaturated = StaticRef<RwRGBAReal, 0x8E2418>();
 
+#ifdef NOTSA_LIBRW
+// (The ones below are globals of the original's RenderWare, which isn't running)
+inline IDirect3DDevice9 *GetD3D9Device() {
+    return static_cast<IDirect3DDevice9 *>(RwD3D9GetCurrentD3DDevice());
+}
+
+//! Of the camera being rendered with
+inline _D3DMATRIX *GetD3DViewTransform() {
+    return reinterpret_cast<_D3DMATRIX *>(&RwCameraGetCurrentCamera()->devView);
+}
+
+inline _D3DMATRIX *GetD3DProjTransform() {
+    return reinterpret_cast<_D3DMATRIX *>(&RwCameraGetCurrentCamera()->devProj);
+}
+#else
 inline IDirect3DDevice9 *GetD3D9Device() {
     return *reinterpret_cast<IDirect3DDevice9 **>(0xC97C28);
 }
@@ -50,6 +65,7 @@ inline _D3DMATRIX *GetD3DViewTransform() {
 inline _D3DMATRIX *GetD3DProjTransform() {
     return reinterpret_cast<_D3DMATRIX *>(0x8E2458);
 }
+#endif
 
 inline void _rpMaterialSetDefaultSurfaceProperties(RwSurfaceProperties *surfProps) {
     ((void(__cdecl *)(RwSurfaceProperties*))0x74D870)(surfProps);

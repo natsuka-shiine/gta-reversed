@@ -394,7 +394,13 @@ RwStream *RwStreamOpen(RwStreamType type, RwStreamAccessType accessType, const v
 		return nil;
 	}
 }
-RwBool RwStreamClose(RwStream * stream, void *pData) { stream->close(); rwFree(stream); return true; }
+bool RwLibrwIsCallerOwnedStream(RwStream *stream); // (fake_sa.cpp)
+RwBool RwStreamClose(RwStream * stream, void *pData) {
+	stream->close();
+	if(!RwLibrwIsCallerOwnedStream(stream))	// Initialized in the caller's storage by `_rwStreamInitialize`. Can be closed any number of times.
+		rwFree(stream);
+	return true;
+}
 RwUInt32 RwStreamRead(RwStream * stream, void *buffer, RwUInt32 length) { return stream->read8(buffer, length); }
 RwStream *RwStreamWrite(RwStream * stream, const void *buffer, RwUInt32 length) { stream->write8(buffer, length); return stream; }
 RwStream *RwStreamSkip(RwStream * stream, RwUInt32 offset) { stream->seek(offset); return stream; }
@@ -445,6 +451,9 @@ RwBool RwIm3DRenderPrimitive(RwPrimitiveType primType);
 
 
 
+// librw only has 3 of the 8 alpha test functions, the one asked for is kept here (RenderWare's default)
+static uint32 gAlphaTestFunction = rwALPHATESTFUNCTIONGREATER;
+
 RwBool RwRenderStateGet(RwRenderState state, void *value)
 {
 	uint32 *uival = (uint32*)value;
@@ -476,16 +485,19 @@ RwBool RwRenderStateGet(RwRenderState state, void *value)
 	case rwRENDERSTATEFOGDENSITY: *(float*)value = 1.0f; return true;
 	case rwRENDERSTATECULLMODE: *uival = GetRenderState(CULLMODE); return true;
 
-	// all unsupported
+	// (The stencil operations and functions have the same values in librw as in RenderWare)
+	case rwRENDERSTATESTENCILENABLE: *uival = GetRenderState(STENCILENABLE); return true;
+	case rwRENDERSTATESTENCILFAIL: *uival = GetRenderState(STENCILFAIL); return true;
+	case rwRENDERSTATESTENCILZFAIL: *uival = GetRenderState(STENCILZFAIL); return true;
+	case rwRENDERSTATESTENCILPASS: *uival = GetRenderState(STENCILPASS); return true;
+	case rwRENDERSTATESTENCILFUNCTION: *uival = GetRenderState(STENCILFUNCTION); return true;
+	case rwRENDERSTATESTENCILFUNCTIONREF: *uival = GetRenderState(STENCILFUNCTIONREF); return true;
+	case rwRENDERSTATESTENCILFUNCTIONMASK: *uival = GetRenderState(STENCILFUNCTIONMASK); return true;
+	case rwRENDERSTATESTENCILFUNCTIONWRITEMASK: *uival = GetRenderState(STENCILFUNCTIONWRITEMASK); return true;
 
-	case rwRENDERSTATESTENCILENABLE:
-	case rwRENDERSTATESTENCILFAIL:
-	case rwRENDERSTATESTENCILZFAIL:
-	case rwRENDERSTATESTENCILPASS:
-	case rwRENDERSTATESTENCILFUNCTION:
-	case rwRENDERSTATESTENCILFUNCTIONREF:
-	case rwRENDERSTATESTENCILFUNCTIONMASK:
-	case rwRENDERSTATESTENCILFUNCTIONWRITEMASK:
+	case rwRENDERSTATEALPHATESTFUNCTION: *uival = gAlphaTestFunction; return true;
+	case rwRENDERSTATEALPHATESTFUNCTIONREF: *uival = GetRenderState(ALPHATESTREF); return true;
+
 	default:
 		return false;
 	}
@@ -521,15 +533,33 @@ RwBool RwRenderStateSet(RwRenderState state, void *value)
 	case rwRENDERSTATEFOGDENSITY: return true;
 	case rwRENDERSTATECULLMODE: SetRenderState(CULLMODE, uival); return true;
 
-	// all unsupported
-	case rwRENDERSTATESTENCILENABLE:
-	case rwRENDERSTATESTENCILFAIL:
-	case rwRENDERSTATESTENCILZFAIL:
-	case rwRENDERSTATESTENCILPASS:
-	case rwRENDERSTATESTENCILFUNCTION:
-	case rwRENDERSTATESTENCILFUNCTIONREF:
-	case rwRENDERSTATESTENCILFUNCTIONMASK:
-	case rwRENDERSTATESTENCILFUNCTIONWRITEMASK:
+	// (The stencil operations and functions have the same values in librw as in RenderWare)
+	case rwRENDERSTATESTENCILENABLE: SetRenderState(STENCILENABLE, uival); return true;
+	case rwRENDERSTATESTENCILFAIL: SetRenderState(STENCILFAIL, uival); return true;
+	case rwRENDERSTATESTENCILZFAIL: SetRenderState(STENCILZFAIL, uival); return true;
+	case rwRENDERSTATESTENCILPASS: SetRenderState(STENCILPASS, uival); return true;
+	case rwRENDERSTATESTENCILFUNCTION: SetRenderState(STENCILFUNCTION, uival); return true;
+	case rwRENDERSTATESTENCILFUNCTIONREF: SetRenderState(STENCILFUNCTIONREF, uival); return true;
+	case rwRENDERSTATESTENCILFUNCTIONMASK: SetRenderState(STENCILFUNCTIONMASK, uival); return true;
+	case rwRENDERSTATESTENCILFUNCTIONWRITEMASK: SetRenderState(STENCILFUNCTIONWRITEMASK, uival); return true;
+
+	case rwRENDERSTATEALPHATESTFUNCTION:
+		gAlphaTestFunction = uival;
+		// Tell librw the closest one it knows, for the sake of its own book-keeping...
+		switch(uival){
+		case rwALPHATESTFUNCTIONALWAYS: SetRenderState(ALPHATESTFUNC, ALPHAALWAYS); break;
+		case rwALPHATESTFUNCTIONLESS:
+		case rwALPHATESTFUNCTIONLESSEQUAL:
+		case rwALPHATESTFUNCTIONNEVER: SetRenderState(ALPHATESTFUNC, ALPHALESS); break;
+		default: SetRenderState(ALPHATESTFUNC, ALPHAGREATEREQUAL); break;
+		}
+#ifdef RW_D3D9
+		// ...then set the exact one (The values are those of `D3DCMPFUNC`)
+		rw::d3d::setRenderState(D3DRS_ALPHAFUNC, uival);
+#endif
+		return true;
+	case rwRENDERSTATEALPHATESTFUNCTIONREF: SetRenderState(ALPHATESTREF, uival); return true;
+
 	default:
 		return true;
 	}

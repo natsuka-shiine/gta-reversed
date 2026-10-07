@@ -7,10 +7,56 @@
 #endif
 #include "ReversibleHook/ScriptCommandHook.h"
 #include "RHManager.h"
+#include "HookConstants.hpp"
 
 static constexpr auto HOOKS_CHECK_INTERVAL = std::chrono::milliseconds{ 500 };
 
 namespace ReversibleHooks {
+#ifdef NOTSA_LIBRW
+namespace {
+struct VirtualHookTarget {
+    std::string name;
+    uint8*      fnGTA;
+    void*       fnOur;
+};
+std::vector<VirtualHookTarget> s_VirtualHookTargets;
+};
+
+void RedirectOriginalsOfVirtualHooks() {
+    using namespace Constants;
+
+    uint32 numRedirected{}, numSkipped{};
+    for (const auto& t : s_VirtualHookTargets) {
+        if (t.fnGTA[0] == JUMP_OPCODE) { // Has a hook on it (or is one of ours from an earlier entry: more classes can have the same function)
+            continue;
+        }
+
+        // Not if it's shorter than the jump, and something else follows right after it
+        const auto IsPadding = [](uint8 b) { return b == 0xCC || b == 0x90; };
+        auto       fits      = true;
+        for (auto i = 0u; i + 1 < JUMP_OP_SIZE; i++) {
+            if (t.fnGTA[i] == 0xC3 && !std::all_of(t.fnGTA + i + 1, t.fnGTA + JUMP_OP_SIZE, IsPadding)) { // `ret`
+                fits = false;
+                break;
+            }
+        }
+        if (!fits) {
+            NOTSA_LOG_DEBUG("Original of virtual `{}` at {} is too short to redirect", t.name, static_cast<void*>(t.fnGTA));
+            numSkipped++;
+            continue;
+        }
+
+        uint8      jmp[JUMP_OP_SIZE]{ JUMP_OPCODE };
+        const auto rel = static_cast<int32>(reinterpret_cast<uintptr>(t.fnOur) - (reinterpret_cast<uintptr>(t.fnGTA) + JUMP_OP_SIZE));
+        memcpy(jmp + 1, &rel, sizeof(rel));
+        Utility::VirtualCopy(t.fnGTA, jmp, sizeof(jmp));
+        numRedirected++;
+    }
+    NOTSA_LOG_INFO("Redirected the originals of {} virtual functions to ours ({} were too short for that)", numRedirected, numSkipped);
+    s_VirtualHookTargets.clear();
+}
+#endif
+
 void RHManager::CheckAll() {
     if (const auto now = HooksCheckClock::now(); now - m_LastHooksCheckTime > HOOKS_CHECK_INTERVAL) {
         m_LastHooksCheckTime = now;
@@ -58,6 +104,9 @@ void RHManager::InstallVirtual(
     ));
 #else
     const auto idx = vmtInfoGTA.FindIndexOf(fnAddressGTA);
+#ifdef NOTSA_LIBRW
+    s_VirtualHookTargets.push_back({ fnName, static_cast<uint8*>(fnAddressGTA), *vmtInfoOur.GetEntryAddressAt(idx) }); // (Before the hook changes the entry)
+#endif
     // We can't do `vmtInfoOur.FindIndexOf(fnAddressOur)` because `fnAddressOur` points to the thunk, while the address in the VMT is pointing to the actual function
 
     if (opt.Overrides) {

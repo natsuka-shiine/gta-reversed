@@ -560,7 +560,7 @@ void InjectHooksMain() {
     **/
 
     #ifndef NOTSA_STANDALONE
-        #ifdef NOTSA_WINDOWED_MODE
+        #if defined(NOTSA_WINDOWED_MODE) && !defined(NOTSA_LIBRW)
             notsa::InjectWindowedModeHooks();
         #endif
     #endif
@@ -583,7 +583,9 @@ void InjectHooksMain() {
     ProcObjectMan_c::InjectHooks();
     ProcSurfaceInfo_c::InjectHooks();
     RwHelperInjectHooks();
+#ifndef NOTSA_LIBRW // (No RenderWare of the original to hook, with librw)
     RwCoreInjectHooks();
+#endif
     CPad::InjectHooks();
     InjectCommonHooks();
     CEscalator::InjectHooks();
@@ -841,7 +843,9 @@ void InjectHooksMain() {
     RpAnimBlendPlugin::InjectHooks();
     CCollisionPlugin::InjectHooks();
     BreakablePlugin::InjectHooks();
+#ifndef NOTSA_LIBRW
     RtAnim::InjectHooks();
+#endif
 
     CIplStore::InjectHooks();
     cHandlingDataMgr::InjectHooks();
@@ -1496,6 +1500,10 @@ void InjectHooksMain() {
     Vehicle();
     Interior();
     Scripts();
+
+#ifdef NOTSA_LIBRW
+    ReversibleHooks::RedirectOriginalsOfVirtualHooks();
+#endif
 
     NOTSA_LOG_INFO("InjectedHooksMain(): Finished in {} ms", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - now).count());
 

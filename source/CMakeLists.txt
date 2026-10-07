@@ -377,4 +377,18 @@ if (${RE_PROJECT}_WITH_LIBRW)
             UNITY_BUILD_BATCH_SIZE 16
         )
     endif()
+
+    # Links the objects of the check above with librw into a module, to see what's still missing from the adapter
+    # (Every unresolved symbol is a function the adapter declares, but doesn't implement). Not part of the default build:
+    #   cmake --build build --target gta_reversed_librw_link
+    set(RE_PROJECT_LIBRW_LINK_NAME gta_reversed_librw_link)
+
+    add_library(${RE_PROJECT_LIBRW_LINK_NAME} MODULE EXCLUDE_FROM_ALL $<TARGET_OBJECTS:${RE_PROJECT_LIBRW_CHECK_NAME}>)
+    set_target_properties(${RE_PROJECT_LIBRW_LINK_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+    target_link_libraries(${RE_PROJECT_LIBRW_LINK_NAME} PRIVATE
+        $<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},LINK_LIBRARIES>
+        librw
+        xinput
+    )
+    target_link_options(${RE_PROJECT_LIBRW_LINK_NAME} PRIVATE "/SUBSYSTEM:WINDOWS" "/INCREMENTAL:NO")
 endif()
