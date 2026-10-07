@@ -24,7 +24,14 @@ void CTaskSequences::CleanUpForShutdown() {
 }
 
 // 0x632E00
-int32 CTaskSequences::GetAvailableSlot(uint8 slot) {
-    assert(false);
+int32 CTaskSequences::GetAvailableSlot(uint8 forMission) {
+    // Mission scripts use the upper half of the slots, all others the lower half
+    const auto begin = forMission ? NUM_SEQUENCES / 2 : 0;
+    const auto end   = forMission ? NUM_SEQUENCES : NUM_SEQUENCES / 2;
+    for (auto i = begin; i < end; i++) {
+        if (!ms_bIsOpened[i] && !ms_taskSequence[i].m_Tasks[0]) {
+            return i;
+        }
+    }
     return -1;
 }
