@@ -43,9 +43,19 @@ int32 CreatePickupWithAmmo(script::Model model, int32 pickupType, int32 ammo, CV
     return GeneratePickup(model, pickupType, static_cast<uint32>(ammo), pos);
 }
 
+// COMMAND_HAS_PICKUP_BEEN_COLLECTED - 0x47E662
+bool HasPickupBeenCollected(int32 handle) {
+    return CPickups::IsPickUpPickedUp(tPickupReference{ handle }); // Also forgets that it was collected
+}
+
 // COMMAND_REMOVE_PICKUP - 0x47E6AB
 void RemovePickup(int32 handle) {
     CPickups::RemovePickUp(tPickupReference{ handle });
+}
+
+// COMMAND_UPDATE_PICKUP_MONEY_PER_DAY - 0x477584
+void UpdatePickupMoneyPerDay(int32 handle, int32 money) {
+    CPickups::UpdateMoneyPerDay(tPickupReference{ handle }, static_cast<uint16>(money)); // Only the low word is passed
 }
 };
 
@@ -54,5 +64,7 @@ void notsa::script::commands::pickup::RegisterHandlers() {
 
     REGISTER_COMMAND_HANDLER(COMMAND_CREATE_PICKUP, CreatePickup);
     REGISTER_COMMAND_HANDLER(COMMAND_CREATE_PICKUP_WITH_AMMO, CreatePickupWithAmmo);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_PICKUP_BEEN_COLLECTED, HasPickupBeenCollected);
     REGISTER_COMMAND_HANDLER(COMMAND_REMOVE_PICKUP, RemovePickup);
+    REGISTER_COMMAND_HANDLER(COMMAND_UPDATE_PICKUP_MONEY_PER_DAY, UpdatePickupMoneyPerDay);
 }

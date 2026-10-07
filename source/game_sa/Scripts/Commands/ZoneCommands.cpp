@@ -64,6 +64,12 @@ auto GetZoneGangStrength(const char* label, eGangID gang) {
 //    
 //}
 
+// GET_CITY_PLAYER_IS_IN (2114) - 0x470EB4
+eLevelName GetCityPlayerIsIn(int32 /*playerId*/) {
+    // The player is read, but neither checked nor used
+    return CTheZones::m_CurrLevel;
+}
+
 // SET_ZONE_POPULATION_RACE (2164)
 void SetZonePopulationRace(const char* label, uint8 races) {
     if (auto* const zi = GetZoneInfoByLabel(label)) {
@@ -88,11 +94,13 @@ auto GetCurrentPopulationZoneType() {
     return CPopCycle::m_nCurrentZoneType;
 }
 
-// TODO
-// GET_NAME_OF_INFO_ZONE (2289)
-//void GetNameOfInfoZone() {
-//    NOTSA_UNREACHABLE("COMMAND_GET_NAME_OF_INFO_ZONE is not implemented");
-//}
+// GET_NAME_OF_INFO_ZONE (2289) - 0x475EB7
+void GetNameOfInfoZone(CRunningScript& S, CVector pos) {
+    const auto* const zone = CTheZones::FindSmallestZoneForPosition(pos, true);
+    // The output is a text label variable, which comes right after the inputs
+    auto* const       name = reinterpret_cast<char*>(S.GetPointerToScriptVariable(VAR_GLOBAL));
+    strncpy(name, zone->m_InfoLabel, 8);
+}
 
 // SET_SPECIFIC_ZONE_TO_TRIGGER_GANG_WAR (2316)
 void SetSpecificZoneToTriggerGangWar(const char* label) {
@@ -102,6 +110,16 @@ void SetSpecificZoneToTriggerGangWar(const char* label) {
 // CLEAR_SPECIFIC_ZONES_TO_TRIGGER_GANG_WAR (2317)
 void ClearSpecificZonesToTriggerGangWar() {
     CGangWars::ClearSpecificZonesToTriggerGangWar();
+}
+
+// GET_TERRITORY_UNDER_CONTROL_PERCENTAGE (2274)
+auto GetTerritoryUnderControlPercentage() {
+    return static_cast<int32>(CGangWars::TerritoryUnderControlPercentage * 100.f);
+}
+
+// IS_GANG_WAR_FIGHTING_GOING_ON (2563)
+bool IsGangWarFightingGoingOn() {
+    return CGangWars::GangWarFightingGoingOn();
 }
 
 // SET_ZONE_NO_COPS (2487)
@@ -135,13 +153,16 @@ void notsa::script::commands::zone::RegisterHandlers() {
     REGISTER_COMMAND_UNIMPLEMENTED(COMMAND_SET_BEAT_ZONE_SIZE);
     REGISTER_COMMAND_UNIMPLEMENTED(COMMAND_IS_3D_COORD_IN_ZONE);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_NAME_OF_ZONE, GetNameOfZone);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_CITY_PLAYER_IS_IN, GetCityPlayerIsIn);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_ZONE_POPULATION_RACE, SetZonePopulationRace);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_ZONE_FOR_GANG_WARS_TRAINING, SetZoneForGangWarsTraining);
     REGISTER_COMMAND_HANDLER(COMMAND_INIT_ZONE_POPULATION_SETTINGS, InitZonePopulationSettings);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CURRENT_POPULATION_ZONE_TYPE, GetCurrentPopulationZoneType);
-    //REGISTER_COMMAND_HANDLER(COMMAND_GET_NAME_OF_INFO_ZONE, GetNameOfInfoZone);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_NAME_OF_INFO_ZONE, GetNameOfInfoZone);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_SPECIFIC_ZONE_TO_TRIGGER_GANG_WAR, SetSpecificZoneToTriggerGangWar);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_SPECIFIC_ZONES_TO_TRIGGER_GANG_WAR, ClearSpecificZonesToTriggerGangWar);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_TERRITORY_UNDER_CONTROL_PERCENTAGE, GetTerritoryUnderControlPercentage);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_GANG_WAR_FIGHTING_GOING_ON, IsGangWarFightingGoingOn);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_ZONE_NO_COPS, SetZoneNoCops);
     REGISTER_COMMAND_HANDLER(COMMAND_DISPLAY_ZONE_NAMES, DisplayZoneNames);
 }

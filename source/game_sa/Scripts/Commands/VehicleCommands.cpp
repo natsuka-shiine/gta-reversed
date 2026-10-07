@@ -120,6 +120,23 @@ CVector GetOffsetFromCarInWorldCoords(CVehicle& vehicle, CVector offset) {
     return vehicle.GetMatrix().TransformVector(offset) + vehicle.GetPosition();
 }
 
+/// GET_CAR_HEADING(0174)
+float GetCarHeading(CVehicle& vehicle) {
+    float heading = vehicle.GetHeading() * RadiansToDegrees(1.0f);
+    if (heading < 0.0f) {
+        heading += 360.0f;
+    }
+    if (heading > 360.0f) {
+        heading -= 360.0f;
+    }
+    return heading;
+}
+
+/// IS_CAR_UPRIGHT(020D)
+bool IsCarUpright(CVehicle& vehicle) {
+    return !(vehicle.GetMatrix().GetUp().z < 0.0f); // The original's comparison (so NaN counts as upright)
+}
+
 /// SET_CAR_HEADING(0175)
 void SetCarHeading(CVehicle& vehicle, float heading) {
     vehicle.SetHeading(DegreesToRadians(FixAngleDegrees(heading)));
@@ -356,6 +373,8 @@ void notsa::script::commands::vehicle::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CAR_COORDINATES, GetCarCoordinates);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CAR_COORDINATES, SetCarCoordinates);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_OFFSET_FROM_CAR_IN_WORLD_COORDS, GetOffsetFromCarInWorldCoords);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_CAR_HEADING, GetCarHeading);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_CAR_UPRIGHT, IsCarUpright);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CAR_HEADING, SetCarHeading);
     REGISTER_COMMAND_HANDLER(COMMAND_FREEZE_CAR_POSITION, FreezeCarPosition);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CAR_HEALTH, SetCarHealth);

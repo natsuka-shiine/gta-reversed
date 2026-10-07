@@ -8,6 +8,8 @@
 #include "PedClothesDesc.h"
 #include "MBlur.h"
 #include "Ropes.h"
+#include "GameLogic.h"
+#include "Pad.h"
 
 #include <RunningScript.h>
 
@@ -153,6 +155,11 @@ void ClearWantedLevel(CPlayerPed& player) {
     player.GetWanted()->SetWantedLevel(eWantedLevel::WANTED_CLEAN);
 }
 
+/// STORE_WANTED_LEVEL(01C0)
+int32 StoreWantedLevel(CPlayerPed& player) { // 0x47D6A8
+    return static_cast<int32>(player.GetWantedLevel());
+}
+
 /// SET_MAX_WANTED_LEVEL(01F0)
 void SetMaxWantedLevel(eWantedLevel level) {
     CWanted::SetMaximumWantedLevel(level);
@@ -176,6 +183,11 @@ bool IsPlayerPressingHorn(uint32 playerIdx) {
 /// SET_PLAYER_CONTROL(01B4)
 void SetPlayerControl(CPlayerInfo& player, bool state) {
     player.MakePlayerSafe(!state, 10.0);
+}
+
+/// IS_PLAYER_CONTROL_ON(09E7)
+bool IsPlayerControlOn(uint32 playerIdx) { // 0x47B109
+    return !CPad::GetPad(playerIdx)->bPlayerSafe;
 }
 
 /// SET_POLICE_IGNORE_PLAYER(01F7)
@@ -222,6 +234,19 @@ void SetPlayerNeverGetsTired(CPlayerInfo& player, bool state) {
 /// SET_PLAYER_FAST_RELOAD(0331)
 void SetPlayerFastReload(CPlayerInfo& player, bool state) {
     player.m_bFastReload = state;
+}
+
+/// GET_WHEELIE_STATS(04FC)
+MultiRet<uint32, float, uint32, float, uint32, float> GetWheelieStats(CPlayerInfo& player) {
+    // Reading the stats also resets them
+    return {
+        std::exchange(player.m_nBestCarTwoWheelsTimeMs, 0u),
+        std::exchange(player.m_fBestCarTwoWheelsDistM, 0.0f),
+        std::exchange(player.m_nBestBikeWheelieTimeMs, 0u),
+        std::exchange(player.m_fBestBikeWheelieDistM, 0.0f),
+        std::exchange(player.m_nBestBikeStoppieTimeMs, 0u),
+        std::exchange(player.m_fBestBikeStoppieDistM, 0.0f),
+    };
 }
 
 /// CAN_PLAYER_START_MISSION(03EE)
@@ -376,6 +401,11 @@ void SetPlayersCanBeInSeparateCars(bool state) {
     CGameLogic::bPlayersCanBeInSeparateCars = state;
 }
 
+/// IS_2PLAYER_GAME_GOING_ON(0800)
+bool Is2PlayerGameGoingOn() { // 0x4732FE
+    return CGameLogic::IsCoopGameGoingOn();
+}
+
 /// BUILD_PLAYER_MODEL(070D)
 void BuildPlayerModel(CPlayerPed* player) {
     CClothes::RebuildPlayer(player, false);
@@ -469,9 +499,11 @@ void notsa::script::commands::player::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_ALTER_WANTED_LEVEL_NO_DROP, AlterPlayerWantedLevelNoDrop);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_WANTED_LEVEL_GREATER, IsWantedLevelGreater);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_WANTED_LEVEL, ClearWantedLevel);
+    REGISTER_COMMAND_HANDLER(COMMAND_STORE_WANTED_LEVEL, StoreWantedLevel);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_PLAYER_DEAD, IsPlayerDead);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_PLAYER_PRESSING_HORN, IsPlayerPressingHorn);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PLAYER_CONTROL, SetPlayerControl);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_PLAYER_CONTROL_ON, IsPlayerControlOn);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_MAX_WANTED_LEVEL, SetMaxWantedLevel);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_PLAYER_CHAR, GetPlayerChar);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_POLICE_IGNORE_PLAYER, SetPoliceIgnorePlayer);
@@ -482,6 +514,7 @@ void notsa::script::commands::player::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_GET_NUM_OF_MODELS_KILLED_BY_PLAYER, GetNumOfModelsKilledByPlayer);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PLAYER_NEVER_GETS_TIRED, SetPlayerNeverGetsTired);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PLAYER_FAST_RELOAD, SetPlayerFastReload);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_WHEELIE_STATS, GetWheelieStats);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_EVERYONE_IGNORE_PLAYER, SetEveryoneIgnorePlayer);
     REGISTER_COMMAND_HANDLER(COMMAND_CAN_PLAYER_START_MISSION, CanPlayerStartMission);
     REGISTER_COMMAND_HANDLER(COMMAND_MAKE_PLAYER_SAFE_FOR_CUTSCENE, MakePlayerSafeForCutscene);
@@ -505,6 +538,7 @@ void notsa::script::commands::player::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_RELEASE_TWO_PLAYER_DISTANCE, ReleaseTwoPlayerDistance);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PLAYER_PLAYER_TARGETTING, SetPlayerPlayerTargetting);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PLAYERS_CAN_BE_IN_SEPARATE_CARS, SetPlayersCanBeInSeparateCars);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_2PLAYER_GAME_GOING_ON, Is2PlayerGameGoingOn);
     REGISTER_COMMAND_HANDLER(COMMAND_BUILD_PLAYER_MODEL, BuildPlayerModel);
     REGISTER_COMMAND_HANDLER(COMMAND_GIVE_PLAYER_CLOTHES, GivePlayerClothes);
     REGISTER_COMMAND_HANDLER(COMMAND_PLAYER_ENTERED_DOCK_CRANE, PlayerEnteredDockCrane);

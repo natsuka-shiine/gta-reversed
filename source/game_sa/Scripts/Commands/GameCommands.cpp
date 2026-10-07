@@ -19,6 +19,8 @@
 #include "UserDisplay.h"
 #include "EntryExit.h"
 #include "EntryExitManager.h"
+#include "Shopping.h"
+#include "Collision/ColStore.h"
 
 /*!
 * Various game related commands
@@ -47,6 +49,31 @@ float GetGroundZFor3DCoord(CVector coord) {
 
 void PlayerMadeProgress(int32 progress) {
     return CStats::IncrementStat(STAT_PROGRESS_MADE, float(progress));
+}
+
+// SET_PROGRESS_TOTAL (0x30D) - 0x480D28
+void SetProgressTotal(int32 total) {
+    CStats::SetStatValue(STAT_TOTAL_PROGRESS, float(total));
+}
+
+// SET_TOTAL_NUMBER_OF_MISSIONS (0x42C) - 0x489D5B
+void SetTotalNumberOfMissions(int32 total) {
+    CStats::SetStatValue(STAT_TOTAL_NUMBER_OF_MISSIONS_IN_GAME, float(total));
+}
+
+// SET_MISSION_RESPECT_TOTAL (0x997) - 0x478EA4
+void SetMissionRespectTotal(int32 total) {
+    CStats::SetStatValue(STAT_RESPECT_MISSION_TOTAL, float(total));
+}
+
+// GET_PROGRESS_PERCENTAGE (0x58C) - 0x48EDA0
+float GetProgressPercentage() {
+    return CStats::GetPercentageProgress();
+}
+
+// HAS_SAVE_GAME_FINISHED (0x3D9) - 0x48548A
+bool HasSaveGameFinished() {
+    return !FrontEndMenuManager.m_bMenuActive && !FrontEndMenuManager.m_bIsSaveDone;
 }
 
 void RegisterMissionGiven() {
@@ -95,6 +122,12 @@ void SetNoResprays(bool enabled) {
     CGarages::AllRespraysCloseOrOpen(enabled);
 }
 
+/// IS_GARAGE_OPEN(03B0)
+bool IsGarageOpen(const char* name) {
+    const auto garageId = CGarages::GetGarageNumberByName(name);
+    return garageId >= 0 && CGarages::IsGarageOpen(garageId);
+}
+
 void SetRespawnPointForDurationOfMission(CVector point) {
     CRestart::SetRespawnPointForDurationOfMission(point);
 }
@@ -130,6 +163,26 @@ void ClearArea(CVector pos, float radius, int32 clearParticles) {
 void SetAreaVisible(eAreaCodes area) {
     CGame::currArea = area;
     CStreaming::RemoveBuildingsNotInArea(area);
+}
+
+/// GET_AREA_VISIBLE(077E) - 0x46B88C
+eAreaCodes GetAreaVisible() {
+    return CGame::GetCurrentAreaCode();
+}
+
+/// REQUEST_COLLISION(04E4) - 0x48C244
+void RequestCollision(CVector2D pos) {
+    CColStore::RequestCollision(CVector{ pos.x, pos.y, 0.f }, CGame::GetCurrentAreaCode());
+}
+
+/// GET_LOADED_SHOP(07B0) - 0x46C364
+void GetLoadedShop(CRunningScript& S) {
+    // The name is stored as a short (8 character) text label in upper case.
+    // Like in the original the destination variable's type isn't checked, and an 8 character name is stored without a terminator.
+    char name[8 + 1]{}; // Original has no room for a terminator (and so runs `MakeUpperCase` past the end for names of 8+ characters)
+    strncpy(name, CShopping::GetLoadedShopName(), 8);
+    MakeUpperCase(name);
+    strncpy(reinterpret_cast<char*>(S.GetPointerToScriptVariable(VAR_GLOBAL)), name, 8);
 }
 
 /// SWITCH_ENTRY_EXIT(07FB) - 0x4730A8
@@ -237,6 +290,11 @@ void notsa::script::commands::game::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_FAIL_CURRENT_MISSION, FailCurrentMission);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_GROUND_Z_FOR_3D_COORD, GetGroundZFor3DCoord);
     REGISTER_COMMAND_HANDLER(COMMAND_PLAYER_MADE_PROGRESS, PlayerMadeProgress);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_PROGRESS_TOTAL, SetProgressTotal);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_TOTAL_NUMBER_OF_MISSIONS, SetTotalNumberOfMissions);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_MISSION_RESPECT_TOTAL, SetMissionRespectTotal);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_PROGRESS_PERCENTAGE, GetProgressPercentage);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_SAVE_GAME_FINISHED, HasSaveGameFinished);
     REGISTER_COMMAND_HANDLER(COMMAND_REGISTER_MISSION_GIVEN, RegisterMissionGiven);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PED_DENSITY_MULTIPLIER, SetPedDensityMultiplier);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_JAPANESE_VERSION, IsJapaneseVersion);
@@ -249,6 +307,7 @@ void notsa::script::commands::game::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_INCREMENT_INT_STAT_NO_MESSAGE, IncrementFloatStatNoMessage);
     REGISTER_COMMAND_HANDLER(COMMAND_TAKE_PHOTO, TakePhoto);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_NO_RESPRAYS, SetNoResprays);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_GARAGE_OPEN, IsGarageOpen);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_RESPAWN_POINT_FOR_DURATION_OF_MISSION, SetRespawnPointForDurationOfMission);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CURRENT_LANGUAGE, GetCurrentLanguage);
     REGISTER_COMMAND_HANDLER(COMMAND_DO_WEAPON_STUFF_AT_START_OF_2P_GAME, DoWeaponStuffAtStartOf2PlayerGame);
@@ -256,6 +315,9 @@ void notsa::script::commands::game::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_ONSCREEN_COUNTER, ClearOnscreenCounter);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_AREA, ClearArea);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_AREA_VISIBLE, SetAreaVisible);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_AREA_VISIBLE, GetAreaVisible);
+    REGISTER_COMMAND_HANDLER(COMMAND_REQUEST_COLLISION, RequestCollision);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_LOADED_SHOP, GetLoadedShop);
     REGISTER_COMMAND_HANDLER(COMMAND_SWITCH_ENTRY_EXIT, SwitchEntryExit);
     REGISTER_COMMAND_HANDLER(COMMAND_DELETE_MENU, DeleteScriptMenu);
     REGISTER_COMMAND_HANDLER(COMMAND_REGISTER_BEST_POSITION, RegisterBestPosition);

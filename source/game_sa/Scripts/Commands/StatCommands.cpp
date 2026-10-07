@@ -43,6 +43,11 @@ template<typename T>
 T GetStat(eStats stat) {
     return (T)(CStats::GetStatValue(stat));
 }
+
+// SHOW_UPDATE_STATS (2296) - 0x47608E
+void ShowUpdateStats(int32 state) {
+    CStats::bShowUpdateStats = state != 0;
+}
 };
 
 void notsa::script::commands::stat::RegisterHandlers() {
@@ -62,6 +67,8 @@ void notsa::script::commands::stat::RegisterHandlers() {
 
     REGISTER_COMMAND_HANDLER(COMMAND_GET_INT_STAT, GetStat<int32>);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_FLOAT_STAT, GetStat<float>);
+
+    REGISTER_COMMAND_HANDLER(COMMAND_SHOW_UPDATE_STATS, ShowUpdateStats);
 
     REGISTER_COMMAND_UNIMPLEMENTED(COMMAND_GET_STAT_CHANGE_AMOUNT);
 }

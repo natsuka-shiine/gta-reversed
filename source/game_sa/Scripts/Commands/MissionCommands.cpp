@@ -66,6 +66,11 @@ void ScriptName(CRunningScript* S, std::string_view name) {
     S->SetName(name);
 }
 
+// SET_DEATHARREST_STATE (0x111) - 0x469A7B
+void SetDeathArrestState(CRunningScript* S, int32 state) {
+    S->m_IsDeathArrestCheckEnabled = state == 1; // Original compares against 1, not against 0
+}
+
 int32 StartScriptFire(CVector pos, int8 propagation, int32 size) {
     return gFireManager.StartScriptFire(pos, nullptr, 0.8f, 1, propagation, size);
 }
@@ -80,6 +85,7 @@ void notsa::script::commands::mission::RegisterHandlers() {
 
     REGISTER_COMMAND_HANDLER(COMMAND_LOAD_AND_LAUNCH_MISSION_INTERNAL, LoadAndLaunchMissionInternal);
     REGISTER_COMMAND_HANDLER(COMMAND_SCRIPT_NAME, ScriptName);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_DEATHARREST_STATE, SetDeathArrestState);
     REGISTER_COMMAND_HANDLER(COMMAND_START_SCRIPT_FIRE, StartScriptFire);
     REGISTER_COMMAND_HANDLER(COMMAND_LAUNCH_MISSION, LaunchMission);
 

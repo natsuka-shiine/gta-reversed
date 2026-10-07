@@ -14,6 +14,7 @@
 #include <TaskTypes/TaskSimpleStandStill.h>
 #include <TaskTypes/TaskComplexWanderCriminal.h>
 #include <TaskTypes/TaskComplexWanderStandard.h>
+#include <TaskTypes/TaskSimpleLookAbout.h>
 #include <TaskTypes/TaskComplexTurnToFaceEntityOrCoord.h>
 #include <TaskTypes/TaskComplexKillPedOnFoot.h>
 #include <TaskTypes/TaskComplexEnterCarAsDriver.h>
@@ -32,6 +33,7 @@
 #include <TaskTypes/TaskComplexLeaveAnyCar.h>
 #include <TaskTypes/TaskSimpleGangDriveBy.h>
 #include <TaskTypes/TaskSimpleClearLookAt.h>
+#include <TaskTypes/TaskSimpleTriggerLookAt.h>
 #include <Ragdoll/IKChainManager.h>
 
 #include <Attractors/PedAttractorPedPlacer.h>
@@ -2479,8 +2481,46 @@ auto IsCharInAnyPlane(CPed& ped) {
  * 
  * @param {Char} self
  */
+/*
+ * @opcode 09AE
+ * @command IS_CHAR_IN_ANY_TRAIN
+ * @class Char
+ * @method IsInAnyTrain
+ * 
+ * @brief Returns true if the specified character is in a train
+ * 
+ * @param {Char} self
+ */
+auto IsCharInAnyTrain(CPed& ped) { // 0x4793B0
+    return ped.bInVehicle && ped.m_pVehicle->IsTrain(); // The original doesn't check the vehicle pointer either
+}
+
 auto IsCharInWater(CPed* ped) {
     return ped && ped->physicalFlags.bSubmergedInWater;
+}
+
+/*
+ * @opcode 0818
+ * @command IS_CHAR_IN_AIR
+ * @class Char
+ * @method IsInAir
+ * 
+ * @brief Returns true if the character is in the air
+ * 
+ * @param {Char} self
+ */
+bool IsCharInAir(CPed& ped) { // 0x473CB3
+    if (ped.bIsInTheAir) {
+        return true;
+    }
+    if (ped.bIsStanding) {
+        return false;
+    }
+    if (!ped.bKnockedUpIntoAir && !ped.bKnockedOffBike) {
+        return false;
+    }
+    const auto task = ped.GetTaskManager().GetSimplestActiveTask();
+    return task && task->GetTaskType() == TASK_SIMPLE_FALL;
 }
 
 /*
@@ -3022,6 +3062,28 @@ auto LoadCharDecisionMaker(CRunningScript& S, int32 type) { // TODO: return Scri
 }
 
 /*
+ * @opcode 065C
+ * @command REMOVE_DECISION_MAKER
+ * @class DecisionMaker
+ * @method Remove
+ *
+ * @brief Removes the decision maker
+ *
+ * @param {DecisionMaker} self
+ */
+auto RemoveDecisionMaker(CRunningScript& S, int32 scriptHandleOfDM) { // 0x494767
+    const auto dm = CTheScripts::GetActualScriptThingIndex(scriptHandleOfDM, SCRIPT_THING_DECISION_MAKER);
+    if (dm >= 0 && dm < (int32)(CDecisionMakerTypes::NUM_TYPES)) {
+        if (CTheScripts::ScriptResourceManager.RemoveFromResourceManager(scriptHandleOfDM, RESOURCE_TYPE_DECISION_MAKER, &S)) {
+            CDecisionMakerTypesFileLoader::UnloadDecisionMaker((eDecisionMakerType)(dm));
+        }
+    }
+    if (S.m_UsesMissionCleanup) {
+        CTheScripts::MissionCleanUp.RemoveEntityFromList(scriptHandleOfDM, MISSION_CLEANUP_ENTITY_TYPE_DECISION_MAKER);
+    }
+}
+
+/*
  * @opcode 060B
  * @command SET_CHAR_DECISION_MAKER
  * @class Char
@@ -3067,6 +3129,50 @@ auto AddCharDecisionMakerEventResponse(int32 scriptHandleOfDM, eEventType event,
     float responseChances[]{ dislike, like, respect, hate };
     int32 flags[]{ onFoot, inCar };
     CDecisionMakerTypes::GetInstance()->AddEventResponse(dm, event, taskId, responseChances, flags);
+}
+
+/*
+ * @opcode 0978
+ * @command COPY_SHARED_CHAR_DECISION_MAKER
+ * @class DecisionMakerChar
+ * @method CopyShared
+ *
+ * @brief Copies a decision maker, unless the variable the handle is stored to already has a valid decision maker in it
+ *
+ * @param {DecisionMakerCharTemplate} handleOrTemplate
+ *
+ * @returns {DecisionMakerChar} handle
+ */
+auto CopySharedCharDecisionMaker(CRunningScript& S, int32 scriptHandleOfDM) { // 0x47875E
+    const auto srcDM = scriptHandleOfDM == -1
+        ? -1
+        : CTheScripts::GetActualScriptThingIndex(scriptHandleOfDM, SCRIPT_THING_DECISION_MAKER);
+    // The current value of the variable the result is going to be stored to (All inputs have been read by now, so that's the next parameter)
+    auto handle = S.CollectNextParameterWithoutIncreasingPC();
+    if (CTheScripts::GetActualScriptThingIndex(handle, SCRIPT_THING_DECISION_MAKER) == -1) { // Not a valid decision maker, so make the copy
+        const auto id = CDecisionMakerTypes::GetInstance()->CopyDecisionMaker(srcDM, PED_DECISION_MAKER, S.m_UsesMissionCleanup);
+        handle = CTheScripts::GetNewUniqueScriptThingIndex(id, SCRIPT_THING_DECISION_MAKER);
+        if (S.m_UsesMissionCleanup) {
+            CTheScripts::MissionCleanUp.AddEntityToList(handle, MISSION_CLEANUP_ENTITY_TYPE_DECISION_MAKER);
+        }
+    }
+    CTheScripts::ScriptResourceManager.AddToResourceManager(handle, RESOURCE_TYPE_DECISION_MAKER, &S);
+    return handle;
+}
+
+/*
+ * @opcode 074F
+ * @command IS_CHAR_RESPONDING_TO_EVENT
+ * @class Char
+ * @method IsRespondingToEvent
+ *
+ * @brief Returns true if the character is responding to the event
+ *
+ * @param {Char} self
+ * @param {Event} event
+ */
+auto IsCharRespondingToEvent(CPed& ped, eEventType event) { // 0x46E7BC
+    return ped.GetIntelligence()->IsRespondingToEvent(event);
 }
 
 /*
@@ -3256,6 +3362,28 @@ auto StartCharFacialTalk(CPed& ped, int32 duration) {
 }
 
 /*
+ * @opcode 094B
+ * @command GET_NAME_OF_ENTRY_EXIT_CHAR_USED
+ * @class Char
+ * @method GetNameOfEntryExitUsed
+ *
+ * @brief Gets the name of the entry/exit (interior) the character used
+ *
+ * @param {Char} self
+ *
+ * @returns {string} interiorName
+ */
+void GetNameOfEntryExitCharUsed(CRunningScript& S, CPed& ped) {
+    // 0x4775B3 - The output is a text label variable, which comes right after the handle
+    auto* const name = reinterpret_cast<char*>(S.GetPointerToScriptVariable(VAR_GLOBAL));
+    if (const auto* const enex = ped.m_pEnex) {
+        strcpy(name, enex->m_szName); // Not length limited in the original either
+    } else {
+        name[0] = '\0';
+    }
+}
+
+/*
  * @opcode 0968
  * @command STOP_CHAR_FACIAL_TALK
  * @class Char
@@ -3421,6 +3549,45 @@ auto TaskAchieveHeading(eScriptCommands command, CRunningScript& S, int32 pedHan
     S.GivePedScriptedTask(
         pedHandle,
         new CTaskSimpleAchieveHeading{ DegreesToRadians(headingDeg), 0.5f, 0.2f },
+        command
+    );
+}
+
+/*
+ * @opcode 05DE
+ * @command TASK_WANDER_STANDARD
+ * @class Task
+ * @method WanderStandard
+ * @static
+ *
+ * @brief Makes the character walk around the ped path nodes
+ *
+ * @param {Char} handle
+ */
+auto TaskWanderStandard(eScriptCommands command, CRunningScript& S, int32 pedHandle) { // 0x490EF7
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskComplexWanderStandard{ PEDMOVE_WALK, (uint8)(CGeneral::GetRandomNumberInRange(0, 8)), true },
+        command
+    );
+}
+
+/*
+ * @opcode 05C9
+ * @command TASK_LOOK_ABOUT
+ * @class Task
+ * @method LookAbout
+ * @static
+ *
+ * @brief Makes the character look around
+ *
+ * @param {Char} handle
+ * @param {int} time
+ */
+auto TaskLookAbout(eScriptCommands command, CRunningScript& S, int32 pedHandle, int32 time) { // 0x490313
+    S.GivePedScriptedTask(
+        pedHandle,
+        new CTaskSimpleLookAbout{ (uint32)(time == -1 ? 20'000 : time) },
         command
     );
 }
@@ -4569,6 +4736,32 @@ auto ClearLookAt(int32 pedHandle) {
     }
 }
 
+/*
+ * @opcode 05BF
+ * @command TASK_LOOK_AT_CHAR
+ * @class Task
+ * @method LookAtChar
+ *
+ * @brief Makes the character look at another character
+ *
+ * @param {Char} observer (-1 to add the task to the open sequence)
+ * @param {Char} target
+ * @param {int} time (-1 for 20 seconds, -2 for no time limit)
+ */
+auto TaskLookAtChar(int32 pedHandle, int32 targetHandle, int32 time) {
+    if (time == -1) {
+        time = 20'000;
+    } else if (time == -2) {
+        time = -1;
+    }
+    const auto target = GetPedPool()->GetAtRef(targetHandle);
+    if (pedHandle != -1) {
+        g_ikChainMan.LookAt("COMMAND_TASK_LOOK_AT_CHAR", GetPedPool()->GetAtRef(pedHandle), target, time, BONE_HEAD, nullptr, false, 0.25f, 500, 6, true);
+    } else {
+        CTaskSequences::AddTaskToActiveSequence(new CTaskSimpleTriggerLookAt{ target, time, BONE_HEAD, CVector{ 0.f, 0.f, 0.f }, true, 0.25f, 1000, 3 });
+    }
+}
+
 //! The route built by `EXTEND_ROUTE`, for the commands that take a point route
 auto& s_ScriptPointRoute = StaticRef<CPointRoute, 0xC18D50>();
 
@@ -4607,6 +4800,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_ADD_ARMOUR_TO_CHAR, AddArmourToChar);
     //REGISTER_COMMAND_HANDLER(COMMAND_ARE_ANY_CHARS_NEAR_CHAR, AreAnyCharsNearChar);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_LOOK_AT, ClearLookAt);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_LOOK_AT_CHAR, TaskLookAtChar);
     REGISTER_COMMAND_HANDLER(COMMAND_FLUSH_ROUTE, FlushRoute);
     REGISTER_COMMAND_HANDLER(COMMAND_EXTEND_ROUTE, ExtendRoute);
     REGISTER_COMMAND_HANDLER(COMMAND_CREATE_CHAR, CreateChar);
@@ -4786,6 +4980,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANGLED_AREA_IN_CAR_3D, IsCharInAngledAreaInCar3D);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_TAXI, IsCharInTaxi);
     REGISTER_COMMAND_HANDLER(COMMAND_LOAD_CHAR_DECISION_MAKER, LoadCharDecisionMaker);
+    REGISTER_COMMAND_HANDLER(COMMAND_REMOVE_DECISION_MAKER, RemoveDecisionMaker);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_DECISION_MAKER, SetCharDecisionMaker);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_PLAYING_ANIM, IsCharPlayingAnim);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_PLAY_ANIM, TaskPlayAnim);
@@ -4801,6 +4996,8 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_PAUSE, TaskPause);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_TOGGLE_DUCK, TaskToggleDuck);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_ACHIEVE_HEADING, TaskAchieveHeading);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_WANDER_STANDARD, TaskWanderStandard);
+    REGISTER_COMMAND_HANDLER(COMMAND_TASK_LOOK_ABOUT, TaskLookAbout);
     REGISTER_COMMAND_HANDLER(COMMAND_TASK_STAY_IN_SAME_PLACE, TaskStayInSamePlace);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_AT_SCRIPTED_ATTRACTOR, IsCharAtScriptedAttractor);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_MODEL, GetCharModel);
@@ -4841,7 +5038,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_HOLDING_OBJECT, IsCharHoldingObject);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_RANDOM_CHAR_IN_SPHERE, GetRandomCharInSphere);
     //REGISTER_COMMAND_HANDLER(COMMAND_HAS_CHAR_BEEN_ARRESTED, HasCharBeenArrested);
-    //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_RESPONDING_TO_EVENT, IsCharRespondingToEvent);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_RESPONDING_TO_EVENT, IsCharRespondingToEvent);
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_FLEE_CHAR_ANY_MEANS, TaskFleeCharAnyMeans);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_IS_TARGET_PRIORITY, SetCharIsTargetPriority);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_RELATIONSHIP, SetCharRelationship);
@@ -4859,7 +5056,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_TASK_CHAR_SLIDE_TO_COORD_AND_PLAY_ANIM, TaskCharSlideToCoordAndPlayAnim);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_HIGHEST_PRIORITY_EVENT, GetCharHighestPriorityEvent);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_KINDA_STAY_IN_SAME_PLACE, SetCharKindaStayInSamePlace);
-    //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_AIR, IsCharInAir);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_AIR, IsCharInAir);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_CHAR_HEIGHT_ABOVE_GROUND, GetCharHeightAboveGround);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_WEAPON_SKILL, SetCharWeaponSkill);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_RANDOM_CHAR_IN_SPHERE_ONLY_DRUGS_BUYERS, GetRandomCharInSphereOnlyDrugsBuyers);
@@ -4872,7 +5069,7 @@ void notsa::script::commands::character::RegisterHandlers() {
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_FIRE_DAMAGE_MULTIPLIER, SetCharFireDamageMultiplier);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_USES_UPPERBODY_DAMAGE_ANIMS_ONLY, SetCharUsesUpperbodyDamageAnimsOnly);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_SAY_CONTEXT, SetCharSayContext);
-    //REGISTER_COMMAND_HANDLER(COMMAND_GET_NAME_OF_ENTRY_EXIT_CHAR_USED, GetNameOfEntryExitCharUsed);
+    REGISTER_COMMAND_HANDLER(COMMAND_GET_NAME_OF_ENTRY_EXIT_CHAR_USED, GetNameOfEntryExitCharUsed);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_POSITION_OF_ENTRY_EXIT_CHAR_USED, GetPositionOfEntryExitCharUsed);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_TALKING, IsCharTalking);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_STUCK_UNDER_CAR, IsCharStuckUnderCar);
@@ -4882,12 +5079,12 @@ void notsa::script::commands::character::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_START_CHAR_FACIAL_TALK, StartCharFacialTalk);
     REGISTER_COMMAND_HANDLER(COMMAND_STOP_CHAR_FACIAL_TALK, StopCharFacialTalk);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_COORDINATES_NO_OFFSET, SetCharCoordinatesNoOffset);
-    //REGISTER_COMMAND_HANDLER(COMMAND_COPY_SHARED_CHAR_DECISION_MAKER, CopySharedCharDecisionMaker);
+    REGISTER_COMMAND_HANDLER(COMMAND_COPY_SHARED_CHAR_DECISION_MAKER, CopySharedCharDecisionMaker);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_FORCE_DIE_IN_CAR, SetCharForceDieInCar);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_USES_COLLISION_CLOSEST_OBJECT_OF_TYPE, SetCharUsesCollisionClosestObjectOfType);
     //REGISTER_COMMAND_HANDLER(COMMAND_SET_CHAR_DRUGGED_UP, SetCharDruggedUp);
     //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_HEAD_MISSING, IsCharHeadMissing);
-    //REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANY_TRAIN, IsCharInAnyTrain);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_CHAR_IN_ANY_TRAIN, IsCharInAnyTrain);
     //REGISTER_COMMAND_HANDLER(COMMAND_GET_RANDOM_CHAR_IN_AREA_OFFSET_NO_SAVE, GetRandomCharInAreaOffsetNoSave);
 
     REGISTER_COMMAND_UNIMPLEMENTED(COMMAND_SET_CHAR_GRAPHIC_TYPE);

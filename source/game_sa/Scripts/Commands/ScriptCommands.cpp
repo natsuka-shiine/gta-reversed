@@ -90,6 +90,16 @@ void LoadCutscene(const char* name) {
     CCutsceneMgr::LoadCutsceneData(name);
 }
 
+/// HAS_CUTSCENE_LOADED(06B9)
+bool HasCutsceneLoaded() { // 0x4976A2
+    return CCutsceneMgr::ms_cutsceneLoadStatus == CCutsceneMgr::LoadStatus::LOADED;
+}
+
+/// IS_MINIGAME_IN_PROGRESS(09BE)
+bool IsMinigameInProgress() { // 0x479800
+    return CTheScripts::bMiniGameInProgress;
+}
+
 void SetPhotoCameraEffect(bool enable) {
     CTheScripts::bDrawCrossHair = enable ? eCrossHairType::FIXED_DRAW_1STPERSON_WEAPON : eCrossHairType::NONE;
 }
@@ -125,6 +135,8 @@ void notsa::script::commands::script::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_MISSION_AUDIO, ClearMissionAudio);
     REGISTER_COMMAND_HANDLER(COMMAND_REPORT_MISSION_AUDIO_EVENT_AT_POSITION, ReportMissionAudioEventAtPosition);
     REGISTER_COMMAND_HANDLER(COMMAND_LOAD_CUTSCENE, LoadCutscene);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_CUTSCENE_LOADED, HasCutsceneLoaded);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_MINIGAME_IN_PROGRESS, IsMinigameInProgress);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_PHOTO_CAMERA_EFFECT, SetPhotoCameraEffect);
     REGISTER_COMMAND_HANDLER(COMMAND_DRAW_ODDJOB_TITLE_BEFORE_FADE, DrawOddJobTitleBeforeFade);
     REGISTER_COMMAND_HANDLER(COMMAND_DRAW_SUBTITLES_BEFORE_FADE, DrawSubtitlesBeforeFade);

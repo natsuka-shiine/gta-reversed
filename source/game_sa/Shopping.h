@@ -85,6 +85,8 @@ class CShopping {
 public:
     static void InjectHooks();
 
+    static const char* GetLoadedShopName() { return ms_shopLoaded; } // NOTSA
+
     static void Init();
     static void ShutdownForRestart();
     static void Buy(uint32 key, int32 extraInfo);

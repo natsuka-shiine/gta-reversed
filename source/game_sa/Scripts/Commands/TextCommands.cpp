@@ -304,6 +304,23 @@ bool IsMessageBeingDisplayed() {
     return CMessages::BriefMessages[0].Text != nullptr;
 }
 
+/// IS_HELP_MESSAGE_BEING_DISPLAYED(08FE) - 0x476323
+bool IsHelpMessageBeingDisplayed() {
+    return CHud::HelpMessageDisplayed();
+}
+
+/// IS_THIS_HELP_MESSAGE_BEING_DISPLAYED(0A2A) - 0x479E75
+bool IsThisHelpMessageBeingDisplayed(const char* key) {
+    const auto* const text = TheText.Get(key);
+    if (!CHud::HelpMessageDisplayed()) {
+        return false;
+    }
+    GxtChar expanded[400];
+    CMessages::StringCopy(expanded, text, (uint16)(std::size(expanded)));
+    CMessages::InsertPlayerControlKeysInString(expanded);
+    return CMessages::StringCompare(expanded, CHud::m_pHelpMessageToPrint, (uint16)(CMessages::GetStringLength(expanded)));
+}
+
 /// DISPLAY_NON_MINIGAME_HELP_MESSAGES(0A44)
 void DisplayNonMiniGameHelpMessages(bool state) {
     CTheScripts::bDisplayNonMiniGameHelpMessages = state;
@@ -318,6 +335,8 @@ void notsa::script::commands::text::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_PRINT_HELP, PrintHelp);
     REGISTER_COMMAND_HANDLER(COMMAND_CLEAR_HELP, ClearHelp);
     REGISTER_COMMAND_HANDLER(COMMAND_IS_MESSAGE_BEING_DISPLAYED, IsMessageBeingDisplayed);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_HELP_MESSAGE_BEING_DISPLAYED, IsHelpMessageBeingDisplayed);
+    REGISTER_COMMAND_HANDLER(COMMAND_IS_THIS_HELP_MESSAGE_BEING_DISPLAYED, IsThisHelpMessageBeingDisplayed);
     REGISTER_COMMAND_HANDLER(COMMAND_FLASH_HUD_OBJECT, FlashHudObject);
     REGISTER_COMMAND_HANDLER(COMMAND_PRINT_BIG, PrintBig);
     REGISTER_COMMAND_HANDLER(COMMAND_PRINT, Print);

@@ -140,6 +140,16 @@ void SetObjectCollision(CObject& object, bool enable) {
 bool DoesObjectHaveThisModel(CObject& object, script::Model model) {
     return object.m_nModelIndex == model;
 }
+
+/// ATTACH_OBJECT_TO_CHAR(069B) - 0x495C6A
+void AttachObjectToChar(CObject& object, CPed* ped, CVector offset, CVector rotationDeg) {
+    object.AttachEntityToEntity(ped, offset, rotationDeg * DegreesToRadians(1.0f)); // Does nothing if there is no ped
+}
+
+/// SET_OBJECT_VISIBLE(0750) - 0x46E802
+void SetObjectVisible(CObject& object, bool visible) {
+    object.SetIsVisible(visible);
+}
 } // namespace Object
 
 namespace Model {
@@ -262,6 +272,31 @@ uint8 GetNumberOfInstancesOfStreamedScript(int16 scmIndex) {
     return CTheScripts::StreamedScripts.m_aScripts[index].m_NumberOfUsers;
 }
 
+/// STREAM_SCRIPT(08A9)
+void StreamScript(int16 scmIndex) { // 0x47500D
+    const auto index = CTheScripts::StreamedScripts.GetProperIndexFromIndexUsedByScript(scmIndex);
+    CStreaming::RequestModel(SCMToModelId(index), STREAMING_MISSION_REQUIRED);
+}
+
+/// HAS_STREAMED_SCRIPT_LOADED(08AB)
+bool HasStreamedScriptLoaded(int16 scmIndex) { // 0x475049
+    const auto index = CTheScripts::StreamedScripts.GetProperIndexFromIndexUsedByScript(scmIndex);
+    return CStreaming::IsModelLoaded(SCMToModelId(index));
+}
+
+/// MARK_STREAMED_SCRIPT_AS_NO_LONGER_NEEDED(090F)
+void MarkStreamedScriptAsNoLongerNeeded(int16 scmIndex) { // 0x47668A
+    const auto index = CTheScripts::StreamedScripts.GetProperIndexFromIndexUsedByScript(scmIndex);
+    CStreaming::SetMissionDoesntRequireModel(SCMToModelId(index)); // 0x4700E0 (inlined wrapper)
+}
+
+/// START_NEW_STREAMED_SCRIPT(0913)
+void StartNewStreamedScript(CRunningScript& S, int16 scmIndex) { // 0x476742
+    const auto index = CTheScripts::StreamedScripts.GetProperIndexFromIndexUsedByScript(scmIndex);
+    // The original doesn't check for null either (a script that isn't loaded yet), the arguments are read regardless
+    S.ReadParametersForNewlyStartedScript(CTheScripts::StreamedScripts.StartNewStreamedScript(index));
+}
+
 /// ALLOCATE_STREAMED_SCRIPT_TO_RANDOM_PED(0928)
 void AllocateStreamedScriptToRandomPed(int16 scmIndex, script::Model model, int percentage) {
     const auto index = CTheScripts::StreamedScripts.GetProperIndexFromIndexUsedByScript(scmIndex);
@@ -352,6 +387,8 @@ void notsa::script::commands::object::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_SET_OBJECT_SCALE, SetObjectScale);
     REGISTER_COMMAND_HANDLER(COMMAND_SET_OBJECT_COLLISION, SetObjectCollision);
     REGISTER_COMMAND_HANDLER(COMMAND_DOES_OBJECT_HAVE_THIS_MODEL, DoesObjectHaveThisModel);
+    REGISTER_COMMAND_HANDLER(COMMAND_ATTACH_OBJECT_TO_CHAR, AttachObjectToChar);
+    REGISTER_COMMAND_HANDLER(COMMAND_SET_OBJECT_VISIBLE, SetObjectVisible);
 
     REGISTER_COMMAND_HANDLER(COMMAND_REQUEST_MODEL, LoadModel);
     REGISTER_COMMAND_HANDLER(COMMAND_HAS_MODEL_LOADED, HasModelLoaded);
@@ -373,6 +410,10 @@ void notsa::script::commands::object::RegisterHandlers() {
     REGISTER_COMMAND_HANDLER(COMMAND_REGISTER_SCRIPT_BRAIN_FOR_CODE_USE, RegisterScriptBrainForCodeUse);
     REGISTER_COMMAND_HANDLER(COMMAND_REGISTER_ATTRACTOR_SCRIPT_BRAIN_FOR_CODE_USE, RegisterAttractorScriptBrainForCodeUse);
     REGISTER_COMMAND_HANDLER(COMMAND_GET_NUMBER_OF_INSTANCES_OF_STREAMED_SCRIPT, GetNumberOfInstancesOfStreamedScript);
+    REGISTER_COMMAND_HANDLER(COMMAND_STREAM_SCRIPT, StreamScript);
+    REGISTER_COMMAND_HANDLER(COMMAND_HAS_STREAMED_SCRIPT_LOADED, HasStreamedScriptLoaded);
+    REGISTER_COMMAND_HANDLER(COMMAND_MARK_STREAMED_SCRIPT_AS_NO_LONGER_NEEDED, MarkStreamedScriptAsNoLongerNeeded);
+    REGISTER_COMMAND_HANDLER(COMMAND_START_NEW_STREAMED_SCRIPT, StartNewStreamedScript);
     REGISTER_COMMAND_HANDLER(COMMAND_ALLOCATE_STREAMED_SCRIPT_TO_OBJECT, AllocateStreamedScriptToObject);
     REGISTER_COMMAND_HANDLER(COMMAND_ALLOCATE_STREAMED_SCRIPT_TO_RANDOM_PED, AllocateStreamedScriptToRandomPed);
     REGISTER_COMMAND_HANDLER(COMMAND_SWITCH_OBJECT_BRAINS, SwitchObjectBrains);
