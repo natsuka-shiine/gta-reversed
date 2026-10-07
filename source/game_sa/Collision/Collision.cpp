@@ -35,9 +35,10 @@ void CCollision::Init() {
 
 // 0x4162E0
 void CCollision::Shutdown() {
-    for (auto i = ms_colModelCache.freeListTail.prev; i != &ms_colModelCache.usedListHead; i = i->prev) {
+    // NB: Walks the used list, and frees the planes directly (the list itself is thrown away right after)
+    for (auto i = ms_colModelCache.usedListTail.prev; i != &ms_colModelCache.usedListHead; i = i->prev) {
         if (i->data) {
-            RemoveTrianglePlanes(i->data);
+            i->data->RemoveTrianglePlanes();
         }
     }
     ms_colModelCache.Shutdown();
@@ -3381,8 +3382,7 @@ void CCollision::InjectHooks() {
     // Test & Process
     ////
 
-    // Hooks disabled due to bad performance in debug mode
-    const auto state = HS::RedirectToGTA;
+    const auto state = HS::RedirectToOurs;
     const auto locked = state == HS::RedirectToGTA;
     
     RH_ScopedInstall(Test2DLineAgainst2DLine, 0x4138D0, { .State = state, .Locked = locked });

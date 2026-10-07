@@ -16,6 +16,11 @@ static int32 GetRandomNumberInRange_int32(int32 min, int32 max) {
     return CGeneral::GetRandomNumberInRange(min, max);
 }
 
+// 0x41BD90 - Wrapper without the range check of the template: the original has callers that pass `max < min` (e.g. 0x6DF26D)
+static float GetRandomNumberInRange_float(float min, float max) {
+    return lerp(min, max, static_cast<float>(CGeneral::GetRandomNumber()) * RAND_MAX_FLOAT_RECIPROCAL);
+}
+
 void CGeneral::InjectHooks() {
     RH_ScopedNamespace(CGeneral);
     RH_ScopedCategoryGlobal();
@@ -28,7 +33,7 @@ void CGeneral::InjectHooks() {
     RH_ScopedInstall(SolveQuadratic, 0x53CE30);
     RH_ScopedInstall(GetAngleBetweenPoints, 0x53CEA0);
     RH_ScopedGlobalInstall(GetRandomNumberInRange_int32, 0x407180);
-    RH_ScopedOverloadedInstall(GetRandomNumberInRange<float>, "", 0x41BD90, float (*)(float, float), { .State = HS::RedirectToGTA, .Locked = true }); // There's a bug in the code at 0x6DF26D which causes the assert to be triggered, so I'm unhooking this for now
+    RH_ScopedGlobalInstall(GetRandomNumberInRange_float, 0x41BD90);
 }
 
 // 0x53CB00

@@ -105,7 +105,7 @@ namespace CGeneral { // More like `Math` (Or `Meth`, given how bad the code is, 
 #ifdef BETTER_RNG
         return std::uniform_real_distribution<float>{min, max}(randomEngine);
 #else
-        assert(max >= min); // Check is not empty range (We must use `>=` because the `int` version relies on it)
+        // NOTE: `max < min` is fine here, the original has callers that do that (e.g. `CVehicle::AddSingleWheelParticles`, 0x6DF26D)
         return lerp<T>(min, max, static_cast<float>(GetRandomNumber()) * RAND_MAX_FLOAT_RECIPROCAL);
 #endif
     }
@@ -117,6 +117,7 @@ namespace CGeneral { // More like `Math` (Or `Meth`, given how bad the code is, 
      */
     template<std::integral T>
     inline T GetRandomNumberInRange(T min, T max, bool inclusive = false) {
+        assert(inclusive ? max >= min : max > min); // Check is not empty range
         return inclusive
             ? static_cast<T>(GetRandomNumberInRange<float>(static_cast<float>(min), static_cast<float>(max)))
             : static_cast<T>(GetRandomNumberInRange<float>(static_cast<float>(min), static_cast<float>(max) - 1.f));

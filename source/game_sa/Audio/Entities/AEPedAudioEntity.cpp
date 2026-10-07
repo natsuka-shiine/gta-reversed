@@ -8,7 +8,7 @@ void CAEPedAudioEntity::InjectHooks() {
     RH_ScopedClass(CAEPedAudioEntity);
     RH_ScopedCategory("Audio/Entities");
 
-    //RH_ScopedInstall(Constructor, 0x5DE8D0, { .Reversed = false });
+    //RH_ScopedInstall(Constructor, 0x5DE8D0);
 
     RH_ScopedInstall(Initialise, 0x4E0E80);
     RH_ScopedInstall(StaticInitialise, 0x5B98A0);

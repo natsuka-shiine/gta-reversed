@@ -11,8 +11,8 @@ void InteriorGroup_c::InjectHooks() {
     RH_ScopedClass(InteriorGroup_c);
     RH_ScopedCategory("Interior");
 
-    //RH_ScopedInstall(Constructor, 0x597FE0, { .Reversed = false });
-    //RH_ScopedInstall(Destructor, 0x597FF0, { .Reversed = false });
+    //RH_ScopedInstall(Constructor, 0x597FE0);
+    //RH_ScopedInstall(Destructor, 0x597FF0);
 
     RH_ScopedInstall(Init, 0x5947E0);
     RH_ScopedInstall(Update, 0x5968E0);

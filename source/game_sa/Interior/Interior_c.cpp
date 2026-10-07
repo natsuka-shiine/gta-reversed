@@ -43,8 +43,8 @@ void Interior_c::InjectHooks() {
     RH_ScopedClass(Interior_c);
     RH_ScopedCategory("Interior");
 
-    //RH_ScopedInstall(Constructor, 0x5921D0, { .Reversed = false });
-    //RH_ScopedInstall(Destructor, 0x591360, { .Reversed = false });
+    //RH_ScopedInstall(Constructor, 0x5921D0);
+    //RH_ScopedInstall(Destructor, 0x591360);
 
     RH_ScopedInstall(Bedroom_AddTableItem, 0x593F10);
     RH_ScopedInstall(FurnishBedroom, 0x593FC0);

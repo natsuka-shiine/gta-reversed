@@ -40,18 +40,18 @@ void CTaskComplexGangLeader::InjectHooks() {
     * See PR#449 for more info.
     */
 
-    RH_ScopedInstall(GetRandomGangAmbientAnim, 0x65E730, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedInstall(ShouldLoadGangAnims, 0x65E7F0, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedInstall(DoGangAbuseSpeech, 0x65E860, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedInstall(TryToPassObject, 0x65EA50, { .State = HS::RedirectToGTA, .Locked = true });
+    RH_ScopedInstall(GetRandomGangAmbientAnim, 0x65E730);
+    RH_ScopedInstall(ShouldLoadGangAnims, 0x65E7F0);
+    RH_ScopedInstall(DoGangAbuseSpeech, 0x65E860);
+    RH_ScopedInstall(TryToPassObject, 0x65EA50);
 
-    RH_ScopedVMTInstall(Clone, 0x661FA0, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedVMTInstall(GetTaskType, 0x65DF20, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedVMTInstall(MakeAbortable, 0x65DFA0, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedVMTInstall(CreateNextSubTask, 0x65DFF0, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedVMTInstall(CreateFirstSubTask, 0x65E1F0, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedVMTInstall(ControlSubTask, 0x662370, { .State = HS::RedirectToGTA, .Locked = true });
-    RH_ScopedVMTInstall(ScanForStuff, 0x65E200, { .State = HS::RedirectToGTA, .Locked = true });
+    RH_ScopedVMTInstall(Clone, 0x661FA0);
+    RH_ScopedVMTInstall(GetTaskType, 0x65DF20);
+    RH_ScopedVMTInstall(MakeAbortable, 0x65DFA0);
+    RH_ScopedVMTInstall(CreateNextSubTask, 0x65DFF0);
+    RH_ScopedVMTInstall(CreateFirstSubTask, 0x65E1F0);
+    RH_ScopedVMTInstall(ControlSubTask, 0x662370);
+    RH_ScopedVMTInstall(ScanForStuff, 0x65E200);
 }
 
 // 0x65DED0

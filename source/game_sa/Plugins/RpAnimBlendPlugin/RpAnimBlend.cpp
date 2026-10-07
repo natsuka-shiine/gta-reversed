@@ -633,7 +633,7 @@ float CalculateTotalBlendOfPartial(AnimBlendUpdateData* c, AnimBlendFrameData* f
 
 #define USE_COPY_PASTE_FRAME_UPDATE 0
 #ifdef USE_COPY_PASTE_FRAME_UPDATE
-    #define DISABLE_CUSTOM_FRAME_UPDATE_FUNCTIONS 1
+    #define DISABLE_CUSTOM_FRAME_UPDATE_FUNCTIONS 0
 #endif
 
 #ifdef USE_COPY_PASTE_FRAME_UPDATE
