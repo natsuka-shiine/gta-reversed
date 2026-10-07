@@ -1,6 +1,8 @@
 #include "StdInc.h"
 
 #include "RwHelper.h"
+#include "Plugins/TwoDEffectPlugin/2dEffect.h"
+#include "Plugins/TwoDEffectPlugin/2dEffectStream.h"
 
 void RwHelperInjectHooks() {
     RH_ScopedNamespaceName("RwHelper");
@@ -10,7 +12,7 @@ void RwHelperInjectHooks() {
     RH_ScopedGlobalInstall(GetNameAndDamage, 0x5370A0);
     RH_ScopedGlobalInstall(GetFirstAtomicCallback, 0x734810);
     RH_ScopedGlobalInstall(GetFirstAtomic, 0x734820);
-    // RH_ScopedGlobalInstall(Get2DEffectAtomicCallback, 0x734850);
+    RH_ScopedGlobalInstall(Get2DEffectAtomicCallback, 0x734850);
     RH_ScopedGlobalInstall(Get2DEffectAtomic, 0x734880);
     RH_ScopedGlobalInstall(GetFirstObjectCallback, 0x7348B0);
     RH_ScopedGlobalInstall(GetFirstObject, 0x7348C0);
@@ -18,7 +20,7 @@ void RwHelperInjectHooks() {
     RH_ScopedGlobalInstall(GetFirstChild, 0x734900);
     RH_ScopedGlobalInstall(SkinAtomicGetHAnimHierarchCB, 0x734A20);
     RH_ScopedGlobalInstall(GetAnimHierarchyFromSkinClump, 0x734A40);
-    // RH_ScopedGlobalInstall(GetAnimHierarchyFromFrame, 0x734AB0);
+    RH_ScopedGlobalInstall(GetAnimHierarchyFromFrame, 0x734AB0);
     RH_ScopedGlobalInstall(GetAnimHierarchyFromClump, 0x734B10);
     RH_ScopedGlobalInstall(AtomicRemoveAnimFromSkinCB, 0x734B90);
     RH_ScopedGlobalInstall(RpAtomicConvertGeometryToTL, 0x734BE0);
@@ -31,6 +33,12 @@ void RwHelperInjectHooks() {
     RH_ScopedGlobalInstall(SetFilterModeOnClumpsTextures, 0x734DC0);
     RH_ScopedGlobalInstall(forceLinearFilteringMatTexturesCB, 0x734D60);
     RH_ScopedGlobalInstall(SetFilterModeOnAtomicsTextures, 0x734D80);
+    RH_ScopedGlobalInstall(RpGeometryReplaceOldMaterialWithNewMaterial, 0x734DE0);
+    RH_ScopedGlobalInstall(RwTexDictionaryFindHashNamedTexture, 0x734E50);
+    RH_ScopedGlobalInstall(RpClumpGetBoundingSphere, 0x734FC0);
+    RH_ScopedGlobalInstall(SkinGetBonePositions, 0x735140);
+    RH_ScopedGlobalInstall(SkinSetBonePositions, 0x7352D0);
+    RH_ScopedGlobalInstall(SkinGetBonePositionsToTable, 0x735360);
     RH_ScopedGlobalInstall(RemoveRefsCB, 0x7226D0);
 }
 
@@ -88,7 +96,12 @@ RpAtomic* GetFirstAtomic(RpClump* clump) {
 
 // 0x734850
 RpAtomic* Get2DEffectAtomicCallback(RpAtomic* atomic, void* data) {
-    return ((RpAtomic * (__cdecl*)(RpAtomic*, void*))0x734850)(atomic, data);
+    const auto* const effects = RWPLUGINOFFSET(t2dEffectPlugin, RpAtomicGetGeometry(atomic), C2dEffect::g2dEffectPluginOffset)->m_pEffectEntries;
+    if (!effects || static_cast<int32>(effects->m_nObjCount) <= 0) {
+        return atomic;
+    }
+    *static_cast<RpAtomic**>(data) = atomic;
+    return nullptr;
 }
 
 // 0x734880
@@ -124,10 +137,25 @@ RwFrame* GetFirstChild(RwFrame* frame) {
     return child;
 }
 
+// 0x734A70 - Finds the first frame (depth-first) that has a hierarchy
+static RwFrame* GetAnimHierarchyFromFrameCB(RwFrame* frame, void* data) {
+    if (auto* const hier = RpHAnimFrameGetHierarchy(frame)) {
+        *static_cast<RpHAnimHierarchy**>(data) = hier;
+        return nullptr;
+    }
+    RwFrameForAllChildren(frame, GetAnimHierarchyFromFrameCB, data);
+    return frame;
+}
+
 // 0x734AB0
 RpHAnimHierarchy* GetAnimHierarchyFromFrame(RwFrame* frame) {
     assert(frame);
-    return ((RpHAnimHierarchy * (__cdecl*)(RwFrame*))0x734AB0)(frame);
+    if (auto* const hier = RpHAnimFrameGetHierarchy(frame)) {
+        return hier;
+    }
+    RpHAnimHierarchy* hier{};
+    RwFrameForAllChildren(frame, GetAnimHierarchyFromFrameCB, &hier);
+    return hier;
 }
 
 // 0x734B10
@@ -252,32 +280,186 @@ bool SetFilterModeOnClumpsTextures(RpClump* clump, RwTextureFilterMode filtering
 
 // 0x734DE0
 bool RpGeometryReplaceOldMaterialWithNewMaterial(RpGeometry* geometry, RpMaterial* oldMaterial, RpMaterial* newMaterial) {
-    return ((bool(__cdecl*)(RpGeometry*, RpMaterial*, RpMaterial*))0x734DE0)(geometry, oldMaterial, newMaterial);
+    auto       replaced   = false;
+    auto*      meshHeader = geometry->mesh;
+    auto*      meshes     = reinterpret_cast<RpMesh*>(meshHeader + 1);
+    for (auto i = 0u; i < meshHeader->numMeshes; i++) {
+        auto& mesh = meshes[i];
+        if (mesh.material != oldMaterial) {
+            continue;
+        }
+        const auto idx = _rpMaterialListFindMaterialIndex(&geometry->matList, oldMaterial);
+        RpMaterialDestroy(oldMaterial);
+        geometry->matList.materials[idx] = newMaterial;
+        mesh.material                    = newMaterial;
+        newMaterial->refCount++;
+        replaced = true;
+    }
+    return replaced;
 }
 
 // 0x734E50
 RwTexture* RwTexDictionaryFindHashNamedTexture(RwTexDictionary* txd, uint32 hash) {
-    return ((RwTexture * (__cdecl*)(RwTexDictionary*, uint32))0x734E50)(txd, hash);
+    for (auto* link = rwLinkListGetFirstLLLink(&txd->texturesInDict); link != rwLinkListGetTerminator(&txd->texturesInDict); link = rwLLLinkGetNext(link)) {
+        auto* const texture = rwLLLinkGetData(link, RwTexture, lInDictionary);
+        if (CKeyGen::GetUppercaseKey(texture->name) == hash) {
+            return texture;
+        }
+    }
+    return nullptr;
+}
+
+static auto& s_BoundingSphereUseLTM = StaticRef<bool>(0x8D60BC);
+
+// Centre of the atomic's bounding sphere, transformed by its frame (Either the LTM or the modelling matrix, see above)
+static RwV3d GetAtomicBoundingSphereCentre(RpAtomic* atomic) {
+    auto* const frame = RpAtomicGetFrame(atomic);
+    RwV3d       centre;
+    RwV3dTransformPoints(
+        &centre,
+        &RpAtomicGetBoundingSphere(atomic)->center,
+        1,
+        s_BoundingSphereUseLTM ? RwFrameGetLTM(frame) : RwFrameGetMatrix(frame)
+    );
+    return centre;
+}
+
+// 0x734970 - Sums up the centres
+static RpAtomic* AtomicAddBoundingSphereCentreCB(RpAtomic* atomic, void* data) {
+    auto* const sum    = static_cast<RwV3d*>(data);
+    const auto  centre = GetAtomicBoundingSphereCentre(atomic);
+    sum->x += centre.x;
+    sum->y += centre.y;
+    sum->z += centre.z;
+    return atomic;
+}
+
+// 0x734ED0 - Grows the sphere to contain the atomic's one
+static RpAtomic* AtomicGrowBoundingSphereCB(RpAtomic* atomic, void* data) {
+    auto* const sphere = static_cast<RwSphere*>(data);
+    const auto  centre = GetAtomicBoundingSphereCentre(atomic);
+    const auto  dist   = std::sqrt(sq(centre.x - sphere->center.x) + sq(centre.y - sphere->center.y) + sq(centre.z - sphere->center.z))
+                       + RpAtomicGetBoundingSphere(atomic)->radius;
+    if (dist > sphere->radius) {
+        sphere->radius = dist;
+    }
+    return atomic;
 }
 
 // 0x734FC0
 RpClump* RpClumpGetBoundingSphere(RpClump* clump, RwSphere* sphere, bool bUseLTM) {
-    return ((RpClump * (__cdecl*)(RpClump*, RwSphere*, bool))0x734FC0)(clump, sphere, bUseLTM);
+    s_BoundingSphereUseLTM = bUseLTM;
+
+    if (!clump || !sphere) {
+        return nullptr;
+    }
+
+    *sphere = RwSphere{};
+
+    const auto numAtomics = RpClumpGetNumAtomics(clump);
+    if (numAtomics < 1) {
+        return nullptr;
+    }
+
+    // The centre is the average of the atomics' centres
+    RwV3d sum{};
+    RpClumpForAllAtomics(clump, AtomicAddBoundingSphereCentreCB, &sum);
+
+    const auto invNum = 1.0f / static_cast<float>(numAtomics);
+    RwSphere   result{ .center = { sum.x * invNum, sum.y * invNum, sum.z * invNum }, .radius = 0.0f };
+    RpClumpForAllAtomics(clump, AtomicGrowBoundingSphereCB, &result);
+
+    // Bring the centre back into the clump's space
+    auto* const frame = RpClumpGetFrame(clump);
+    RwMatrix    invMat;
+    RwMatrixInvert(&invMat, s_BoundingSphereUseLTM ? RwFrameGetLTM(frame) : RwFrameGetMatrix(frame));
+    RwV3dTransformPoints(&result.center, &result.center, 1, &invMat);
+
+    *sphere = result;
+    return clump;
+}
+
+struct tSkinBonePosition {
+    int32 parent; //!< Index of the parent bone
+    RwV3d pos;    //!< Position relative to the parent bone
+};
+VALIDATE_SIZE(tSkinBonePosition, 0x10);
+
+static auto& s_SkinBonePositions          = StaticRef<std::array<tSkinBonePosition, 64>>(0xC88258);
+static auto& s_SkinBonePositionsAreStored = StaticRef<bool>(0xC88658);
+
+/*!
+* @brief Walk the bones of the clump's skin, and call `fn(boneIdx, parentIdx, posRelativeToParent)` for each one (apart from the root)
+*/
+template<typename Fn>
+static void ForEachSkinBonePosition(RpClump* clump, Fn&& fn) {
+    auto* const skin = RpSkinGeometryGetSkin(RpAtomicGetGeometry(GetFirstAtomic(clump)));
+    auto* const hier = GetAnimHierarchyFromSkinClump(clump);
+
+    const auto numBones = static_cast<int32>(RpSkinGetNumBones(skin));
+
+    int32  stack[32];
+    int32* sp     = stack;
+    int32  parent = 0;
+    for (auto i = 1; i < numBones; i++) {
+        // The bone's position is the translation of its inverted skin-to-bone matrix...
+        RwMatrix boneToSkin;
+        auto     skinToBone = RpSkinGetSkinToBoneMatrices(skin)[i];
+        RwMatrixInvert(&boneToSkin, &skinToBone);
+
+        // ...which is then brought into the parent's space
+        auto  parentSkinToBone = RpSkinGetSkinToBoneMatrices(skin)[parent];
+        RwV3d pos;
+        RwV3dTransformPoints(&pos, RwMatrixGetPos(&boneToSkin), 1, &parentSkinToBone);
+
+        fn(i, parent, pos);
+
+        const auto flags = hier->pNodeInfo[i].flags;
+        if (flags & rpHANIMPUSHPARENTMATRIX) {
+            *++sp = parent;
+        }
+        if (flags & rpHANIMPOPPARENTMATRIX) {
+            parent = *sp--;
+        } else {
+            parent = i;
+        }
+    }
 }
 
 // 0x735140
 void SkinGetBonePositions(RpClump* clump) {
-    ((void(__cdecl*)(RpClump*))0x735140)(clump);
+    if (s_SkinBonePositionsAreStored) {
+        return;
+    }
+    s_SkinBonePositionsAreStored = true;
+
+    s_SkinBonePositions[0] = { .parent = -1, .pos = {} };
+    ForEachSkinBonePosition(clump, [](int32 bone, int32 parent, const RwV3d& pos) {
+        s_SkinBonePositions[bone] = { .parent = parent, .pos = pos };
+    });
 }
 
 // 0x7352D0
 void SkinSetBonePositions(RpClump* clump) {
-    ((void(__cdecl*)(RpClump*))0x7352D0)(clump);
+    auto* const skin     = RpSkinGeometryGetSkin(RpAtomicGetGeometry(GetFirstAtomic(clump)));
+    auto* const matrices = RpHAnimHierarchyGetMatrixArray(GetAnimHierarchyFromSkinClump(clump));
+
+    const auto numBones = static_cast<int32>(RpSkinGetNumBones(skin));
+    for (auto i = 1; i < numBones; i++) {
+        const auto& bone = s_SkinBonePositions[i];
+        RwV3dTransformPoints(RwMatrixGetPos(&matrices[i]), &bone.pos, 1, &matrices[bone.parent]);
+    }
 }
 
 // 0x735360
 void SkinGetBonePositionsToTable(RpClump* clump, RwV3d* table) {
-    ((void(__cdecl*)(RpClump*, RwV3d*))0x735360)(clump, table);
+    if (!table) {
+        return;
+    }
+    table[0] = {};
+    ForEachSkinBonePosition(clump, [table](int32 bone, int32 parent, const RwV3d& pos) {
+        table[bone] = pos;
+    });
 }
 
 // 0x7226D0

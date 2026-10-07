@@ -1810,30 +1810,34 @@ void CTheScripts::DrawScriptSpritesAndRectangles(bool drawBeforeFade) {
 //   CTheScripts::ScriptDebugCircle2D(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100, 50.f, 50.f, HudColour.GetRGB(HUD_COLOUR_RED).ToInt());
 // 0x485C20
 void CTheScripts::ScriptDebugCircle2D(float x, float y, float width, float height, CRGBA color) {
-    return plugin::Call<0x485C20, float, float, float, float, CRGBA>(x, y, width, height, color);
-
-    // untested
     RwRenderStateSet(rwRENDERSTATEZWRITEENABLE,      RWRSTATE(TRUE));
     RwRenderStateSet(rwRENDERSTATEZTESTENABLE,       RWRSTATE(FALSE));
     RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, RWRSTATE(TRUE));
     RwRenderStateSet(rwRENDERSTATESRCBLEND,          RWRSTATE(rwBLENDSRCALPHA));
     RwRenderStateSet(rwRENDERSTATEDESTBLEND,         RWRSTATE(rwBLENDINVSRCALPHA));
-    RwRenderStateSet(rwRENDERSTATETEXTUREFILTER,     RWRSTATE(rwFILTERLINEAR));
+    RwRenderStateSet(rwRENDERSTATESHADEMODE,         RWRSTATE(rwSHADEMODEGOURAUD));
     RwRenderStateSet(rwRENDERSTATETEXTURERASTER,     RWRSTATE(NULL));
 
-    const auto iters = 16;
-    auto part = (CTimer::GetTimeInMS() >> 6) % iters;
-    for (auto i = 0; i < iters; i++) {
-        RwIm2DVertex vertex{
-            .x = std::sin((float)i * PI / 8.0f) * width + x,
-            .y = std::cos((float)i * PI / 8.0f) * height + y
+    // A circle made of 16 line segments, one of them (which one changes with time) is drawn darker
+    constexpr auto NUM_SEGMENTS = 16;
+    const auto darkSegment = static_cast<int32>((CTimer::GetTimeInMS() >> 6) % NUM_SEGMENTS);
+    for (auto i = 0; i < NUM_SEGMENTS; i++) {
+        const auto GetPoint = [&](int32 segment) {
+            const auto angle = static_cast<float>(segment) * (TWO_PI / static_cast<float>(NUM_SEGMENTS));
+            return CVector2D{ std::sin(angle) * width + x, std::cos(angle) * height + y };
         };
-        if (part == i)
-            vertex.emissiveColor = (3 * color.g / 4) | (((3 * color.b / 4) | (((3 * color.a / 4) | ((3 * color.r / 4) << 8)) << 8)) << 8); // todo: (3 * color / 4).ToIntARGB();
-        else
-            vertex.emissiveColor = color.ToIntARGB();
-        RwIm2DVertex vertices[2] = { vertex, vertex };
-        RwIm2DRenderLine(vertices, std::size(vertices), 0, 1); // todo: RwIm2DRenderLine_BUGFIX
+        const auto segColor = i == darkSegment
+            ? CRGBA{ static_cast<uint8>(color.r * 3 / 4), static_cast<uint8>(color.g * 3 / 4), static_cast<uint8>(color.b * 3 / 4), static_cast<uint8>(color.a * 3 / 4) }
+            : color;
+
+        RwIm2DVertex vertices[2]{}; // NB: The original leaves `z` and `rhw` uninitialized
+        for (auto v = 0; v < 2; v++) {
+            const auto pt = GetPoint(i + v);
+            vertices[v].x             = pt.x;
+            vertices[v].y             = pt.y;
+            vertices[v].emissiveColor = segColor.ToIntARGB();
+        }
+        RwIm2DRenderLine(vertices, std::size(vertices), 0, 1);
     }
 
     RwRenderStateSet(rwRENDERSTATEVERTEXALPHAENABLE, RWRSTATE(FALSE));

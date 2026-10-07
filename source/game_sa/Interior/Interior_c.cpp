@@ -121,8 +121,10 @@ int32 Interior_c::Init(const CVector& pos) {
             seed = FloatToU32(entityPos.z * entityPos.y * entityPos.x + (float)m_box->m_seed);
         }
         srand(seed);
-        // NOTSA: Also seed the game's own CRT (0x821B11 = srand), as the not yet reversed furnishing functions use its `rand` (0x821B1E)
+#ifndef NOTSA_STANDALONE
+        // NOTSA: Also seed the game's own CRT (0x821B11 = srand), in case anything still running from the original uses its `rand` (0x821B1E)
         plugin::Call<0x821B11, uint32>(seed);
+#endif
     }
 
     field_40C            = 0;

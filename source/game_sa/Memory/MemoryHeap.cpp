@@ -328,7 +328,7 @@ uint32 CMemoryHeap::GetSizeOfHoles() {
 
 // 0x72E8E0
 void CMemoryHeap::IntegrityCheck() {
-    plugin::CallMethod<0x72E8E0, CMemoryHeap*>(this);
+    // The original only walks the free lists and the blocks here (the checks themselves were compiled out), so there's nothing to do
 }
 
 void* CMemoryHeap::MoveHeapBlock(HeapFreeBlockDesc* free, HeapBlockDesc* used) {

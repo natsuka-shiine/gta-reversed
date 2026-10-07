@@ -566,8 +566,23 @@ bool CTaskSimpleCarDrive::ProcessPed(CPed* ped) {
     return false;
 }
 
-// 0x63C840 - Finish callback of the `ANIM_ID_CAR_ROLLDOOR` anim (Not reversed yet, so it's referenced by address)
-static const auto FinishAnimCloseDoorRollingCB = reinterpret_cast<void(__cdecl*)(CAnimBlendAssociation*, void*)>(0x63C840);
+// 0x63C840 - Finish callback of the `ANIM_ID_CAR_ROLLDOOR` anim
+static void FinishAnimCloseDoorRollingCB(CAnimBlendAssociation* assoc, void* data) {
+    auto* const self = static_cast<CTaskSimpleCarDrive*>(data);
+
+    self->m_b20                   = false;
+    self->m_pAnimCloseDoorRolling = nullptr;
+
+    auto* const veh = self->m_pVehicle;
+    if (!veh) {
+        return;
+    }
+    veh->ClearGettingOutFlags(1);
+    if (auto* const driver = veh->m_pDriver) {
+        const auto groupId = CVehicleAnimGroupData::GetVehicleAnimGroup(veh->m_pHandlingData->m_nAnimGroup).GetGroup(ANIM_ID_CAR_ROLLDOOR);
+        veh->ProcessOpenDoor(driver, 10, groupId, ANIM_ID_CAR_ROLLDOOR, 1.0f);
+    }
+}
 
 // 0x642700
 void CTaskSimpleCarDrive::StartCloseDoorRolling(CPed* ped) {
