@@ -1,6 +1,7 @@
 #include "StdInc.h"
 
 #include <bitset>
+#include "dllmain.h"
 
 #include "RunningScript.h"
 #include "TheScripts.h"
@@ -1625,7 +1626,56 @@ OpcodeResult CRunningScript::ProcessOneCommand() {
 
     m_NotFlag = op.NotFlag;
 
+#ifdef NOTSA_NO_ORIGINAL_CODE
+    // For when the command can't be run. Step over it, so that at least the script stays on track:
+    // read what it reads, store zeros for what it stores, and "false" if it's a condition.
+    const auto ipOfParams = m_IP;
+    const auto StepOver   = [&, this] {
+        static constexpr struct {
+            uint8 numRead, numStored;
+            bool  isCondition, isVariadic;
+        } s_ParamInfo[]{
+#include "CommandParamInfo.inc"
+        };
+        if (op.Command >= std::size(s_ParamInfo) || s_ParamInfo[op.Command].isVariadic) {
+            NOTSA_UNREACHABLE("Can't step over script command {:#06x}", (size_t)op.Command);
+        }
+        const auto& info = s_ParamInfo[op.Command];
+        m_IP = ipOfParams;
+        CollectParameters(info.numRead);
+        if (info.numStored) {
+            for (auto i = 0u; i < info.numStored; i++) {
+                ScriptParams[i].iParam = 0;
+            }
+            StoreParameters(info.numStored);
+        }
+        if (info.isCondition) {
+            UpdateCompareFlag(false);
+        }
+        return OR_CONTINUE;
+    };
+#endif
+
     if (const auto handler = CustomCommandHandlerOf((eScriptCommands)(op.Command))) {
+#ifdef NOTSA_NO_ORIGINAL_CODE
+        if (!notsa::IsOriginalCodeAvailable()) {
+            // The commands that were stepped over have stored zeros where there would be the handles of what they create,
+            // and those end up as arguments of commands that we do have.
+            try {
+                return std::invoke(handler, this);
+            } catch (const notsa::script::InvalidEntityHandle&) {
+                static std::bitset<COMMAND_HIGHEST_VANILLA_ID + 1> s_Reported{};
+                if (op.Command <= COMMAND_HIGHEST_VANILLA_ID && !s_Reported.test(op.Command)) {
+                    s_Reported.set(op.Command);
+                    NOTSA_LOG_ERR(
+                        "Script `{}`: command {:#06x} ({}) was given a handle of nothing (Most likely from a command that was stepped over), stepping over it too",
+                        m_szName, (size_t)op.Command, notsa::script::GetScriptCommandName((eScriptCommands)op.Command)
+                    );
+                }
+                return StepOver();
+            }
+        }
+#endif
         return std::invoke(handler, this);
     } else {
 #ifdef NOTSA_NO_ORIGINAL_CODE
@@ -1633,7 +1683,16 @@ OpcodeResult CRunningScript::ProcessOneCommand() {
         static std::bitset<COMMAND_HIGHEST_VANILLA_ID + 1> s_Reported{};
         if (op.Command <= COMMAND_HIGHEST_VANILLA_ID && !s_Reported.test(op.Command)) {
             s_Reported.set(op.Command);
-            NOTSA_LOG_ERR("Script command {:#06x} ({}) has no handler of ours, running the original's ({} such commands so far)", (size_t)op.Command, notsa::script::GetScriptCommandName((eScriptCommands)op.Command), s_Reported.count());
+            NOTSA_LOG_ERR(
+                "Script command {:#06x} ({}) has no handler of ours, {} ({} such commands so far)",
+                (size_t)op.Command, notsa::script::GetScriptCommandName((eScriptCommands)op.Command),
+                notsa::IsOriginalCodeAvailable() ? "running the original's" : "stepping over it", s_Reported.count()
+            );
+        }
+
+        // Without the original there's nothing to run
+        if (!notsa::IsOriginalCodeAvailable()) {
+            return StepOver();
         }
 #endif
         return std::invoke(s_OriginalCommandHandlerTable[(size_t)op.Command / 100], this, (eScriptCommands)(op.Command));

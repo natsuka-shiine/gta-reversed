@@ -14,6 +14,8 @@
 #include <Pools/Pools.h>
 
 namespace notsa {
+bool IsOriginalCodeAvailable(); // dllmain.h (Which has Windows.h in it)
+
 namespace script {
 namespace detail {
 
@@ -106,6 +108,11 @@ struct ScriptEntity {
     int32       h;  ///< Script handle of the entity
 };
 
+#ifdef NOTSA_NO_ORIGINAL_CODE
+//! Thrown when a command needs an entity, and the handle it was given isn't one's. Only in a game without the original's code.
+struct InvalidEntityHandle {};
+#endif
+
 //! Read a value (Possibly from script => increases IP, or return a value (w/o increasing IP)
 template<typename T>
 inline T Read(CRunningScript* S) {
@@ -117,6 +124,11 @@ inline T Read(CRunningScript* S) {
     // This check here also means that all other branches must either return by-value or a pointer (not a refernce)
     if constexpr (std::is_reference_v<T>) {
         const auto ptr = Read<std::remove_reference_t<T>*>(S);
+#ifdef NOTSA_NO_ORIGINAL_CODE
+        if (!ptr && !notsa::IsOriginalCodeAvailable()) {
+            throw InvalidEntityHandle{}; // See `CRunningScript::ProcessOneCommand`
+        }
+#endif
         assert(ptr); // This assert is usually hit if the implementation defines an argument with a different type than the original. Eg.: `CVehicle&` instead of `CPed&`.
         return *ptr;
     } else if constexpr (std::is_same_v<Y, CVector>) {
