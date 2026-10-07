@@ -82,7 +82,9 @@ bool FxSystem_c::Init(FxSystemBP_c* systemBP, const RwMatrix& local, RwMatrix* p
     m_nRateMult    = 1000;
     m_nTimeMult    = 1000;
     m_VelAdd       = CVector();
-    m_useZTest     = true;
+    m_allocatedParentMat = false;
+    m_createLocal        = false;
+    m_useZTest           = true;
 
     m_BoundingSphere = nullptr;
     if (m_SystemBP->m_BoundingSphere) {
