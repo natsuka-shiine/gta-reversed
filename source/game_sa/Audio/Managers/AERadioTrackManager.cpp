@@ -8,40 +8,40 @@
 #include "AEAudioUtility.h"
 #include "AEAudioEnvironment.h"
 
-auto& AERadioTrackManager = StaticRef<CAERadioTrackManager>(0x8CB6F8);
+auto& AERadioTrackManager = StaticRef<CAERadioTrackManager, 0x8CB6F8>();
 
 // The tables below are the original game's per-station sound index ranges/counts.
 // They aren't named anywhere else in the project yet, hence why they're declared here.
 // A `first` index of `NO_SOUND_INDEX` means that the station has no sounds of that category.
 static constexpr int32 NO_SOUND_INDEX = 0x782; // 1922
 
-static auto& ms_aIdentIndexRanges           = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8FB0); // Stations (EAA + the 11 radios)
-static auto& ms_aDJBanterIndexRanges        = StaticRef<std::pair<int32, int32>[RADIO_COUNT]>(0x8C8CB0);
-static auto& ms_aSpecialDJBanterIndexRanges = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8C50);
-static auto& ms_aForcedDJBanterIndexRanges  = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8BF0);
-static auto& ms_anSpecialDJBanterIndices    = StaticRef<int32[RADIO_COUNT][22]>(0x8CB280);
-static auto& ms_anAdvertIndexRange          = StaticRef<std::pair<int32, int32>>(0x8C8B88);
-static auto& ms_aAdvertIndicesInQueue       = StaticRef<std::array<int32, 23>[RADIO_COUNT]>(0x8CADD0);
-static auto& ms_anMusicTrackCounts          = StaticRef<int32[RADIO_COUNT]>(0x8C9010);
-static auto& ms_anStationTrackLengths       = StaticRef<int32[RADIO_COUNT]>(0x8CAD50);
-static auto& ms_nPreviousTrackPlayTime      = StaticRef<int32>(0x8CBA68);
-static auto& ms_fRetuneDelaySelector        = StaticRef<float>(0xB6F14C); // Selects the retune delay in `CheckForStationRetune`
+static auto& ms_aIdentIndexRanges           = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8FB0>(); // Stations (EAA + the 11 radios)
+static auto& ms_aDJBanterIndexRanges        = StaticRef<std::pair<int32, int32>[RADIO_COUNT], 0x8C8CB0>();
+static auto& ms_aSpecialDJBanterIndexRanges = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8C50>();
+static auto& ms_aForcedDJBanterIndexRanges  = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8BF0>();
+static auto& ms_anSpecialDJBanterIndices    = StaticRef<int32[RADIO_COUNT][22], 0x8CB280>();
+static auto& ms_anAdvertIndexRange          = StaticRef<std::pair<int32, int32>, 0x8C8B88>();
+static auto& ms_aAdvertIndicesInQueue       = StaticRef<std::array<int32, 23>[RADIO_COUNT], 0x8CADD0>();
+static auto& ms_anMusicTrackCounts          = StaticRef<int32[RADIO_COUNT], 0x8C9010>();
+static auto& ms_anStationTrackLengths       = StaticRef<int32[RADIO_COUNT], 0x8CAD50>();
+static auto& ms_nPreviousTrackPlayTime      = StaticRef<int32, 0x8CBA68>();
+static auto& ms_fRetuneDelaySelector        = StaticRef<float, 0xB6F14C>(); // Selects the retune delay in `CheckForStationRetune`
 
 // Per station (`0`-`11`) and track index: The ID of the track, and the (min, max) track IDs
 // used for intros/outros.
-static auto& ms_aStationTrackIds       = StaticRef<int32[RADIO_COUNT - 2][31]>(0x8C9040);
-static auto& ms_aStationIntroTrackIds  = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2][31]>(0x8C9610);
-static auto& ms_aStationOutroTrackIds  = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2][31]>(0x8CA1B0);
-static auto& ms_anTalkRadioShowLengths = StaticRef<int32[31]>(0x8CAD50); // Indexed by the talk show index (See `StopRadio`)
+static auto& ms_aStationTrackIds       = StaticRef<int32[RADIO_COUNT - 2][31], 0x8C9040>();
+static auto& ms_aStationIntroTrackIds  = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2][31], 0x8C9610>();
+static auto& ms_aStationOutroTrackIds  = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2][31], 0x8CA1B0>();
+static auto& ms_anTalkRadioShowLengths = StaticRef<int32[31], 0x8CAD50>(); // Indexed by the talk show index (See `StopRadio`)
 
 // DJ banter index ranges selected by the current weather forecast/time of day
 // NOTE: The names of these are descriptive, the original project doesn't name them either.
-static auto& ms_aDJBanterIndexRangesTimeA = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8D70);
-static auto& ms_aDJBanterIndexRangesTimeB = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8DD0);
-static auto& ms_aDJBanterIndexRangesRiots = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8E30);
-static auto& ms_aDJBanterIndexRangesRainy = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8E90);
-static auto& ms_aDJBanterIndexRangesClear = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8EF0);
-static auto& ms_aDJBanterIndexRangesFoggy = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2]>(0x8C8F50);
+static auto& ms_aDJBanterIndexRangesTimeA = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8D70>();
+static auto& ms_aDJBanterIndexRangesTimeB = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8DD0>();
+static auto& ms_aDJBanterIndexRangesRiots = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8E30>();
+static auto& ms_aDJBanterIndexRangesRainy = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8E90>();
+static auto& ms_aDJBanterIndexRangesClear = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8EF0>();
+static auto& ms_aDJBanterIndexRangesFoggy = StaticRef<std::pair<int32, int32>[RADIO_COUNT - 2], 0x8C8F50>();
 
 void CAERadioTrackManager::InjectHooks() {
     RH_ScopedClass(CAERadioTrackManager);

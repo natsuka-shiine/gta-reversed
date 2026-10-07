@@ -2,7 +2,7 @@
 
 #include "Buoyancy.h"
 
-auto& mod_Buoyancy = StaticRef<cBuoyancy>(0xC1C890);
+auto& mod_Buoyancy = StaticRef<cBuoyancy, 0xC1C890>();
 
 void cBuoyancy::InjectHooks()
 {

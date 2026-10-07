@@ -771,9 +771,9 @@ void CShadows::RenderStaticShadows() {
 // 0x7086B0
 void CShadows::CastShadowEntityXY(CEntity* entity, float conrerAX, float cornerAY, float cornerBX, float cornerBY, CVector* posn, float frontX, float frontY, float sideX, float sideY, int16 intensity, uint8 red, uint8 green, uint8 blue, float zDistance, float scale, CPolyBunch** ppPolyBunch, uint8* pDayNightIntensity, int32 shadowType) {
     // Function local statics in SA
-    static auto& List    = StaticRef<std::array<CVector, 20>>(0xC4B7A8); // Vertices of the polygon (in the entity's space) - The 2 halves ([0, 10) and [10, 20)) are used alternately as in/out buffers
-    static auto& Texture = StaticRef<std::array<CVector, 20>>(0xC4B6B8); // UVs of the polygon
-    static auto& Points  = StaticRef<std::array<CVector, 4>>(0xC4B898);  // Corners of the shadow (in the entity's space)
+    static auto& List    = StaticRef<std::array<CVector, 20>, 0xC4B7A8>(); // Vertices of the polygon (in the entity's space) - The 2 halves ([0, 10) and [10, 20)) are used alternately as in/out buffers
+    static auto& Texture = StaticRef<std::array<CVector, 20>, 0xC4B6B8>(); // UVs of the polygon
+    static auto& Points  = StaticRef<std::array<CVector, 4>, 0xC4B898>();  // Corners of the shadow (in the entity's space)
 
     auto* const cm = CModelInfo::GetModelInfo(entity->m_nModelIndex)->GetColModel();
     auto* const cd = cm->m_pColData;

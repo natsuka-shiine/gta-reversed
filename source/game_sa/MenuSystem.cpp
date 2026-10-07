@@ -2,7 +2,7 @@
 
 #include "MenuSystem.h"
 
-auto& MenuNumber = StaticRef<std::array<CMenuSystem::Menu*, 2>>(0xBA82D8);
+auto& MenuNumber = StaticRef<std::array<CMenuSystem::Menu*, 2>, 0xBA82D8>();
 
 void CMenuSystem::InjectHooks() {
     RH_ScopedClass(CMenuSystem);

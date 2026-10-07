@@ -2,7 +2,7 @@
 
 #include "RpAnimBlend.h"
 
-static auto& ClumpOffset = StaticRef<uint32>(0xB5F878);
+static auto& ClumpOffset = StaticRef<uint32, 0xB5F878>();
 
 CAnimBlendClumpData*& RpAnimBlendClumpGetData(RpClump* clump) {
     return *RWPLUGINOFFSET(CAnimBlendClumpData*, clump, ClumpOffset);
@@ -611,7 +611,7 @@ struct AnimBlendUpdateData { // OG name
                                            //!< (This works because the sequences are sorted the same way as the frames apprear in the clump)
 };
 
-static auto& gpAnimBlendClump = StaticRef<CAnimBlendClumpData*>(0xB4EA0C);
+static auto& gpAnimBlendClump = StaticRef<CAnimBlendClumpData*, 0xB4EA0C>();
 
 float CalculateTotalBlendOfPartial(AnimBlendUpdateData* c, AnimBlendFrameData* fd, bool checkDontAddToBlend) {
     float sum{};

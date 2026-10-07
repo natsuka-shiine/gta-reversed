@@ -14,10 +14,10 @@ class CEntity;
 
 class CPedAcquaintanceScanner {
 public:
-    static inline auto& ms_fThresholdDotProduct = StaticRef<float>(0xC0B034);
-    static inline auto& ms_iAcquaintanceScanPeriod = StaticRef<int32>(0x8D2358);
-    static inline auto& ms_iAcquaintanceLatencyPeriodDefinite = StaticRef<int32>(0x8D235C); // 3000
-    static inline auto& ms_iAcquaintanceLatencyPeriodMaybe = StaticRef<int32>(0x8D2360);    // 200
+    static inline auto& ms_fThresholdDotProduct = StaticRef<float, 0xC0B034>();
+    static inline auto& ms_iAcquaintanceScanPeriod = StaticRef<int32, 0x8D2358>();
+    static inline auto& ms_iAcquaintanceLatencyPeriodDefinite = StaticRef<int32, 0x8D235C>(); // 3000
+    static inline auto& ms_iAcquaintanceLatencyPeriodMaybe = StaticRef<int32, 0x8D2360>();    // 200
 
     CTaskTimer m_timer;
     bool m_bScanAllowedScriptPed;
@@ -90,7 +90,7 @@ public:
     CSexyPedScanner                   m_sexyPedScanner;
     CNearbyFireScanner                m_nearbyFireScanner;
 
-    static inline auto& m_sDeadPedWalkingTimer = StaticRef<uint32>(0xC0B038);
+    static inline auto& m_sDeadPedWalkingTimer = StaticRef<uint32, 0xC0B038>();
 
 public:
     static void InjectHooks();

@@ -102,35 +102,35 @@ struct _rxD3D9DisplayMode
 
 
 
-auto& _RwD3D9RasterExtOffset             = StaticRef<RwInt32>(0xB4E9E0); /* Raster extension offset */
-auto& StencilClearValue                  = StaticRef<RwUInt32>(0xC97C44);
-auto& WindowHandle                       = StaticRef<HWND>(0xC97C1C);
-auto& _RwHasStencilBuffer                = StaticRef<RwBool>(0xC97C3C);
-auto& _RwD3D9AdapterInformation          = StaticRef<_rwD3D9AdapterInformation>(0xC9BCE0);
-auto& Present                            = StaticRef<D3DPRESENT_PARAMETERS>(0xC9C040);
-auto& _RwD3D9DeviceCaps                  = StaticRef<D3DCAPS9>(0xC9BF00);
-auto& _RwD3D9RenderSurface               = StaticRef<LPSURFACE>(0xC97C30);
-auto& _RwD3D9DepthStencilSurface         = StaticRef<LPSURFACE>(0xC97C2C);
-auto& _RwDirect3DObject                  = StaticRef<IDirect3D9*>(0xC97C20);
-auto& _RwD3DAdapterIndex                 = StaticRef<RwUInt32>(0xC97C24);
-auto& _RwD3DAdapterType                  = StaticRef<D3DDEVTYPE>(0x8E2428);
-auto& FullScreenRefreshRateInHz          = StaticRef<RwUInt32>(0x8E243C);
-auto& _RwD3D9ZBufferDepth                = StaticRef<RwInt32>(0xC9BEFC);
-auto& SelectedMultisamplingLevels        = StaticRef<RwUInt32>(0x8E2430);
-auto& SelectedMultisamplingLevelsNonMask = StaticRef<RwUInt32>(0x8E2438);
-auto& DisplayModes                       = StaticRef<_rxD3D9DisplayMode*>(0xC97C48);
-auto& NumDisplayModes                    = StaticRef<RwInt32>(0xC97C40);
-auto& dgGGlobals                         = StaticRef<RwRwDeviceGlobals>(0xC9BCC0);
-auto& _RwD3D9D3D9ViewTransform           = StaticRef<D3DMATRIX>(0xC9BC80);
-auto& _RwD3D9D3D9ProjTransform           = StaticRef<D3DMATRIX>(0x8E2458);
-auto& _RwD3D9ActiveViewProjTransform     = StaticRef<D3DMATRIX*>(0xC97C64);
-auto& NeedToCopyFromBackBuffer           = StaticRef<RwBool>(0xC97C34);
-auto& InsideScene                        = StaticRef<RwBool>(0xC97C54);
-auto& LightsCache                        = StaticRef<RxD3D9Light*>(0xC98088);
-auto& MaxNumLights                       = StaticRef<RwInt32>(0xC98084);
-auto& D3D9RestoreDeviceCallback          = StaticRef<rwD3D9DeviceRestoreCallBack>(0xC980B0);
+auto& _RwD3D9RasterExtOffset             = StaticRef<RwInt32, 0xB4E9E0>(); /* Raster extension offset */
+auto& StencilClearValue                  = StaticRef<RwUInt32, 0xC97C44>();
+auto& WindowHandle                       = StaticRef<HWND, 0xC97C1C>();
+auto& _RwHasStencilBuffer                = StaticRef<RwBool, 0xC97C3C>();
+auto& _RwD3D9AdapterInformation          = StaticRef<_rwD3D9AdapterInformation, 0xC9BCE0>();
+auto& Present                            = StaticRef<D3DPRESENT_PARAMETERS, 0xC9C040>();
+auto& _RwD3D9DeviceCaps                  = StaticRef<D3DCAPS9, 0xC9BF00>();
+auto& _RwD3D9RenderSurface               = StaticRef<LPSURFACE, 0xC97C30>();
+auto& _RwD3D9DepthStencilSurface         = StaticRef<LPSURFACE, 0xC97C2C>();
+auto& _RwDirect3DObject                  = StaticRef<IDirect3D9*, 0xC97C20>();
+auto& _RwD3DAdapterIndex                 = StaticRef<RwUInt32, 0xC97C24>();
+auto& _RwD3DAdapterType                  = StaticRef<D3DDEVTYPE, 0x8E2428>();
+auto& FullScreenRefreshRateInHz          = StaticRef<RwUInt32, 0x8E243C>();
+auto& _RwD3D9ZBufferDepth                = StaticRef<RwInt32, 0xC9BEFC>();
+auto& SelectedMultisamplingLevels        = StaticRef<RwUInt32, 0x8E2430>();
+auto& SelectedMultisamplingLevelsNonMask = StaticRef<RwUInt32, 0x8E2438>();
+auto& DisplayModes                       = StaticRef<_rxD3D9DisplayMode*, 0xC97C48>();
+auto& NumDisplayModes                    = StaticRef<RwInt32, 0xC97C40>();
+auto& dgGGlobals                         = StaticRef<RwRwDeviceGlobals, 0xC9BCC0>();
+auto& _RwD3D9D3D9ViewTransform           = StaticRef<D3DMATRIX, 0xC9BC80>();
+auto& _RwD3D9D3D9ProjTransform           = StaticRef<D3DMATRIX, 0x8E2458>();
+auto& _RwD3D9ActiveViewProjTransform     = StaticRef<D3DMATRIX*, 0xC97C64>();
+auto& NeedToCopyFromBackBuffer           = StaticRef<RwBool, 0xC97C34>();
+auto& InsideScene                        = StaticRef<RwBool, 0xC97C54>();
+auto& LightsCache                        = StaticRef<RxD3D9Light*, 0xC98088>();
+auto& MaxNumLights                       = StaticRef<RwInt32, 0xC98084>();
+auto& D3D9RestoreDeviceCallback          = StaticRef<rwD3D9DeviceRestoreCallBack, 0xC980B0>();
 
-//auto& _rwD3D9PixelFormatInfo             = StaticRef<_rwD3D9FormatInfo[MAX_PIXEL_FORMATS]>(0xB4E7E0);
+//auto& _rwD3D9PixelFormatInfo             = StaticRef<_rwD3D9FormatInfo[MAX_PIXEL_FORMATS], 0xB4E7E0>();
 
 
 static RwBool EnableFullScreenDialogBoxMode = FALSE;

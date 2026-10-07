@@ -10,9 +10,9 @@
 #include "Fx.h"
 #include "Shadows.h"
 
-static auto& TempVertexBuffer = StaticRef<std::array<RxObjSpace3DVertex, 4>>(0xC4D958);
+static auto& TempVertexBuffer = StaticRef<std::array<RxObjSpace3DVertex, 4>, 0xC4D958>();
 
-auto& g_fx = StaticRef<Fx_c>(0xA9AE00);
+auto& g_fx = StaticRef<Fx_c, 0xA9AE00>();
 
 void Fx_c::InjectHooks() {
     RH_ScopedClass(Fx_c);
@@ -427,7 +427,7 @@ void Fx_c::AddPunchImpact(const CVector& pos, const CVector& velocity, int32 num
 
 // 0x49F750
 void Fx_c::AddDebris(const CVector& pos, const RwRGBA& color, float scale, int32 amount) {
-    static auto& s_DebrisPrimIdx = StaticRef<int32>(0xA9ADE4);
+    static auto& s_DebrisPrimIdx = StaticRef<int32, 0xA9ADE4>();
 
     if (GetDistSqToCamera(pos) > sq(25.0f)) {
         return;

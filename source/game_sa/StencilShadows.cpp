@@ -2,10 +2,10 @@
 #include "StencilShadowObject.h"
 
 // TODO: Statically allocate after reversing RenderForVehicle&RenderForObject.
-static inline auto& s_ShadowTrianglePointsUnk         = StaticRef<RxVertexIndex*>(0xC6A170);
-static inline auto& s_ShadowTrianglePoints            = StaticRef<CVector*>(0xC6A174);
-static inline auto& s_TransformedShadowTrianglePoints = StaticRef<CVector*>(0xC6A178);
-static inline auto& s_SunPosNrm                       = StaticRef<CVector>(0x8D5244); // CVector(1.0, 1.0, -2.0)
+static inline auto& s_ShadowTrianglePointsUnk         = StaticRef<RxVertexIndex*, 0xC6A170>();
+static inline auto& s_ShadowTrianglePoints            = StaticRef<CVector*, 0xC6A174>();
+static inline auto& s_TransformedShadowTrianglePoints = StaticRef<CVector*, 0xC6A178>();
+static inline auto& s_SunPosNrm                       = StaticRef<CVector, 0x8D5244>(); // CVector(1.0, 1.0, -2.0)
 
 // 0x70FA70
 // Maintains the silhouette edge list used for shadow volume extrusion.

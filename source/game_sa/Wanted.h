@@ -60,9 +60,9 @@ private:
     bool                        m_StoredPoliceBackOff;
 
 public:
-    static inline auto& MaximumWantedLevel = StaticRef<eWantedLevel>(0x8CDEE4); // 6
-    static inline auto& MaximumChaosLevel = StaticRef<uint32>(0x8CDEE8); // 9200; nMaximumWantedLevel
-    static inline auto& UseNewsHeliInAdditionToPolice = StaticRef<bool>(0xB7CB8C);
+    static inline auto& MaximumWantedLevel = StaticRef<eWantedLevel, 0x8CDEE4>(); // 6
+    static inline auto& MaximumChaosLevel = StaticRef<uint32, 0x8CDEE8>(); // 9200; nMaximumWantedLevel
+    static inline auto& UseNewsHeliInAdditionToPolice = StaticRef<bool, 0xB7CB8C>();
 
 public:
     void Initialise();

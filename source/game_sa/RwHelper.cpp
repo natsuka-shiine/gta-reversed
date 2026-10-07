@@ -44,7 +44,7 @@ void RwHelperInjectHooks() {
 
 // 0x4ABA50
 CEventGlobalGroup* GetEventGlobalGroup() {
-    static auto& globalEvents = StaticRef<CEventGlobalGroup*>(0xA9AF6C);
+    static auto& globalEvents = StaticRef<CEventGlobalGroup*, 0xA9AF6C>();
 
     if (globalEvents)
         return globalEvents;
@@ -309,7 +309,7 @@ RwTexture* RwTexDictionaryFindHashNamedTexture(RwTexDictionary* txd, uint32 hash
     return nullptr;
 }
 
-static auto& s_BoundingSphereUseLTM = StaticRef<bool>(0x8D60BC);
+static auto& s_BoundingSphereUseLTM = StaticRef<bool, 0x8D60BC>();
 
 // Centre of the atomic's bounding sphere, transformed by its frame (Either the LTM or the modelling matrix, see above)
 static RwV3d GetAtomicBoundingSphereCentre(RpAtomic* atomic) {
@@ -385,8 +385,8 @@ struct tSkinBonePosition {
 };
 VALIDATE_SIZE(tSkinBonePosition, 0x10);
 
-static auto& s_SkinBonePositions          = StaticRef<std::array<tSkinBonePosition, 64>>(0xC88258);
-static auto& s_SkinBonePositionsAreStored = StaticRef<bool>(0xC88658);
+static auto& s_SkinBonePositions          = StaticRef<std::array<tSkinBonePosition, 64>, 0xC88258>();
+static auto& s_SkinBonePositionsAreStored = StaticRef<bool, 0xC88658>();
 
 /*!
 * @brief Walk the bones of the clump's skin, and call `fn(boneIdx, parentIdx, posRelativeToParent)` for each one (apart from the root)

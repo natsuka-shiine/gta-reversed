@@ -90,12 +90,12 @@ public:
     bool         m_bSearchLightEnabled;
     float        field_A14;
 
-    static inline auto& bPoliceHelisAllowed = StaticRef<bool>(0x8D338C); // 1
-    static inline auto& TestForNewRandomHelisTimer = StaticRef<uint32>(0xC1C960);
-    static inline auto& pHelis = StaticRef<std::array<CHeli*, 2>>(0xC1C964);
-    static inline auto& NumberOfSearchLights = StaticRef<uint32>(0xC1C96C);
-    static inline auto& bHeliControlsCheat = StaticRef<bool>(0xC1C970);
-    static inline auto& HeliSearchLights = StaticRef<std::array<tHeliLight, 4>>(0xC1C990);
+    static inline auto& bPoliceHelisAllowed = StaticRef<bool, 0x8D338C>(); // 1
+    static inline auto& TestForNewRandomHelisTimer = StaticRef<uint32, 0xC1C960>();
+    static inline auto& pHelis = StaticRef<std::array<CHeli*, 2>, 0xC1C964>();
+    static inline auto& NumberOfSearchLights = StaticRef<uint32, 0xC1C96C>();
+    static inline auto& bHeliControlsCheat = StaticRef<bool, 0xC1C970>();
+    static inline auto& HeliSearchLights = StaticRef<std::array<tHeliLight, 4>, 0xC1C990>();
 
     static constexpr auto Type = VEHICLE_TYPE_HELI;
 

@@ -10,10 +10,10 @@ class Furniture_c;
 
 class FurnitureManager_c {
 public:
-    static inline auto& g_currSubGroupId  = StaticRef<uint32>(0xBAB37C);
-    static inline auto& g_currFurnitureId = StaticRef<uint32>(0xBAB378);
-    static inline auto& g_subGroupStore   = StaticRef<std::array<FurnitureSubGroup_c, 128>>(0xBAD3F8);
-    static inline auto& g_furnitureStore  = StaticRef<std::array<Furniture_c, 256>>(0xBAE1F8);
+    static inline auto& g_currSubGroupId  = StaticRef<uint32, 0xBAB37C>();
+    static inline auto& g_currFurnitureId = StaticRef<uint32, 0xBAB378>();
+    static inline auto& g_subGroupStore   = StaticRef<std::array<FurnitureSubGroup_c, 128>, 0xBAD3F8>();
+    static inline auto& g_furnitureStore  = StaticRef<std::array<Furniture_c, 256>, 0xBAE1F8>();
 
 public:
     static void InjectHooks();
@@ -38,4 +38,4 @@ private:
 };
 VALIDATE_SIZE(FurnitureManager_c, 0x2078);
 
-static inline auto& g_furnitureMan = StaticRef<FurnitureManager_c>(0xBAB380);
+static inline auto& g_furnitureMan = StaticRef<FurnitureManager_c, 0xBAB380>();

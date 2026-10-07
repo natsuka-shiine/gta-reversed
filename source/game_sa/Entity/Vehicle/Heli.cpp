@@ -15,7 +15,7 @@
 #include "Tasks/TaskTypes/TaskComplexUseSwatRope.h"
 #include "Tasks/TaskTypes/TaskComplexWanderCop.h"
 
-auto& HELI_MAIN_ROTOR_SPIN_MULT = StaticRef<float>(0x8D33A0); // 1.66f
+auto& HELI_MAIN_ROTOR_SPIN_MULT = StaticRef<float, 0x8D33A0>(); // 1.66f
 
 void CHeli::InjectHooks() {
     RH_ScopedVirtualClass(CHeli, 0x871680, 71);
@@ -1096,7 +1096,7 @@ void CHeli::PreRender() {
 
 // 0x6C7050
 void CHeli::ProcessControl() {
-    static auto& s_HeliGunBurstChance = StaticRef<float>(0x8D33A4);
+    static auto& s_HeliGunBurstChance = StaticRef<float, 0x8D33A4>();
 
     CAutomobile::ProcessControl();
 

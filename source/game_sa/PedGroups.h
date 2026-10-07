@@ -15,11 +15,11 @@ class CPedGroups {
 	enum { MAX_NUM_GROUPS = 8 }; // Android
 
 public:
-    static inline auto& ScriptReferenceIndex = StaticRef<std::array<uint16, 8>>(0xC098D0);
-    static inline auto& ms_activeGroups = StaticRef<std::array<char, 8>>(0xC098E0);
-    static inline auto& ms_bIsPlayerOnAMission = StaticRef<bool>(0xC098E8);
-    static inline auto& ms_iNoOfPlayerKills = StaticRef<uint32>(0xC098EC);
-    static inline auto& ms_groups = StaticRef<std::array<CPedGroup, 8>>(0xC09920);
+    static inline auto& ScriptReferenceIndex = StaticRef<std::array<uint16, 8>, 0xC098D0>();
+    static inline auto& ms_activeGroups = StaticRef<std::array<char, 8>, 0xC098E0>();
+    static inline auto& ms_bIsPlayerOnAMission = StaticRef<bool, 0xC098E8>();
+    static inline auto& ms_iNoOfPlayerKills = StaticRef<uint32, 0xC098EC>();
+    static inline auto& ms_groups = StaticRef<std::array<CPedGroup, 8>, 0xC09920>();
 
 public:
     static void InjectHooks();

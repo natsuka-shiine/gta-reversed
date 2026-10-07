@@ -16,8 +16,8 @@ class CGangInfo;
 
 class CGangs {
 public:
-    static inline auto& GangAttackWithCops = StaticRef<std::array<bool, 10>>(0xC091E0);
-    static inline auto& Gang               = StaticRef<std::array<CGangInfo, 10>>(0xC091F0);
+    static inline auto& GangAttackWithCops = StaticRef<std::array<bool, 10>, 0xC091E0>();
+    static inline auto& Gang               = StaticRef<std::array<CGangInfo, 10>, 0xC091F0>();
 
 public:
     static void InjectHooks();

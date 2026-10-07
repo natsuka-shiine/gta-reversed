@@ -10,7 +10,7 @@
 
 constexpr auto EVENT_VOLUMES_BUFFER_SIZE = 45401;
 
-auto& m_pAudioEventVolumes = StaticRef<int8*>(0xBD00F8); // Use `GetDefaultVolume` to access!
+auto& m_pAudioEventVolumes = StaticRef<int8*, 0xBD00F8>(); // Use `GetDefaultVolume` to access!
 
 // NOTSA | INLINED | REFACTORED
 bool CAEAudioEntity::StaticInitialise() {

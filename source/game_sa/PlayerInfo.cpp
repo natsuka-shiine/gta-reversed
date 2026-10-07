@@ -260,9 +260,9 @@ void CPlayerInfo::SetLastTargetVehicle(CVehicle* vehicle) {
 
 // 0x56F8D0
 void CPlayerInfo::Process(uint32 playerIndex) {
-    static auto& s_bPlayerHasMoved   = StaticRef<bool>(0x8CDF21);    // true
-    static auto& s_bRoadNodeIsNearby = StaticRef<bool>(0x8CDF20);    // true
-    static auto& s_vecOldCoors       = StaticRef<CVector>(0xB9B994); // `static CVector OldCoors` (Init guard: 0xB9B9A0)
+    static auto& s_bPlayerHasMoved   = StaticRef<bool, 0x8CDF21>();    // true
+    static auto& s_bRoadNodeIsNearby = StaticRef<bool, 0x8CDF20>();    // true
+    static auto& s_vecOldCoors       = StaticRef<CVector, 0xB9B994>(); // `static CVector OldCoors` (Init guard: 0xB9B9A0)
 
     if (CReplay::Mode == MODE_PLAYBACK) {
         return;
@@ -1097,10 +1097,10 @@ void CPlayerInfo::PlayerFailedCriticalMission() {
 // 0x56E610
 void CPlayerInfo::WorkOutEnergyFromHunger() {
 
-    static auto& s_lastTimeHungryStateProcessedInitialized = StaticRef<bool>(0xB9B8F4); // false
-    static auto& s_lastTimeHungryStateProcessed = StaticRef<uint8>(0xB9B8F2);
-    static auto& s_LastHungryState = StaticRef<int8>(0xB9B8F1);
-    static auto& s_bHungryMessageShown = StaticRef<bool>(0xB9B8F0);
+    static auto& s_lastTimeHungryStateProcessedInitialized = StaticRef<bool, 0xB9B8F4>(); // false
+    static auto& s_lastTimeHungryStateProcessed = StaticRef<uint8, 0xB9B8F2>();
+    static auto& s_LastHungryState = StaticRef<int8, 0xB9B8F1>();
+    static auto& s_bHungryMessageShown = StaticRef<bool, 0xB9B8F0>();
 
     if (CCheat::IsActive(CHEAT_NEVER_GET_HUNGRY)) {
         return;

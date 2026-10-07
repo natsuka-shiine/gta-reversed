@@ -986,7 +986,7 @@ updateSteer: {
         if (m_fRawSteerAngle < 0.0f) {
             signedSquare = -signedSquare;
         }
-        StaticRef<float>(0xC1C804) = signedSquare; // 0xC1C804: unknown static kept for fidelity
+        StaticRef<float, 0xC1C804>() = signedSquare; // 0xC1C804: unknown static kept for fidelity
         if (m_autoPilot.m_vehicleRecordingId < 0 || CVehicleRecording::bUseCarAI[m_autoPilot.m_vehicleRecordingId]) {
             m_fSteerAngle = m_pHandlingData->m_fSteeringLock * 0.017453292f * signedSquare;
         }
@@ -1129,7 +1129,7 @@ int32 CBike::ProcessEntityCollision(CEntity* entity, CColPoint* outColPoints) {
 
 // 0x6B9250
 void CBike::ProcessControl() {
-    static auto& vecTestResistance = StaticRef<CVector>(0x8D3238); // { 0.9995f, 0.9f, 0.95f }
+    static auto& vecTestResistance = StaticRef<CVector, 0x8D3238>(); // { 0.9995f, 0.9f, 0.95f }
     constexpr float fDAxisX      = 1.0f;    // 0x8712D8
     constexpr float fDAxisXExtra = 100.0f;  // 0x8712DC
     constexpr float fInAirXRes   = 0.98f;   // 0x8712E0
@@ -1572,7 +1572,7 @@ void CBike::ProcessControl() {
         rearContact = GetMatrix().TransformVector(rearContact);
 
         // 0x6BA9D6
-        static auto& s_fTractionScale = StaticRef<float>(0xC1C818); // Initialised at runtime (0.004f on Android)
+        static auto& s_fTractionScale = StaticRef<float, 0xC1C818>(); // Initialised at runtime (0.004f on Android)
         const float  traction         = m_pHandlingData->m_fTractionMultiplier * m_fExtraTractionMult * s_fTractionScale * 0.25f;
 
         // 0x6BA9F7 - Turn the handlebars
@@ -1609,8 +1609,8 @@ void CBike::ProcessControl() {
         }
 
         // 0x6BAC22
-        static auto& s_WheelStates = StaticRef<std::array<tWheelState, 2>>(0xC1C26C); // Function-static `WheelState[2]`
-        static auto& s_fThrust     = StaticRef<float>(0xC1C27C);                      // Function-static `fThrust`
+        static auto& s_WheelStates = StaticRef<std::array<tWheelState, 2>, 0xC1C26C>(); // Function-static `WheelState[2]`
+        static auto& s_fThrust     = StaticRef<float, 0xC1C27C>();                      // Function-static `fThrust`
 
         const CVector initialMoveSpeed = m_vecMoveSpeed;
         const bool    rearWheelsFirst  = m_pHandlingData->m_bProcRearwheelFirst;
@@ -1990,9 +1990,9 @@ void CBike::ProcessControl() {
         return;
     }
 
-    static auto& s_fStoppieSteerMult = StaticRef<float>(0x8D3280); // 0.05f
-    static auto& s_fWheelieLeanMult  = StaticRef<float>(0x8D3284); // -0.1f
-    static auto& s_fWheelieMoveMult  = StaticRef<float>(0x8D3288); // 0.01f
+    static auto& s_fStoppieSteerMult = StaticRef<float, 0x8D3280>(); // 0.05f
+    static auto& s_fWheelieLeanMult  = StaticRef<float, 0x8D3284>(); // -0.1f
+    static auto& s_fWheelieMoveMult  = StaticRef<float, 0x8D3288>(); // 0.01f
 
     const float   onSideness = std::clamp(DotProduct(m_vecAveGroundNormal, GetRight()), -1.0f, 1.0f);
     const CVector worldCOM   = GetMatrix().TransformVector(m_vecCentreOfMass);
@@ -2144,10 +2144,10 @@ void CBike::CalculateLeanMatrix() {
 
 // 0x6B7F90
 void CBike::FixHandsToBars(CPed* rider) {
-    static auto& vecBmxHandleBarPos     = StaticRef<CVector>(0x8D3244);
-    static auto& vecMtbHandleBarPos     = StaticRef<CVector>(0x8D3250);
-    static auto& vecChopperHandleBarPos = StaticRef<CVector>(0x8D325C);
-    static auto& vecTweakHandleBarPos2  = StaticRef<CVector>(0x8D3274);
+    static auto& vecBmxHandleBarPos     = StaticRef<CVector, 0x8D3244>();
+    static auto& vecMtbHandleBarPos     = StaticRef<CVector, 0x8D3250>();
+    static auto& vecChopperHandleBarPos = StaticRef<CVector, 0x8D325C>();
+    static auto& vecTweakHandleBarPos2  = StaticRef<CVector, 0x8D3274>();
 
     if (!m_nFixRightHand && !m_nFixLeftHand) {
         return;
@@ -2285,8 +2285,8 @@ void CBike::Fix() {
 // 0x6BD090
 void CBike::PreRender() {
     // Unknown statics, kept for fidelity
-    static auto& s_SpeedToExhaustSpeedDiv = StaticRef<float>(0xC1C81C);
-    static auto& s_SirenBrightness        = StaticRef<float>(0xB7C4E4);
+    static auto& s_SpeedToExhaustSpeedDiv = StaticRef<float, 0xC1C81C>();
+    static auto& s_SirenBrightness        = StaticRef<float, 0xB7C4E4>();
 
     CVehicle::PreRender();
 

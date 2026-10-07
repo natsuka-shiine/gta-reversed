@@ -11,11 +11,11 @@
 #include "TheCarGenerators.h"
 
 using IplTreeNode  = CQuadTreeNode<IplDef*>;
-auto& ms_pQuadTree = StaticRef<IplTreeNode*>(0x8E3FAC);
+auto& ms_pQuadTree = StaticRef<IplTreeNode*, 0x8E3FAC>();
 
-auto& ms_pPool = StaticRef<CIplPool*>(0x8E3FB0);
+auto& ms_pPool = StaticRef<CIplPool*, 0x8E3FB0>();
 
-auto& ms_currentIPLAreaCode = StaticRef<int32>(0x8E3EF8);
+auto& ms_currentIPLAreaCode = StaticRef<int32, 0x8E3EF8>();
 
 /*!
  * @addr 0x405EC0

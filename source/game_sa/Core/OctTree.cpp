@@ -1,7 +1,7 @@
 #include "StdInc.h"
 
 #include "OctTree.h"
-auto& gpTmpOctTree = StaticRef<COctTree*>(0xBC12D8);
+auto& gpTmpOctTree = StaticRef<COctTree*, 0xBC12D8>();
 
 // 0x5A6DB0
 COctTree::COctTree() {

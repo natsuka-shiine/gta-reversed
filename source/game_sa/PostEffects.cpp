@@ -4,17 +4,17 @@
 #include "CustomBuildingDNPipeline.h"
 #include "Clouds.h"
 
-auto& cc_vertices = StaticRef<std::array<RwIm2DVertex, 4>>(0xC400D8);
-auto& cc_indices = StaticRef<std::array<RwImVertexIndex, 12>>(0x8D5174); // { 0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3 };
+auto& cc_vertices = StaticRef<std::array<RwIm2DVertex, 4>, 0xC400D8>();
+auto& cc_indices = StaticRef<std::array<RwImVertexIndex, 12>, 0x8D5174>(); // { 0, 1, 2, 0, 2, 3, 0, 1, 2, 0, 2, 3 };
 
-auto& hpX = StaticRef<std::array<int32, 180>>(0xC3FE08);
-auto& hpY = StaticRef<std::array<int32, 180>>(0xC3FB38);
-auto& hpS = StaticRef<std::array<int32, 180>>(0xC3F868); // speed
+auto& hpX = StaticRef<std::array<int32, 180>, 0xC3FE08>();
+auto& hpY = StaticRef<std::array<int32, 180>, 0xC3FB38>();
+auto& hpS = StaticRef<std::array<int32, 180>, 0xC3F868>(); // speed
 
-static inline auto& s_DayNightBalanceParamOld = StaticRef<float>(0xC3F860);
+static inline auto& s_DayNightBalanceParamOld = StaticRef<float, 0xC3F860>();
 
 // 0xC402BB - Only ever cleared in the original game (See `HeatHazeFX`)
-static inline auto& s_bHeatHazeAlphaMaskMode = StaticRef<bool>(0xC402BB);
+static inline auto& s_bHeatHazeAlphaMaskMode = StaticRef<bool, 0xC402BB>();
 
 // SpeedFX: Which parameters to use for a given speed (The highest `minSpeed` that is `<= speed` wins)
 struct SpeedFXParams {
@@ -24,12 +24,12 @@ struct SpeedFXParams {
     int32 randomShift; // How much the uv offsets are randomly shifted
 };
 
-static inline auto& s_SpeedFXParams = StaticRef<std::array<SpeedFXParams, 7>>(0x8D5190);
+static inline auto& s_SpeedFXParams = StaticRef<std::array<SpeedFXParams, 7>, 0x8D5190>();
 
 // NOTE: The header declares `m_RadiosityPixelsX/Y` as `float`, but the original game stores `int32`s
 //       in them (See 0x8548A0/0x8548B0, which just copy `RsGlobal.maximumWidth/Height` verbatim)
-static inline auto& s_RadiosityPixelsX = StaticRef<int32>(0xC40314);
-static inline auto& s_RadiosityPixelsY = StaticRef<int32>(0xC40318);
+static inline auto& s_RadiosityPixelsX = StaticRef<int32, 0xC40314>();
+static inline auto& s_RadiosityPixelsY = StaticRef<int32, 0xC40318>();
 
 static constexpr auto GRAIN_TEXTURE_DIM = 256u; // 256x256
 
@@ -944,8 +944,8 @@ void CPostEffects::InfraredVisionRestoreLightsForHeatObjects() {
 
 // 0x704150
 void CPostEffects::Fog() {
-    static auto& s_FogRadius = StaticRef<float>(0xC402E4);
-    static auto& s_FogAngle  = StaticRef<float>(0xC402DC);
+    static auto& s_FogRadius = StaticRef<float, 0xC402E4>();
+    static auto& s_FogAngle  = StaticRef<float, 0xC402DC>();
 
     ImmediateModeRenderStatesStore();
     ImmediateModeRenderStatesSet();
@@ -1033,7 +1033,7 @@ void CPostEffects::CCTV() {
 
 // 0x7037C0
 void CPostEffects::Grain(int32 strengthMask, bool update) {
-    static auto& s_NumberOfReseeds = StaticRef<uint32>(0xC4031C);
+    static auto& s_NumberOfReseeds = StaticRef<uint32, 0xC4031C>();
     if (update) {
         auto* pixels = RwRasterLock(m_pGrainRaster, 0, rwRASTERLOCKWRITE);
 
@@ -1386,10 +1386,10 @@ void CPostEffects::SetSpeedFXManualSpeedCurrentFrame(float value) {
 void CPostEffects::Render() {
     ZoneScoped;
 
-    static auto& s_CurrentStrength    = StaticRef<int32>(0xC40328);
-    static auto& s_WaterGreen         = StaticRef<float>(0xC40324);
-    static auto& s_WaitForOneFrame    = StaticRef<bool>(0xC40321);
-    static auto& s_SavePhotoToGallery = StaticRef<bool>(0xC40320);
+    static auto& s_CurrentStrength    = StaticRef<int32, 0xC40328>();
+    static auto& s_WaterGreen         = StaticRef<float, 0xC40324>();
+    static auto& s_WaitForOneFrame    = StaticRef<bool, 0xC40321>();
+    static auto& s_SavePhotoToGallery = StaticRef<bool, 0xC40320>();
 
     if (m_bDisableAllPostEffect) {
         return;

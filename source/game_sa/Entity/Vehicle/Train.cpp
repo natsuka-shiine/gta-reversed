@@ -30,13 +30,13 @@ CVector CTrain::aStationCoors[6] = { // 0x8D48F8
     CVector{ 2865.0f,  1281.0f, 12.0  }
 };
 
-auto& pTrackNodes = StaticRef<CTrainNode*[4]>(0xC38024);
-auto& NumTrackNodes = StaticRef<std::array<int32, 4>>(0xC38014);
-auto& arrTotalTrackLength = StaticRef<std::array<float, 4>>(0xC37FEC);
-auto& StationDist = StaticRef<std::array<float, 6>>(0xC38034);
-auto& TrainConfigs = StaticRef<int32[16][16]>(0x8D44F8);
-auto& TrainGenCounter = StaticRef<int32>(0xC38064);
-auto& bPlayerNearStation = StaticRef<bool>(0xC38068);
+auto& pTrackNodes = StaticRef<CTrainNode*[4], 0xC38024>();
+auto& NumTrackNodes = StaticRef<std::array<int32, 4>, 0xC38014>();
+auto& arrTotalTrackLength = StaticRef<std::array<float, 4>, 0xC37FEC>();
+auto& StationDist = StaticRef<std::array<float, 6>, 0xC38034>();
+auto& TrainConfigs = StaticRef<int32[16][16], 0x8D44F8>();
+auto& TrainGenCounter = StaticRef<int32, 0xC38064>();
+auto& bPlayerNearStation = StaticRef<bool, 0xC38068>();
 
 void CTrain::InjectHooks() {
     RH_ScopedVirtualClass(CTrain, 0x872370, 66);
@@ -1145,7 +1145,7 @@ void CTrain::AddNearbyPedAsRandomPassenger() {
 
     auto* const seekTask = new CTaskComplexSeekEntityXYOffset{ // 0x661DC0 via 0x61A5A0 (0x58)
         this, 50000, 1000, // 0xC350, 0x3E8
-        StaticRef<float>(0x86FC2C), StaticRef<float>(0x86FC28), StaticRef<float>(0x86FC30),
+        StaticRef<float, 0x86FC2C>(), StaticRef<float, 0x86FC28>(), StaticRef<float, 0x86FC30>(),
         true, true
     };
     seekTask->GetSeekPosCalculator().SetOffset(seekOffset); // +0x44..0x4C (vtable 0x86F8F8)

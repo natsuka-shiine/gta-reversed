@@ -77,8 +77,8 @@ void CCustomBuildingRenderer::UpdateDayNightBalanceParam() {
 void CCustomBuildingRenderer::Update() {
     ZoneScoped;
 
-    static auto& magic1 = StaticRef<uint32>(0xC02C14);
-    static auto& magic2 = StaticRef<uint32>(0xC02C18);
+    static auto& magic1 = StaticRef<uint32, 0xC02C14>();
+    static auto& magic2 = StaticRef<uint32, 0xC02C18>();
     UpdateDayNightBalanceParam();
     magic1 = (magic1 + 1) & 15;
     magic2 = 0;

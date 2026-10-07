@@ -69,7 +69,7 @@ private:
     std::pair<CVector, eBoneTag> GetAimLookAtInfo() const;
     void                         ProcessAnim(CPed* ped); // NOTSA: Part of `ProcessPed`
 
-    static inline auto& WEAPON_RE_AIM_RATE = StaticRef<float>(0x8D2E64); // 0.96f
+    static inline auto& WEAPON_RE_AIM_RATE = StaticRef<float, 0x8D2E64>(); // 0.96f
 
 public:
     bool                   m_IsFinished{};

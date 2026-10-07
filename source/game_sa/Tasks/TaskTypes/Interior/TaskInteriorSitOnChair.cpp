@@ -82,7 +82,7 @@ bool CTaskInteriorSitOnChair::MakeAbortable(CPed* ped, eAbortPriority priority, 
 bool CTaskInteriorSitOnChair::ProcessPed(CPed* ped) {
     // Offset of the ped (in the ped's space) to be applied when getting on/off the chair
     // NOTE: Zero in the executable's image, and no writer of it was found - It's read from the game's memory to stay faithful
-    static auto& s_ChairPedOffset = StaticRef<CVector>(0xC18C78);
+    static auto& s_ChairPedOffset = StaticRef<CVector, 0xC18C78>();
 
     const auto currAnimId = m_Anim ? m_Anim->GetAnimId() : ANIM_ID_UNDEFINED;
 

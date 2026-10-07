@@ -2,7 +2,7 @@
 
 #include "TheZones.h"
 
-static inline auto& gPriceMultipliers = StaticRef<std::array<float, NUM_LEVELS>>(0x8A6204);
+static inline auto& gPriceMultipliers = StaticRef<std::array<float, NUM_LEVELS>, 0x8A6204>();
 
 // incomplete, todo: move
 class CMultiBuilding {};
@@ -67,20 +67,20 @@ class CShopping {
     static constexpr auto NUM_BUYABLE_ITEMS = 300u; // ?
     static constexpr auto NUM_SECTION_NAMES = 11u;
 
-    static inline auto& ms_sectionNames = StaticRef<std::array<const char*, NUM_SECTION_NAMES>>(0x8A61D8);
+    static inline auto& ms_sectionNames = StaticRef<std::array<const char*, NUM_SECTION_NAMES>, 0x8A61D8>();
 
-    static inline auto& ms_bHasBought = StaticRef<std::array<bool, NUM_ITEMS>>(0xA972A0);
-    static inline auto& ms_statModifiers = StaticRef<std::array<StatModifiers, NUM_ITEMS>>(0xA974D0);
-    static inline auto& ms_priceModifiers = StaticRef<std::array<PriceModifier, MAX_PRICE_MODIFIERS>>(0xA98650);
-    static inline auto& ms_prices = StaticRef<std::array<ItemPrice, NUM_BUYABLE_ITEMS>>(0xA986F0);
-    static inline auto& ms_numBuyableItems = StaticRef<uint32>(0xA9A310);
-    static inline auto& ms_keys = StaticRef<std::array<uint32, NUM_ITEMS>>(0xA97D90);
-    static inline auto& ms_shopContents = StaticRef<std::array<uint32, NUM_BUYABLE_ITEMS>>(0xA9A318);
-    static inline auto& ms_priceSectionLoaded = StaticRef<ePriceSection>(0xA9A7C8);
-    static inline auto& ms_numPrices = StaticRef<int32>(0xA9A7CC);
-    static inline auto& ms_numPriceModifiers = StaticRef<int32>(0xA9A7D0);
-    static inline auto& ms_shopLoaded = StaticRef<char[24]>(0xA9A7D8);
-    static inline auto& ms_numItemsInShop = StaticRef<int32>(0xA9A7F0);
+    static inline auto& ms_bHasBought = StaticRef<std::array<bool, NUM_ITEMS>, 0xA972A0>();
+    static inline auto& ms_statModifiers = StaticRef<std::array<StatModifiers, NUM_ITEMS>, 0xA974D0>();
+    static inline auto& ms_priceModifiers = StaticRef<std::array<PriceModifier, MAX_PRICE_MODIFIERS>, 0xA98650>();
+    static inline auto& ms_prices = StaticRef<std::array<ItemPrice, NUM_BUYABLE_ITEMS>, 0xA986F0>();
+    static inline auto& ms_numBuyableItems = StaticRef<uint32, 0xA9A310>();
+    static inline auto& ms_keys = StaticRef<std::array<uint32, NUM_ITEMS>, 0xA97D90>();
+    static inline auto& ms_shopContents = StaticRef<std::array<uint32, NUM_BUYABLE_ITEMS>, 0xA9A318>();
+    static inline auto& ms_priceSectionLoaded = StaticRef<ePriceSection, 0xA9A7C8>();
+    static inline auto& ms_numPrices = StaticRef<int32, 0xA9A7CC>();
+    static inline auto& ms_numPriceModifiers = StaticRef<int32, 0xA9A7D0>();
+    static inline auto& ms_shopLoaded = StaticRef<char[24], 0xA9A7D8>();
+    static inline auto& ms_numItemsInShop = StaticRef<int32, 0xA9A7F0>();
 
 public:
     static void InjectHooks();
@@ -129,8 +129,8 @@ public:
 
 static constexpr auto NUM_COMPONENTS = 20u; // ?
 
-static inline auto& gClothesHaveBeenStored = StaticRef<char>(0xA97298);
-static inline auto& gStoredClothesState = StaticRef<CPedClothesDesc>(0xA9A810);
-static inline auto& gComponentDamageState = StaticRef<std::array<eDamageState, 20u>>(0xA97258);
-static inline auto& gStoredVehicleMods = StaticRef<std::array<int16, 15u>>(0xA97274);
+static inline auto& gClothesHaveBeenStored = StaticRef<char, 0xA97298>();
+static inline auto& gStoredClothesState = StaticRef<CPedClothesDesc, 0xA9A810>();
+static inline auto& gComponentDamageState = StaticRef<std::array<eDamageState, 20u>, 0xA97258>();
+static inline auto& gStoredVehicleMods = StaticRef<std::array<int16, 15u>, 0xA97274>();
 static inline CMultiBuilding* gpCurrentProperty = (CMultiBuilding*)0xA97294;

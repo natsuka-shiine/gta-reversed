@@ -61,8 +61,8 @@ public:
     // char             _pad1E[2];
 
 public:
-    static inline auto& m_bHotdogVendorPositionOffsetInitialized = StaticRef<bool>(0xC2B974);
-    static inline auto& m_HotdogVendorPositionOffset = StaticRef<CVector>(0xC2B968);
+    static inline auto& m_bHotdogVendorPositionOffsetInitialized = StaticRef<bool, 0xC2B974>();
+    static inline auto& m_HotdogVendorPositionOffset = StaticRef<CVector, 0xC2B968>();
 
 public:
     static void InjectHooks();

@@ -12,7 +12,7 @@ private:
     std::array<BoneNode_c, 128> m_Space;
     TList_c<BoneNode_c>         m_Bones;
 
-    static inline auto& ms_boneInfos = StaticRef<std::array<BoneInfo_t, MAX_BONE_NUM>>(0x8D26D0);
+    static inline auto& ms_boneInfos = StaticRef<std::array<BoneInfo_t, MAX_BONE_NUM>, 0x8D26D0>();
 
 public:
     BoneNodeManager_c() = default;  // 0x617330
@@ -48,4 +48,4 @@ private: // notsa section
 };
 VALIDATE_SIZE(BoneNodeManager_c, 0x4C0C);
 
-static inline auto& g_boneNodeMan = StaticRef<BoneNodeManager_c>(0xC10820);
+static inline auto& g_boneNodeMan = StaticRef<BoneNodeManager_c, 0xC10820>();

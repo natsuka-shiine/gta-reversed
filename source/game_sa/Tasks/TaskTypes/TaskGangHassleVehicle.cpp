@@ -146,7 +146,7 @@ CTask* CTaskGangHassleVehicle::CreateNextSubTask(CPed* ped) {
         }
         return new CTaskComplexTrackEntity{ m_Vehicle, m_vecPosn, 1, -1, 10.0f, 40.0f, 1 };
     }
-    return new CTaskComplexSmartFleeEntity{ m_Vehicle, false, 28.0f, 1'000'000, 1000, StaticRef<float>(0xC18CF0) };
+    return new CTaskComplexSmartFleeEntity{ m_Vehicle, false, 28.0f, 1'000'000, 1000, StaticRef<float, 0xC18CF0>() };
 }
 
 // 0x664BA0

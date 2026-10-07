@@ -10,7 +10,7 @@
 #include "Shadows.h"
 #include "CarFXRenderer.h"
 
-auto& bFudgeNow = StaticRef<bool>(0xC7C72A);
+auto& bFudgeNow = StaticRef<bool, 0xC7C72A>();
 
 /*!
  * Screen positions in Los Santos stadium. Odd job called as "8-Track"

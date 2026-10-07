@@ -21,19 +21,19 @@
 
 extern std::array<CColPoint, 32>& gaTempSphereColPoints; // World.cpp
 
-auto& TheCamera = StaticRef<CCamera>(0xB6F028);
-auto& gbModelViewer = StaticRef<bool>(0xBA6728);
-auto& gbCineyCamMessageDisplayed = StaticRef<int8>(0x8CC381); // 2
-auto& gCameraDirection = StaticRef<int32>(0x8CC384);         // 3
-auto& gCameraMode = StaticRef<eCamMode>(0x8CC388);        // -1
-auto& gLastTime2PlayerCameraWasOK = StaticRef<uint32>(0xB6EC24);    // 0
-auto& gLastTime2PlayerCameraCollided = StaticRef<uint32>(0xB6EC28); // 0
-auto& gPlayerPedVisible = StaticRef<bool>(0x8CC380); // true
-auto& gCurCamColVars = StaticRef<uint8>(0x8CCB80);
-auto& gCurDistForCam = StaticRef<float>(0x8CCB84);
-auto& gpCamColVars = StaticRef<float*>(0xB6FE88);
-auto& gCamColVars = StaticRef<float[28][6]>(0x8CC8E0);
-static auto& gLastRadiusUsedInCollisionPreventionOfCamera = StaticRef<float>(0xB6EC6C);
+auto& TheCamera = StaticRef<CCamera, 0xB6F028>();
+auto& gbModelViewer = StaticRef<bool, 0xBA6728>();
+auto& gbCineyCamMessageDisplayed = StaticRef<int8, 0x8CC381>(); // 2
+auto& gCameraDirection = StaticRef<int32, 0x8CC384>();         // 3
+auto& gCameraMode = StaticRef<eCamMode, 0x8CC388>();        // -1
+auto& gLastTime2PlayerCameraWasOK = StaticRef<uint32, 0xB6EC24>();    // 0
+auto& gLastTime2PlayerCameraCollided = StaticRef<uint32, 0xB6EC28>(); // 0
+auto& gPlayerPedVisible = StaticRef<bool, 0x8CC380>(); // true
+auto& gCurCamColVars = StaticRef<uint8, 0x8CCB80>();
+auto& gCurDistForCam = StaticRef<float, 0x8CCB84>();
+auto& gpCamColVars = StaticRef<float*, 0xB6FE88>();
+auto& gCamColVars = StaticRef<float[28][6], 0x8CC8E0>();
+static auto& gLastRadiusUsedInCollisionPreventionOfCamera = StaticRef<float, 0xB6EC6C>();
 
 static bool IsActiveCamSourceUnderWater();
 
@@ -535,11 +535,11 @@ float CCamera::GetRoughDistanceToGround() {
 
 // 0x50AFA0
 void CCamera::CopyCameraMatrixToRWCam(bool bUpdateMatrix) {
-    static auto& gPrevCamRight = StaticRef<CVector>(0xB6FF90);
-    static auto& gPrevCamUp    = StaticRef<CVector>(0xB6FF9C);
-    static auto& gPrevCamAt    = StaticRef<CVector>(0xB6FFA8);
-    static auto& gPrevCamPos   = StaticRef<CVector>(0xB6FFB4);
-    static auto& gPrevCamInit  = StaticRef<uint32>(0xB6FFC0);
+    static auto& gPrevCamRight = StaticRef<CVector, 0xB6FF90>();
+    static auto& gPrevCamUp    = StaticRef<CVector, 0xB6FF9C>();
+    static auto& gPrevCamAt    = StaticRef<CVector, 0xB6FFA8>();
+    static auto& gPrevCamPos   = StaticRef<CVector, 0xB6FFB4>();
+    static auto& gPrevCamInit  = StaticRef<uint32, 0xB6FFC0>();
 
     RwFrame*  frame  = RwCameraGetFrame(m_pRwCamera);
     RwMatrix* matrix = RwFrameGetMatrix(frame);
@@ -570,8 +570,8 @@ void CCamera::CopyCameraMatrixToRWCam(bool bUpdateMatrix) {
         gPrevCamRight = CVector(-99999.0f, -99999.0f, -99999.0f);
     }
 
-    static auto& positionSnapDistance = StaticRef<float>(0x8CCC7C);
-    static auto& orientationSnapDistance = StaticRef<float>(0x8CCC78);
+    static auto& positionSnapDistance = StaticRef<float, 0x8CCC7C>();
+    static auto& orientationSnapDistance = StaticRef<float, 0x8CCC78>();
     if ((gPrevCamPos - matrix->pos).SquaredMagnitude() < positionSnapDistance * positionSnapDistance) {
         matrix->pos = gPrevCamPos;
     }
@@ -1253,10 +1253,10 @@ void CCamera::UpdateSoundDistances() {
 // unused
 // 0x50CB90
 void CCamera::SetNearClipBasedOnPedCollision(float arg2) {
-    static auto& gSqrDistanceToNearestPed = StaticRef<float>(0xB6EC68);
+    static auto& gSqrDistanceToNearestPed = StaticRef<float, 0xB6EC68>();
 
-    static auto& distanceScale = StaticRef<float>(0x8CCC84);
-    static auto& maxClip = StaticRef<float>(0x8CCC80);
+    static auto& distanceScale = StaticRef<float, 0x8CCC84>();
+    static auto& maxClip = StaticRef<float, 0x8CCC80>();
 
     const float minClip = gpCamColVars[4];
     float nearClip = std::sqrt(arg2) / gSqrDistanceToNearestPed * distanceScale * (maxClip - minClip) + minClip;
@@ -1423,8 +1423,8 @@ void CCamera::ResetDuckingSystem(CPed* ped) {
 // arg5 always used as false
 // 0x50CFA0
 void CCamera::HandleCameraMotionForDucking(CPed* ped, CVector* source, CVector* targPosn, bool arg5) {
-    static auto& stationaryHeight = StaticRef<float>(0x8CCB94);
-    static auto& movingHeight = StaticRef<float>(0x8CCB98);
+    static auto& stationaryHeight = StaticRef<float, 0x8CCB94>();
+    static auto& movingHeight = StaticRef<float, 0x8CCB98>();
 
     float targetFactor = 0.0f;
     if (ConsiderPedAsDucking(ped)) {
@@ -1607,8 +1607,8 @@ struct tObbeCinemaCamSequence {
 };
 
 static void ProcessObbeCinemaCamera(CCamera& cam, const tObbeCinemaCamSequence& seq) {
-    static auto& s_CinemaCamChangeDir   = StaticRef<int8>(0x8CC471); // Direction to step in the sequence
-    static auto& s_bCinemaCamProcessed  = StaticRef<bool>(0xB6EC34); // `cinematicProcessed` in `CamControl`
+    static auto& s_CinemaCamChangeDir   = StaticRef<int8, 0x8CC471>(); // Direction to step in the sequence
+    static auto& s_bCinemaCamProcessed  = StaticRef<bool, 0xB6EC34>(); // `cinematicProcessed` in `CamControl`
 
     const auto IsItTimeForNewCamera = [&](int32 camSequence, uint32 startTime) {
         return cam.IsItTimeForNewCamera(camSequence, (int32)startTime);
@@ -1678,9 +1678,9 @@ void CCamera::ProcessObbeCinemaCameraPed() {
 // 0x526C80
 void CCamera::ProcessObbeCinemaCameraPlane() {
     ProcessObbeCinemaCamera(*this, {
-        .m_CurrentIdx        = StaticRef<int32>(0x8CCEF8),
-        .m_LastChangeTimeMs  = StaticRef<uint32>(0xB7012C),
-        .m_Sequence          = StaticRef<int32[7]>(0x8CC894),
+        .m_CurrentIdx        = StaticRef<int32, 0x8CCEF8>(),
+        .m_LastChangeTimeMs  = StaticRef<uint32, 0xB7012C>(),
+        .m_Sequence          = StaticRef<int32[7], 0x8CC894>(),
         .m_Count             = 6,
         .m_bChangeUnderWater = true,
         .m_bFallbackToFixed  = true,
@@ -1690,9 +1690,9 @@ void CCamera::ProcessObbeCinemaCameraPlane() {
 // 0x526950
 void CCamera::ProcessObbeCinemaCameraTrain() {
     ProcessObbeCinemaCamera(*this, {
-        .m_CurrentIdx        = StaticRef<int32>(0x8CCEF0),
-        .m_LastChangeTimeMs  = StaticRef<uint32>(0xB70124),
-        .m_Sequence          = StaticRef<int32[7]>(0x8CC858),
+        .m_CurrentIdx        = StaticRef<int32, 0x8CCEF0>(),
+        .m_LastChangeTimeMs  = StaticRef<uint32, 0xB70124>(),
+        .m_Sequence          = StaticRef<int32[7], 0x8CC858>(),
         .m_Count             = 6,
         .m_bChangeUnderWater = false,
         .m_bFallbackToFixed  = false,
@@ -1736,9 +1736,9 @@ void CCamera::ProcessVectorTrackLinear(float ratio) {
 // 0x526E20
 void CCamera::ProcessObbeCinemaCameraBoat() {
     ProcessObbeCinemaCamera(*this, {
-        .m_CurrentIdx        = StaticRef<int32>(0x8CCEFC),
-        .m_LastChangeTimeMs  = StaticRef<uint32>(0xB70130),
-        .m_Sequence          = StaticRef<int32[4]>(0x8CC8B0),
+        .m_CurrentIdx        = StaticRef<int32, 0x8CCEFC>(),
+        .m_LastChangeTimeMs  = StaticRef<uint32, 0xB70130>(),
+        .m_Sequence          = StaticRef<int32[4], 0x8CC8B0>(),
         .m_Count             = 3,
         .m_bChangeUnderWater = false,
         .m_bFallbackToFixed  = true,
@@ -1748,9 +1748,9 @@ void CCamera::ProcessObbeCinemaCameraBoat() {
 // 0x5267C0
 void CCamera::ProcessObbeCinemaCameraCar() {
     ProcessObbeCinemaCamera(*this, {
-        .m_CurrentIdx        = StaticRef<int32>(0x8CCEEC),
-        .m_LastChangeTimeMs  = StaticRef<uint32>(0xB70120),
-        .m_Sequence          = StaticRef<int32[12]>(0x8CC828),
+        .m_CurrentIdx        = StaticRef<int32, 0x8CCEEC>(),
+        .m_LastChangeTimeMs  = StaticRef<uint32, 0xB70120>(),
+        .m_Sequence          = StaticRef<int32[12], 0x8CC828>(),
         .m_Count             = 11,
         .m_bChangeUnderWater = false,
         .m_bFallbackToFixed  = false,
@@ -1760,9 +1760,9 @@ void CCamera::ProcessObbeCinemaCameraCar() {
 // 0x526AE0
 void CCamera::ProcessObbeCinemaCameraHeli() {
     ProcessObbeCinemaCamera(*this, {
-        .m_CurrentIdx        = StaticRef<int32>(0x8CCEF4),
-        .m_LastChangeTimeMs  = StaticRef<uint32>(0xB70128),
-        .m_Sequence          = StaticRef<int32[8]>(0x8CC874),
+        .m_CurrentIdx        = StaticRef<int32, 0x8CCEF4>(),
+        .m_LastChangeTimeMs  = StaticRef<uint32, 0xB70128>(),
+        .m_Sequence          = StaticRef<int32[8], 0x8CC874>(),
         .m_Count             = 7,
         .m_bChangeUnderWater = true,
         .m_bFallbackToFixed  = true,
@@ -1818,7 +1818,7 @@ void CCamera::ProcessShake() {
 // shakeIntensity not used
 // 0x516560
 void CCamera::ProcessShake(float intensity) {
-    static auto& initialized = StaticRef<bool>(0xB70048);
+    static auto& initialized = StaticRef<bool, 0xB70048>();
     auto& cam = m_aCams[m_nActiveCam];
     if (!initialized) {
         for (size_t i = 1; i < gHandShaker.size(); i++) {
@@ -1870,7 +1870,7 @@ void CCamera::Process() {
     ZoneScoped;
     ResetMadeInvisibleObjects();
 
-    const auto playerMinDist = StaticRef<float>(0x8CCF20);
+    const auto playerMinDist = StaticRef<float, 0x8CCF20>();
     auto& activeCam = m_aCams[m_nActiveCam];
     auto& otherCam = m_aCams[(m_nActiveCam + 1) % 2];
 
@@ -2037,7 +2037,7 @@ void CCamera::Process() {
             fov
         );
     } else {
-        StaticRef<bool>(0xB70143) = false;
+        StaticRef<bool, 0xB70143>() = false;
         camSource = activeCam.m_vecSource;
         camFront = activeCam.m_vecFront;
         camUp = activeCam.m_vecUp;
@@ -2062,7 +2062,7 @@ void CCamera::Process() {
     }
 
     if (CMBlur::Drunkness > 0.0f) {
-        auto& phase = StaticRef<float>(0xB6EC30);
+        auto& phase = StaticRef<float, 0xB6EC30>();
         const float cosine = std::cos(DegreesToRadians(phase));
         const float sine = std::sin(DegreesToRadians(phase));
         const float positionAmount = CMBlur::Drunkness * -0.02f;
@@ -2098,7 +2098,7 @@ void CCamera::Process() {
     if (amplitude > 0.0f && m_nBlurType != eMotionBlurType::SNIPER) {
         m_nMotionBlurAddAlpha = std::min(25 - static_cast<int32>(shakeForce * -255.0f), 150);
     }
-    auto& firstPersonBlur = StaticRef<bool>(0xB70142);
+    auto& firstPersonBlur = StaticRef<bool, 0xB70142>();
     const auto vehicle = FindPlayerVehicle();
     if (activeCam.m_nMode == MODE_1STPERSON && vehicle && vehicle->GetUp().z < 0.2f) {
         m_nBlurRed = m_nBlurGreen = m_nBlurBlue = 255;
@@ -2227,10 +2227,10 @@ void CCamera::Find3rdPersonCamTargetVector(float range, CVector gunMuzzle, CVect
 
 // 0x514B80
 float CCamera::CalculateGroundHeight(eGroundHeightType type) {
-    static auto& lastCalcCamPos    = StaticRef<CVector>(0xB70034);
-    static auto& exactGroundHeight = StaticRef<float>(0xB70030);
-    static auto& bbTopZ            = StaticRef<float>(0xB7002C);
-    static auto& bbBottomZ         = StaticRef<float>(0xB70028);
+    static auto& lastCalcCamPos    = StaticRef<CVector, 0xB70034>();
+    static auto& exactGroundHeight = StaticRef<float, 0xB70030>();
+    static auto& bbTopZ            = StaticRef<float, 0xB7002C>();
+    static auto& bbBottomZ         = StaticRef<float, 0xB70028>();
 
     const auto& camPos = GetPosition();
 
@@ -2268,13 +2268,13 @@ float CCamera::CalculateGroundHeight(eGroundHeightType type) {
 
 // 0x514030
 void CCamera::AvoidTheGeometry(const CVector* source, const CVector* target, CVector* output, float FOV) {
-    static auto& checkOtherEntities = StaticRef<bool>(0xB6EC65);
-    static auto& nearClipOffset = StaticRef<float>(0x8CC38C);
-    static auto& minimumNearClip = StaticRef<float>(0x8CC390);
-    static auto& timerDamping = StaticRef<float>(0x8CC81C);
-    static auto& sphereScale = StaticRef<float>(0x8CC820);
-    static auto& motionFactor = StaticRef<float>(0xB6EC38);
-    static auto& motionSpeed = StaticRef<float>(0xB6EC3C);
+    static auto& checkOtherEntities = StaticRef<bool, 0xB6EC65>();
+    static auto& nearClipOffset = StaticRef<float, 0x8CC38C>();
+    static auto& minimumNearClip = StaticRef<float, 0x8CC390>();
+    static auto& timerDamping = StaticRef<float, 0x8CC81C>();
+    static auto& sphereScale = StaticRef<float, 0x8CC820>();
+    static auto& motionFactor = StaticRef<float, 0xB6EC38>();
+    static auto& motionSpeed = StaticRef<float, 0xB6EC3C>();
 
     const auto delta = *target - *source;
     m_vecClearGeometryVec = CVector{};
@@ -2402,21 +2402,21 @@ void CCamera::CalculateDerivedValues(bool bForMirror, bool bOriented) {
 
 // 0x516B20
 void CCamera::ImproveNearClip(CVehicle* vehicle, CPed* ped, CVector* source, CVector* targPosn) {
-    static auto& longDistance = StaticRef<float>(0x8CCD08);
-    static auto& longDistanceScale = StaticRef<float>(0x8CCD04);
-    static auto& aircraftCollisionThreshold = StaticRef<float>(0x8CCD00);
-    static auto& groundDistanceThreshold = StaticRef<float>(0x8CCCFC);
-    static auto& aircraftCollisionScale = StaticRef<float>(0x8CCCF8);
-    static auto& aircraftDistanceScale = StaticRef<float>(0x8CCCF4);
-    static auto& heliNearClip = StaticRef<float>(0x8CCCF0);
-    static auto& waterDistanceThreshold = StaticRef<float>(0x8CCCEC);
-    static auto& waterNearClip = StaticRef<float>(0x8CCCE8);
-    static auto& underwaterNearClip = StaticRef<float>(0x8CCCE4);
-    static auto& flyingPedCollisionScale = StaticRef<float>(0x8CCCE0);
-    static auto& flyingPedDistanceScale = StaticRef<float>(0x8CCCDC);
-    static auto& specialPieceRadiusScale = StaticRef<float>(0x8CCCD8);
-    static auto& minPedNearClip = StaticRef<float>(0x8CCCD4);
-    static auto& maxPedNearClip = StaticRef<float>(0x8CCCD0);
+    static auto& longDistance = StaticRef<float, 0x8CCD08>();
+    static auto& longDistanceScale = StaticRef<float, 0x8CCD04>();
+    static auto& aircraftCollisionThreshold = StaticRef<float, 0x8CCD00>();
+    static auto& groundDistanceThreshold = StaticRef<float, 0x8CCCFC>();
+    static auto& aircraftCollisionScale = StaticRef<float, 0x8CCCF8>();
+    static auto& aircraftDistanceScale = StaticRef<float, 0x8CCCF4>();
+    static auto& heliNearClip = StaticRef<float, 0x8CCCF0>();
+    static auto& waterDistanceThreshold = StaticRef<float, 0x8CCCEC>();
+    static auto& waterNearClip = StaticRef<float, 0x8CCCE8>();
+    static auto& underwaterNearClip = StaticRef<float, 0x8CCCE4>();
+    static auto& flyingPedCollisionScale = StaticRef<float, 0x8CCCE0>();
+    static auto& flyingPedDistanceScale = StaticRef<float, 0x8CCCDC>();
+    static auto& specialPieceRadiusScale = StaticRef<float, 0x8CCCD8>();
+    static auto& minPedNearClip = StaticRef<float, 0x8CCCD4>();
+    static auto& maxPedNearClip = StaticRef<float, 0x8CCCD0>();
 
     const float distSrcToTarg = (*source - *targPosn).Magnitude();
     if (distSrcToTarg > longDistance) {
@@ -2495,7 +2495,7 @@ void CCamera::ImproveNearClip(CVehicle* vehicle, CPed* ped, CVector* source, CVe
     CCollision::CheckPeds(*source, m_aCams[m_nActiveCam].m_vecFront, nearest);
 }
 
-static auto& preMirrorMat = StaticRef<CMatrix>(0xB6FE40);
+static auto& preMirrorMat = StaticRef<CMatrix, 0xB6FE40>();
 
 // 0x51A560
 void CCamera::SetCameraUpForMirror() {
@@ -2530,10 +2530,10 @@ bool CCamera::ConeCastCollisionResolve(const CVector& pos, const CVector& lookAt
 
 // 0x51D770
 bool CCamera::IsItTimeForNewCamera(int32 camSequence, int32 startTime) {
-    static auto& s_CinemaCamChangeDir = StaticRef<int8>(0x8CC471);  // Direction to step in the sequence (Same variable as in `ProcessObbeCinemaCamera`)
-    static auto& s_MaxTimeInAnyCamMs  = StaticRef<float>(0x8CCDF8); // 20'000
-    static auto& s_MaxTimeInFixedCamMs = StaticRef<float>(0x8CCDF0); // 15'000
-    static auto& s_bStickCentered     = StaticRef<bool>(0x8CCDF4);  // true
+    static auto& s_CinemaCamChangeDir = StaticRef<int8, 0x8CC471>();  // Direction to step in the sequence (Same variable as in `ProcessObbeCinemaCamera`)
+    static auto& s_MaxTimeInAnyCamMs  = StaticRef<float, 0x8CCDF8>(); // 20'000
+    static auto& s_MaxTimeInFixedCamMs = StaticRef<float, 0x8CCDF0>(); // 15'000
+    static auto& s_bStickCentered     = StaticRef<bool, 0x8CCDF4>();  // true
 
     if (camSequence < 0) {
         return true;
@@ -3017,20 +3017,20 @@ bool CCamera::TryToStartNewCamMode(int32 camSequence) {
 
 // 0x520190
 bool CCamera::CameraColDetAndReact(CVector* source, CVector* target) {
-    static auto& radiusScale = StaticRef<float>(0x8CCB90);
-    static auto& minRadius = StaticRef<float>(0x8CCE18);
-    static auto& pedMinDistance = StaticRef<float>(0x8CCE10);
-    static auto& aimMinDistance = StaticRef<float>(0x8CCE14);
-    static auto& bikeMinDistance = StaticRef<float>(0x8CCE0C);
-    static auto& sourceMotionThreshold = StaticRef<float>(0x8CCE08);
-    static auto& maxDistanceStep = StaticRef<float>(0x8CCE04);
-    static auto& bikeCollisionThreshold = StaticRef<float>(0x8CCE00);
-    static auto& bikeNearClip = StaticRef<float>(0x8CCDFC);
+    static auto& radiusScale = StaticRef<float, 0x8CCB90>();
+    static auto& minRadius = StaticRef<float, 0x8CCE18>();
+    static auto& pedMinDistance = StaticRef<float, 0x8CCE10>();
+    static auto& aimMinDistance = StaticRef<float, 0x8CCE14>();
+    static auto& bikeMinDistance = StaticRef<float, 0x8CCE0C>();
+    static auto& sourceMotionThreshold = StaticRef<float, 0x8CCE08>();
+    static auto& maxDistanceStep = StaticRef<float, 0x8CCE04>();
+    static auto& bikeCollisionThreshold = StaticRef<float, 0x8CCE00>();
+    static auto& bikeNearClip = StaticRef<float, 0x8CCDFC>();
 
-    static auto& gCamColLastSrcPos   = StaticRef<CVector>(0xB700DC);
-    static auto& gCamColStateFlags   = StaticRef<uint32>(0xB700E8);
-    static auto& gCamColMinExtent    = StaticRef<float>(0xB700EC);
-    static auto& gCamColCachedModel  = StaticRef<int32>(0xB700F0);
+    static auto& gCamColLastSrcPos   = StaticRef<CVector, 0xB700DC>();
+    static auto& gCamColStateFlags   = StaticRef<uint32, 0xB700E8>();
+    static auto& gCamColMinExtent    = StaticRef<float, 0xB700EC>();
+    static auto& gCamColCachedModel  = StaticRef<int32, 0xB700F0>();
 
     const CVector delta = *source - *target;
     const float   dist  = delta.Magnitude();
@@ -3120,8 +3120,8 @@ bool CCamera::CameraColDetAndReact(CVector* source, CVector* target) {
 
 // 0x527FA0
 void CCamera::CamControl() {
-    auto& requestedMode = StaticRef<eCamMode>(0xB70140);
-    auto& cinematicProcessed = StaticRef<bool>(0xB6EC34);
+    auto& requestedMode = StaticRef<eCamMode, 0xB70140>();
+    auto& cinematicProcessed = StaticRef<bool, 0xB6EC34>();
     auto& activeCam = GetActiveCam();
     auto& otherCam = m_aCams[(m_nActiveCam + 1) % 2];
     const auto previousMode = activeCam.m_nMode;
@@ -3242,8 +3242,8 @@ void CCamera::CamControl() {
                     direction.z = 0.0f;
                     direction.Normalise();
                 }
-                source = base + direction * StaticRef<float>(0x8CCF1C);
-                source.z += StaticRef<float>(0x8CCF18);
+                source = base + direction * StaticRef<float, 0x8CCF1C>();
+                source.z += StaticRef<float, 0x8CCF18>();
                 SetCamPositionForFixedMode(source, CVector{});
             } else {
                 auto fromCenter = source - center;
@@ -3283,8 +3283,8 @@ void CCamera::CamControl() {
                         direction.z = 0.0f;
                         direction.Normalise();
                     }
-                    source = base + direction * StaticRef<float>(0x8CCF10);
-                    source.z += StaticRef<float>(0x8CCF0C);
+                    source = base + direction * StaticRef<float, 0x8CCF10>();
+                    source.z += StaticRef<float, 0x8CCF0C>();
                     SetCamPositionForFixedMode(source, CVector{});
                 }
             }
@@ -3313,7 +3313,7 @@ void CCamera::CamControl() {
         }
         if (m_pTargetEntity->GetIsTypeVehicle()) {
             auto* vehicle = m_pTargetEntity->AsVehicle();
-            auto& forcedMode = StaticRef<int32>(0x8CC824);
+            auto& forcedMode = StaticRef<int32, 0x8CC824>();
             if (forcedMode > 0) {
                 requestedMode = static_cast<eCamMode>(forcedMode);
                 forcedMode = -1;
@@ -3414,7 +3414,7 @@ void CCamera::CamControl() {
                 m_fPedZoomSmoothed = approach(m_fPedZoomSmoothed, m_fPedZoomValueScript);
             } else if (m_bFailedCullZoneTestPreviously) {
                 closeIn = 0.7f;
-                m_fPedZoomSmoothed = approach(m_fPedZoomSmoothed, StaticRef<float>(0x8CCF14));
+                m_fPedZoomSmoothed = approach(m_fPedZoomSmoothed, StaticRef<float, 0x8CCF14>());
             } else {
                 m_fPedZoomSmoothed = approach(m_fPedZoomSmoothed, m_fPedZoomBase);
                 if (m_nPedZoom == 3 && m_fPedZoomBase == 0.0f) m_fPedZoomSmoothed = m_fPedZoomBase;
@@ -3439,7 +3439,7 @@ void CCamera::CamControl() {
                     requestedMode = player->m_nPedState != PEDSTATE_SEEK_CAR || requestedMode == MODE_TOP_DOWN_PED || mouse
                         ? currentWeaponMode : MODE_FOLLOWPED;
                 } else if (requestedMode != MODE_TOP_DOWN_PED && (player->m_pTargetedObject || player->GetPlayerData()->m_bFreeAiming)) {
-                    auto& fixedAim = StaticRef<bool>(0xB7013D);
+                    auto& fixedAim = StaticRef<bool, 0xB7013D>();
                     bool dyingTarget = player->m_pTargetedObject && player->m_pTargetedObject->GetIsTypePed()
                         && (player->m_pTargetedObject->AsPed()->m_nPedState == PEDSTATE_DEAD
                             || player->m_pTargetedObject->AsPed()->m_nPedState == PEDSTATE_DIE);
@@ -3451,7 +3451,7 @@ void CCamera::CamControl() {
                     if (currentWeaponMode == MODE_AIMWEAPON && dyingTarget && player->m_pTargetedObject
                         && (!m_bTransitionState || activeCam.m_nMode == MODE_SPECIAL_FIXED_FOR_SYPHON)) {
                         const float threshold = activeCam.m_nMode == MODE_SPECIAL_FIXED_FOR_SYPHON && player->m_pTargetedObject->GetIsTypePed()
-                            ? StaticRef<float>(0x8CCF04) : StaticRef<float>(0x8CCF08);
+                            ? StaticRef<float, 0x8CCF04>() : StaticRef<float, 0x8CCF08>();
                         if (delta.Magnitude2D() < threshold) {
                             requestedMode = MODE_SPECIAL_FIXED_FOR_SYPHON;
                             distance = 5.6f;
@@ -3488,9 +3488,9 @@ void CCamera::CamControl() {
             }
         }
     }
-    auto& wasArrested = StaticRef<bool>(0xB7013C);
-    auto& lastPedState = StaticRef<ePedState>(0xB70138);
-    auto& arrestMode = StaticRef<eCamMode>(0xB70134);
+    auto& wasArrested = StaticRef<bool, 0xB7013C>();
+    auto& lastPedState = StaticRef<ePedState, 0xB70138>();
+    auto& arrestMode = StaticRef<eCamMode, 0xB70134>();
     const auto pedState = player->m_nPedState;
     if (pedState == PEDSTATE_ARRESTED) {
         wasArrested = true;
@@ -3642,7 +3642,7 @@ void CCamera::CamControl() {
                 heading -= HALF_PI;
                 if (heading > activeCam.m_fHorizontalAngle + PI) heading -= TWO_PI;
                 else if (heading < activeCam.m_fHorizontalAngle - PI) heading += TWO_PI;
-                if (std::abs(heading - activeCam.m_fHorizontalAngle) > DegreesToRadians(StaticRef<float>(0x8CC46C))
+                if (std::abs(heading - activeCam.m_fHorizontalAngle) > DegreesToRadians(StaticRef<float, 0x8CC46C>())
                     || (ped->GetPosition() - m_mCameraMatrix.GetPosition()).Magnitude() > (TheCamera.m_fPedZoomSmoothed + 2.0f) * 1.5f) {
                     jumpCut = true;
                 }
@@ -3674,7 +3674,7 @@ void CCamera::CamControl() {
                     auto heading = ped->GetHeading() - HALF_PI;
                     if (heading > activeCam.m_fHorizontalAngle + PI) heading -= TWO_PI;
                     else if (heading < activeCam.m_fHorizontalAngle - PI) heading += TWO_PI;
-                    aimCut = std::abs(heading - activeCam.m_fHorizontalAngle) > DegreesToRadians(StaticRef<float>(0x8CC46C)) || !ped->bIsStanding;
+                    aimCut = std::abs(heading - activeCam.m_fHorizontalAngle) > DegreesToRadians(StaticRef<float, 0x8CC46C>()) || !ped->bIsStanding;
                     if (m_bUseMouse3rdPerson) {
                         aimCut = false;
                         m_bJustCameOutOfGarage = true;

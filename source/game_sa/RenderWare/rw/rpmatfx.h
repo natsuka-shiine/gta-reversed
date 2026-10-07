@@ -16,7 +16,7 @@
 #ifndef RPMATFX_MATFX_H
 #define RPMATFX_MATFX_H
 
-static inline auto& MatFXMaterialDataOffset = StaticRef<RwInt32>(0xC9AB74);
+static inline auto& MatFXMaterialDataOffset = StaticRef<RwInt32, 0xC9AB74>();
 
 /**
  * \defgroup rpmatfx RpMatFX

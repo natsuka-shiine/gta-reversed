@@ -427,7 +427,7 @@ void CBmx::ProcessBunnyHop() {
 // 0x6C0810
 void CBmx::PreRender() {
     // When set the wheels are positioned like `CBike` does (from the suspension), and the frame offset isn't applied.
-    static auto& s_bUseBikeWheelPositioning = StaticRef<bool>(0xC1C83C);
+    static auto& s_bUseBikeWheelPositioning = StaticRef<bool, 0xC1C83C>();
 
     const float BMX_WHEEL_RATIO_ON_GROUND = 1.0f;   // 0x8714BC
     const float BMX_LEAN_ROTATE_X_MULT    = -0.05f; // 0x8714C0

@@ -7,33 +7,33 @@
 #include "MotionBlurStreaks.h"
 #include "Events/EventDanger.h"
 
-auto& HARRIER_NOZZLE_ROTATERATE = StaticRef<float>(0x8D33DC);       // 25.0f
-auto& PLANE_DAMAGE_WAVE_COUNTER_VAR = StaticRef<float>(0x8D33E0);   // 0.75f
-auto& PLANE_DAMAGE_THRESHHOLD = StaticRef<float>(0x8D33E4);         // 500.0f
-auto& PLANE_DAMAGE_SCALE_MASS = StaticRef<float>(0x8D33E8);         // 10000.0f
-auto& PLANE_DAMAGE_DESTROY_THRESHHOLD = StaticRef<float>(0x8D33EC); // 5000.0f
-auto& vecRCBaronGunPos = StaticRef<CVector>(0x8D33F0);            // <0.0f, 0.45f, 0.0f>
-auto& PLANE_PANEL_SPRING = StaticRef<float>(0x8D33FC);              // 0.03f
-auto& PLANE_PANEL_DAMPING = StaticRef<float>(0x8D3400);             // 0.98f
-auto& VORTEX_SKIRT_MAX_SCALE = StaticRef<float>(0x8D3404);          // 1.3f
-auto& VORTEX_SKIRT_ROLL_LIMIT = StaticRef<float>(0x8D3408);         // 0.1f
-auto& VORTEX_SKIRT_PITCH_LIMIT = StaticRef<float>(0x8D340C);        // 0.1f
-auto& VORTEX_SKIRT_SMOOTHING = StaticRef<float>(0x8D3410);          // 0.9f
-auto& VORTEX_SKIRT_SPEED_LIMIT = StaticRef<float>(0x8D3414);        // 0.3f
-auto& VORTEX_SKIRT_SPEED_MULT = StaticRef<float>(0x8D3418);         // 2.0f
-auto& HARRIER_HOVER_THRUST_MULT = StaticRef<float>(0x8D341C);       // 0.25f
-auto& PLANE_DAMAGE_AILERON_PANEL_FEEDBACK = StaticRef<float>(0x8D3420);  // 10.0f
-auto& PLANE_DAMAGE_AILERON_PANEL_SHAKE = StaticRef<float>(0x8D3424);     // 0.002f
-auto& PLANE_DAMAGE_AILERON_CONTROL_SHAKE = StaticRef<float>(0x8D3428);   // 0.05f
-auto& PLANE_DAMAGE_ELEVATOR_PANEL_FEEDBACK = StaticRef<float>(0x8D342C); // 10.0f
-auto& PLANE_DAMAGE_ELEVATOR_PANEL_SHAKE = StaticRef<float>(0x8D3430);    // 0.002f
-auto& PLANE_DAMAGE_ELEVATOR_CONTROL_SHAKE = StaticRef<float>(0x8D3434);  // 0.05f
-auto& PLANE_DAMAGE_RUDDER_PANEL_FEEDBACK = StaticRef<float>(0x8D3438);   // 10.0f
-auto& PLANE_DAMAGE_RUDDER_PANEL_SHAKE = StaticRef<float>(0x8D343C);      // 0.002f
-auto& PLANE_DAMAGE_RUDDER_CONTROL_SHAKE = StaticRef<float>(0x8D3440);    // 0.05f
-auto& PLANE_DAMAGE_PROP_THRUST_MULT = StaticRef<float>(0x8D3444);        // 0.2f
-auto& PLANE_DAMAGE_WAVE_PERIOD = StaticRef<uint32>(0x8D3448);            // 2500
-auto& PLANE_DAMAGE_PROP_THRUST_VAR = StaticRef<float>(0x8D344C);         // 0.8f
+auto& HARRIER_NOZZLE_ROTATERATE = StaticRef<float, 0x8D33DC>();       // 25.0f
+auto& PLANE_DAMAGE_WAVE_COUNTER_VAR = StaticRef<float, 0x8D33E0>();   // 0.75f
+auto& PLANE_DAMAGE_THRESHHOLD = StaticRef<float, 0x8D33E4>();         // 500.0f
+auto& PLANE_DAMAGE_SCALE_MASS = StaticRef<float, 0x8D33E8>();         // 10000.0f
+auto& PLANE_DAMAGE_DESTROY_THRESHHOLD = StaticRef<float, 0x8D33EC>(); // 5000.0f
+auto& vecRCBaronGunPos = StaticRef<CVector, 0x8D33F0>();            // <0.0f, 0.45f, 0.0f>
+auto& PLANE_PANEL_SPRING = StaticRef<float, 0x8D33FC>();              // 0.03f
+auto& PLANE_PANEL_DAMPING = StaticRef<float, 0x8D3400>();             // 0.98f
+auto& VORTEX_SKIRT_MAX_SCALE = StaticRef<float, 0x8D3404>();          // 1.3f
+auto& VORTEX_SKIRT_ROLL_LIMIT = StaticRef<float, 0x8D3408>();         // 0.1f
+auto& VORTEX_SKIRT_PITCH_LIMIT = StaticRef<float, 0x8D340C>();        // 0.1f
+auto& VORTEX_SKIRT_SMOOTHING = StaticRef<float, 0x8D3410>();          // 0.9f
+auto& VORTEX_SKIRT_SPEED_LIMIT = StaticRef<float, 0x8D3414>();        // 0.3f
+auto& VORTEX_SKIRT_SPEED_MULT = StaticRef<float, 0x8D3418>();         // 2.0f
+auto& HARRIER_HOVER_THRUST_MULT = StaticRef<float, 0x8D341C>();       // 0.25f
+auto& PLANE_DAMAGE_AILERON_PANEL_FEEDBACK = StaticRef<float, 0x8D3420>();  // 10.0f
+auto& PLANE_DAMAGE_AILERON_PANEL_SHAKE = StaticRef<float, 0x8D3424>();     // 0.002f
+auto& PLANE_DAMAGE_AILERON_CONTROL_SHAKE = StaticRef<float, 0x8D3428>();   // 0.05f
+auto& PLANE_DAMAGE_ELEVATOR_PANEL_FEEDBACK = StaticRef<float, 0x8D342C>(); // 10.0f
+auto& PLANE_DAMAGE_ELEVATOR_PANEL_SHAKE = StaticRef<float, 0x8D3430>();    // 0.002f
+auto& PLANE_DAMAGE_ELEVATOR_CONTROL_SHAKE = StaticRef<float, 0x8D3434>();  // 0.05f
+auto& PLANE_DAMAGE_RUDDER_PANEL_FEEDBACK = StaticRef<float, 0x8D3438>();   // 10.0f
+auto& PLANE_DAMAGE_RUDDER_PANEL_SHAKE = StaticRef<float, 0x8D343C>();      // 0.002f
+auto& PLANE_DAMAGE_RUDDER_CONTROL_SHAKE = StaticRef<float, 0x8D3440>();    // 0.05f
+auto& PLANE_DAMAGE_PROP_THRUST_MULT = StaticRef<float, 0x8D3444>();        // 0.2f
+auto& PLANE_DAMAGE_WAVE_PERIOD = StaticRef<uint32, 0x8D3448>();            // 2500
+auto& PLANE_DAMAGE_PROP_THRUST_VAR = StaticRef<float, 0x8D344C>();         // 0.8f
 
 void CPlane::InjectHooks() {
     RH_ScopedVirtualClass(CPlane, 0x871948, 71);

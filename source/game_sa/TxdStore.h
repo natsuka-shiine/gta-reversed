@@ -19,7 +19,7 @@ struct _TxdParent {
  */
 #define rwID_TXDPARENTPLUGIN  MAKECHUNKID(rwVENDORID_DEVELOPER, 0xF5)
 
-static inline auto& ms_txdPluginOffset = StaticRef<int32>(0xC88018);
+static inline auto& ms_txdPluginOffset = StaticRef<int32, 0xC88018>();
 
 typedef CPool<TxdDef> CTxdPool;
 
@@ -42,12 +42,12 @@ public:
         }
     };
 public:
-    static inline auto& ms_pTxdPool = StaticRef<CTxdPool*>(0xC8800C);
-    static inline auto& ms_pStoredTxd = StaticRef<RwTexDictionary*>(0xC88010);
-    static inline auto& ms_lastSlotFound = StaticRef<int32>(0xC88014);
+    static inline auto& ms_pTxdPool = StaticRef<CTxdPool*, 0xC8800C>();
+    static inline auto& ms_pStoredTxd = StaticRef<RwTexDictionary*, 0xC88010>();
+    static inline auto& ms_lastSlotFound = StaticRef<int32, 0xC88014>();
     // variables list is not finished. Need to make CPools before.
 
-    static inline auto& defaultTxds = StaticRef<std::array<int16, 4>>(0xC88004);
+    static inline auto& defaultTxds = StaticRef<std::array<int16, 4>, 0xC88004>();
 
 public:
     static void InjectHooks();

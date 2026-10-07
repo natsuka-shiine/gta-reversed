@@ -4,8 +4,8 @@
 #include "AEGlobalWeaponAudioEntity.h"
 #include "AEAudioHardware.h"
 
-auto& pWaterfall = StaticRef<CAESound*[3]>(0xB612F0);
-auto& pFogHorn = StaticRef<CAESound*>(0xB612FC);
+auto& pWaterfall = StaticRef<CAESound*[3], 0xB612F0>();
+auto& pFogHorn = StaticRef<CAESound*, 0xB612FC>();
 
 // 0x5075B0
 CAEGlobalWeaponAudioEntity::CAEGlobalWeaponAudioEntity() : CAEWeaponAudioEntity() {
@@ -116,11 +116,11 @@ void CAEGlobalWeaponAudioEntity::ServiceAmbientGunFire() {
         FOGHORN_1,
         WATERFALL_LV, // Only in LV
     };
-    static auto& s_State = StaticRef<eState>(0xB61324);
+    static auto& s_State = StaticRef<eState, 0xB61324>();
 
-    static auto& s_GunShots   = StaticRef<int32>(0xB61318);
-    static auto& s_WeaponType = StaticRef<eWeaponType>(0xB6131C);
-    static auto& s_Delay      = StaticRef<uint32>(0xB61320);
+    static auto& s_GunShots   = StaticRef<int32, 0xB61318>();
+    static auto& s_WeaponType = StaticRef<eWeaponType, 0xB6131C>();
+    static auto& s_Delay      = StaticRef<uint32, 0xB61320>();
     static auto& s_LastTime   = ScopedStaticRef<uint32>(0xB61364, 0xB61368, 0x1, CTimer::GetTimeInMS());
 
     switch (s_State) {

@@ -88,7 +88,7 @@ void InteriorGroup_c::SetupPeds() {
         return;
     }
     // 0xBB3DC2 is InteriorManager_c::m_ArePedsEnabled (0xBAF670 + 0x4752)
-    static auto& s_ArePedsEnabled = StaticRef<bool>(0xBB3DC2);
+    static auto& s_ArePedsEnabled = StaticRef<bool, 0xBB3DC2>();
     if (!s_ArePedsEnabled) {
         return;
     }
@@ -114,7 +114,7 @@ void InteriorGroup_c::UpdatePeds() {
         return;
     }
     // 0xBB3DC2 is InteriorManager_c::m_ArePedsEnabled (0xBAF670 + 0x4752)
-    static auto& s_ArePedsEnabled = StaticRef<bool>(0xBB3DC2);
+    static auto& s_ArePedsEnabled = StaticRef<bool, 0xBB3DC2>();
     if (!s_ArePedsEnabled) {
         return;
     }

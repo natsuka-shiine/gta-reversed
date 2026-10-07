@@ -111,7 +111,7 @@ int32 Interior_c::Init(const CVector& pos) {
         const auto FloatToU32 = [](float v) {
             return static_cast<uint32>(static_cast<int64>(v));
         };
-        static auto& s_EnEx = StaticRef<CEntryExit*>(0xBB3DAC); // g_interiorMan.m_EnEx
+        static auto& s_EnEx = StaticRef<CEntryExit*, 0xBB3DAC>(); // g_interiorMan.m_EnEx
         uint32       seed;
         if (const auto* const enex = s_EnEx) {
             seed = FloatToU32(enex->m_fEntranceZ) * FloatToU32(enex->m_recEntrance.bottom) * FloatToU32(enex->m_recEntrance.left)
@@ -135,8 +135,8 @@ int32 Interior_c::Init(const CVector& pos) {
 
     // Mark the steal data of this interior as set up
     if (!g_interiorMan.HasInteriorHadStealDataSetup(this)) {
-        static auto& s_InteriorCount = StaticRef<int32>(0xBB3914);     // g_interiorMan.m_InteriorCount
-        static auto& s_InteriorIds   = StaticRef<int32[64]>(0xBB3918); // g_interiorMan.m_InteriorIds
+        static auto& s_InteriorCount = StaticRef<int32, 0xBB3914>();     // g_interiorMan.m_InteriorCount
+        static auto& s_InteriorIds   = StaticRef<int32[64], 0xBB3918>(); // g_interiorMan.m_InteriorIds
         if (s_InteriorCount < 64) {
             s_InteriorIds[s_InteriorCount++] = m_interiorId;
         }
@@ -766,7 +766,7 @@ int32 Interior_c::Office_PlaceEdgeFillers(int32 arg0, int32 a2, int32 a3, int32 
         return sizeX;
     }
 
-    static auto& s_HasPlacedWaterCooler = StaticRef<bool>(0xBB3DC8); // TODO: Proper name (Only 1 of subgroup 2 is placed per office)
+    static auto& s_HasPlacedWaterCooler = StaticRef<bool, 0xBB3DC8>(); // TODO: Proper name (Only 1 of subgroup 2 is placed per office)
     if (chance > 90 && !s_HasPlacedWaterCooler) {
         const auto furniture = g_furnitureMan.GetFurniture(1, 2, -1, m_box->m_status);
         if (furniture) {
@@ -1046,7 +1046,7 @@ int32 Interior_c::Shop_PlaceEdgeUnits(int32 type, int32 x, int32 y, int32 dir) {
     } else {
         size = 3;
     }
-    static auto& s_Wealth = StaticRef<int32>(0xBB3DE4);
+    static auto& s_Wealth = StaticRef<int32, 0xBB3DE4>();
     if (type != -1) {
         Shop_Place3PieceUnit(type, x, y, dir, size);
     } else if (s_Wealth > 50) {
@@ -1252,9 +1252,9 @@ void Interior_c::ResetTiles() {
 // 0x5934E0
 CObject* Interior_c::PlaceObject(uint8 isStealable, Furniture_c* furniture, float offsetX, float offsetY, float offsetZ, float rotationZ) {
     // `g_furnitureMan.m_FurnitureList`: The free list (`FurnitureItem` has the same layout as `FurnitureEntity_c`)
-    static auto& s_FreeFurnitureList = StaticRef<TList_c<FurnitureEntity_c>>(0xBAD3EC);
-    static auto& s_ObjectCount       = StaticRef<int32>(0xBB3A18);              // g_interiorMan.m_ObjectCount
-    static auto& s_Objects           = StaticRef<InteriorObject[32]>(0xBB3A1C); // g_interiorMan.m_Objects
+    static auto& s_FreeFurnitureList = StaticRef<TList_c<FurnitureEntity_c>, 0xBAD3EC>();
+    static auto& s_ObjectCount       = StaticRef<int32, 0xBB3A18>();              // g_interiorMan.m_ObjectCount
+    static auto& s_Objects           = StaticRef<InteriorObject[32], 0xBB3A1C>(); // g_interiorMan.m_Objects
 
     const auto  modelId = (int32)(uint16)furniture->m_nModelId;
     const auto& bbMin   = CModelInfo::GetModelInfo(modelId)->GetColModel()->GetBoundingBox().m_vecMin;
@@ -1399,7 +1399,7 @@ void Interior_c::Unfurnish() {
     // `m_list` is the list of this interior's furniture entities (See `GetFurnitureEntity`)
     auto&        furnitureEntities   = reinterpret_cast<TList_c<FurnitureEntity_c>&>(m_list);
     // `g_furnitureMan.m_FurnitureList`: The free list the items are returned to (`FurnitureItem` has the same layout as `FurnitureEntity_c`)
-    static auto& s_FreeFurnitureList = StaticRef<TList_c<FurnitureEntity_c>>(0xBAD3EC);
+    static auto& s_FreeFurnitureList = StaticRef<TList_c<FurnitureEntity_c>, 0xBAD3EC>();
 
     for (auto* item = furnitureEntities.GetHead(); item;) {
         auto* const next = item->m_pNext;
@@ -1680,7 +1680,7 @@ bool Interior_c::AddInteriorInfo(int32 actionType, float offsetX, float offsetY,
 
 // 0x591F90
 void Interior_c::AddPickups() {
-    static auto& s_LastPickupTimeMs = StaticRef<uint32>(0xBB3DC4);
+    static auto& s_LastPickupTimeMs = StaticRef<uint32, 0xBB3DC4>();
     if (CTimer::GetTimeInMS() - s_LastPickupTimeMs <= 179999) {
         return;
     }
@@ -1948,7 +1948,7 @@ CObject* Interior_c::PlaceFurniture(Furniture_c* a1, int32 a2, int32 a3, float a
     const auto  x = a2, y = a3, heightInfo = a5, dir = a6;
 
     // `g_furnitureMan.m_FurnitureList`: The free list (`FurnitureItem` has the same layout as `FurnitureEntity_c`)
-    static auto& s_FreeFurnitureList = StaticRef<TList_c<FurnitureEntity_c>>(0xBAD3EC);
+    static auto& s_FreeFurnitureList = StaticRef<TList_c<FurnitureEntity_c>, 0xBAD3EC>();
 
     const auto Fail = [&]() -> CObject* {
         *a7 = 0;
@@ -2260,7 +2260,7 @@ void Interior_c::Shop_FurnishEdges() {
     }
 
     // Inlined `Shop_AddShelfInfo` (0x59A140)
-    static auto& s_ShelfInfoCounter = StaticRef<int32>(0x8D0948);
+    static auto& s_ShelfInfoCounter = StaticRef<int32, 0x8D0948>();
     const auto   AddShelfInfo       = [this](float x, float y, int32 dir) {
         if (s_ShelfInfoCounter > 1 && RandomNumberInRange(100.0f) > 60) {
             AddInteriorInfo(8, x, y, dir, nullptr);
@@ -2314,7 +2314,7 @@ void Interior_c::Shop_FurnishCeiling() {
 
 // 0x59A140
 void Interior_c::Shop_AddShelfInfo(int32 a2, int32 a3, int32 a5) {
-    static auto& ctr = StaticRef<int32>(0x8D0948);
+    static auto& ctr = StaticRef<int32, 0x8D0948>();
     if (ctr > 1) {
         // rand() * (1.0f / 32767.0f) * 100.0f, truncated to int: chance roll must exceed 60
         const auto roll = (int32)((float)rand() * (1.0f / 32767.0f) * 100.0f);

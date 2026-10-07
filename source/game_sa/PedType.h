@@ -5,7 +5,7 @@
 
 class CPedType {
 public:
-    static inline auto& ms_apPedTypes = StaticRef<CAcquaintance*>(0xC0BBE8);
+    static inline auto& ms_apPedTypes = StaticRef<CAcquaintance*, 0xC0BBE8>();
     static CAcquaintance*  ms_apPedTypesOld;
 
 public:

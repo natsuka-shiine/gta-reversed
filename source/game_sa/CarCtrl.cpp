@@ -29,8 +29,8 @@
 
 using namespace ModelIndices;
 
-auto& apCarsToKeep = StaticRef<CVehicle*[2]>(0x969084);
-auto& aCarsToKeepTime = StaticRef<std::array<uint32, 2>>(0x96907C);
+auto& apCarsToKeep = StaticRef<CVehicle*[2], 0x969084>();
+auto& aCarsToKeepTime = StaticRef<std::array<uint32, 2>, 0x96907C>();
 
 void CCarCtrl::InjectHooks()
 {

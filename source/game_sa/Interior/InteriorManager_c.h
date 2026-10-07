@@ -84,4 +84,4 @@ private:
 };
 VALIDATE_SIZE(InteriorManager_c, 0x4758);
 
-static inline auto& g_interiorMan = StaticRef<InteriorManager_c>(0xBAF670);
+static inline auto& g_interiorMan = StaticRef<InteriorManager_c, 0xBAF670>();

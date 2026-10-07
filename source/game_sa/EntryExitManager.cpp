@@ -3,9 +3,9 @@
 #include "EntryExitManager.h"
 
 using EntryExitTreeNode = CQuadTreeNode<CEntryExit*>;
-auto& mp_QuadTree       = StaticRef<EntryExitTreeNode*>(0x96A7D0);
+auto& mp_QuadTree       = StaticRef<EntryExitTreeNode*, 0x96A7D0>();
 
-auto& mp_poolEntryExits = StaticRef<CEntryExitsPool*>(0x96A7D8);
+auto& mp_poolEntryExits = StaticRef<CEntryExitsPool*, 0x96A7D8>();
 
 void CEntryExitManager::InjectHooks() {
     RH_ScopedClass(CEntryExitManager);

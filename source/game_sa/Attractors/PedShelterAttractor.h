@@ -4,7 +4,7 @@
 
 class NOTSA_EXPORT_VTABLE CPedShelterAttractor final : public CPedAttractor {
 public:
-    static inline auto& ms_displacements = StaticRef<SArray<CVector>>(0xC0986C);
+    static inline auto& ms_displacements = StaticRef<SArray<CVector>, 0xC0986C>();
 
 public:
     static constexpr auto Type = PED_ATTRACTOR_SHELTER;

@@ -3,11 +3,11 @@
 #include "Clouds.h"
 #include "PostEffects.h"
 
-auto& CurrentFogIntensity = StaticRef<float>(0x8D5798);
+auto& CurrentFogIntensity = StaticRef<float, 0x8D5798>();
 
-auto& gpMoonMask = StaticRef<RwTexture*>(0xC6AA74);
-auto& gpCloudTex = StaticRef<RwTexture*>(0xC6AA78);
-auto& gpCloudMaskTex = StaticRef<RwTexture*>(0xC6AA7C);
+auto& gpMoonMask = StaticRef<RwTexture*, 0xC6AA74>();
+auto& gpCloudTex = StaticRef<RwTexture*, 0xC6AA78>();
+auto& gpCloudMaskTex = StaticRef<RwTexture*, 0xC6AA7C>();
 
 void CClouds::InjectHooks() {
     RH_ScopedClass(CClouds);
@@ -859,10 +859,10 @@ void CClouds::RenderSkyPolys() {
 
 // 0x7154B0
 void CClouds::RenderBottomFromHeight() {
-    static auto& s_WindShift   = StaticRef<float>(0xC6E954);
-    static auto& s_Randoms     = StaticRef<std::array<float, 80>>(0x8D5658);
-    static auto& s_SpriteOffsY = StaticRef<std::array<float, 30>>(0x8D57A0);
-    static auto& s_SpriteOffsX = StaticRef<std::array<float, 30>>(0x8D5818);
+    static auto& s_WindShift   = StaticRef<float, 0xC6E954>();
+    static auto& s_Randoms     = StaticRef<std::array<float, 80>, 0x8D5658>();
+    static auto& s_SpriteOffsY = StaticRef<std::array<float, 30>, 0x8D57A0>();
+    static auto& s_SpriteOffsX = StaticRef<std::array<float, 30>, 0x8D5818>();
 
     const auto GetRandom = [](int32 i) {
         return s_Randoms[i % 80];
@@ -1289,7 +1289,7 @@ void CClouds::VolumetricCloudsRender() {
 
     const auto camPos = TheCamera.GetPosition();
 
-    auto& gfVolumetricCloudFader = StaticRef<float>(0xC6E970);
+    auto& gfVolumetricCloudFader = StaticRef<float, 0xC6E970>();
     if (m_bVolumetricCloudHeightSwitch) {
         const auto delta = CTimer::GetTimeStep() * 4.f;
         if (camPos.z < 220.f) {
@@ -1319,8 +1319,8 @@ void CClouds::VolumetricCloudsRender() {
 
 
     //> 0x71653F
-    auto& gVecCameraCoors = StaticRef<CVector>(0xC6E964);
-    auto& gVecPlayerCoors = StaticRef<CVector>(0xC6E958);
+    auto& gVecCameraCoors = StaticRef<CVector, 0xC6E964>();
+    auto& gVecPlayerCoors = StaticRef<CVector, 0xC6E958>();
 
     const auto bIsCameraOrPlayerPosNotStatic = (camPos != gVecCameraCoors) || (plyrPos != gVecPlayerCoors);
 

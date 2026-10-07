@@ -580,11 +580,11 @@ void CWaterLevel::RenderFlatWaterRectangle_OneLayer(int32 minX, int32 maxX, int3
 } 
 
 // Statics used by the high detail water renderers (Names are from Android)
-static inline auto& TempColourBufferIndex        = StaticRef<uint32>(0xC1F960);
-static inline auto& TempColourBufferB            = StaticRef<std::array<uint8, 0x800>>(0xC1F968);
-static inline auto& TempColourBufferG            = StaticRef<std::array<uint8, 0x800>>(0xC20168);
-static inline auto& TempColourBufferR            = StaticRef<std::array<uint8, 0x800>>(0xC20968);
-static inline auto& VecForWaterNormalCalculation = StaticRef<CVector>(0xC278D4);
+static inline auto& TempColourBufferIndex        = StaticRef<uint32, 0xC1F960>();
+static inline auto& TempColourBufferB            = StaticRef<std::array<uint8, 0x800>, 0xC1F968>();
+static inline auto& TempColourBufferG            = StaticRef<std::array<uint8, 0x800>, 0xC20168>();
+static inline auto& TempColourBufferR            = StaticRef<std::array<uint8, 0x800>, 0xC20968>();
+static inline auto& VecForWaterNormalCalculation = StaticRef<CVector, 0xC278D4>();
 
 /*!
 * @addr notsa
@@ -630,7 +630,7 @@ void CWaterLevel::RenderHighDetailWaterRectangle_OneLayer(
     int32 sizeInPolysX, int32 sizeInPolysY
 ) {
     //! NOTSA (Originally unnamed) - If set no vertices/indices are added
-    static auto& s_bDontAddVertices = StaticRef<bool>(0xC278E0);
+    static auto& s_bDontAddVertices = StaticRef<bool, 0xC278E0>();
 
     TempColourBufferIndex = 0;
     RenderAndEmptyRenderBuffer();
@@ -749,7 +749,7 @@ void CWaterLevel::RenderHighDetailWaterTriangle_OneLayer(
     int32 sizeInPolys
 ) {
     //! NOTSA (Originally unnamed) - Brightness of the highlights layer
-    static auto& s_nHighlightBrightness = StaticRef<int32>(0x8D3810); // 255
+    static auto& s_nHighlightBrightness = StaticRef<int32, 0x8D3810>(); // 255
 
     TempColourBufferIndex = 0;
     RenderAndEmptyRenderBuffer();

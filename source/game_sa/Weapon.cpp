@@ -1636,13 +1636,13 @@ bool CWeapon::FireFromCar(CVehicle* vehicle, bool leftSide, bool rightSide) {
 bool CWeapon::FireInstantHit(CEntity* firingEntity, CVector* origin, CVector* muzzlePosn, CEntity* targetEntity, CVector* target, CVector* originForDriveBy, bool arg6, bool muzzleFlag) {
     assert(firingEntity);
 
-    static auto& s_fShotgunSpreadRate   = StaticRef<float>(0x8D611C); // 0.05f
-    static auto& s_fPlayerAimScale      = StaticRef<float>(0x8D6110); // 0.75f
-    static auto& s_fPlayerAimScaleDist  = StaticRef<float>(0x8D6114); // 5.0f
-    static auto& s_fPlayerAimRotRate    = StaticRef<float>(0x8D6118); // 0.0062832f
-    static auto& s_nShotgunNumPellets   = StaticRef<int32>(0x8D6120); // 15
-    static auto& s_nSpasNumPellets      = StaticRef<int32>(0x8D6124); // 8
-    static auto& s_nMuzzleFlashCounter  = StaticRef<uint8>(0xC8A80C); // Function-local static in the original
+    static auto& s_fShotgunSpreadRate   = StaticRef<float, 0x8D611C>(); // 0.05f
+    static auto& s_fPlayerAimScale      = StaticRef<float, 0x8D6110>(); // 0.75f
+    static auto& s_fPlayerAimScaleDist  = StaticRef<float, 0x8D6114>(); // 5.0f
+    static auto& s_fPlayerAimRotRate    = StaticRef<float, 0x8D6118>(); // 0.0062832f
+    static auto& s_nShotgunNumPellets   = StaticRef<int32, 0x8D6120>(); // 15
+    static auto& s_nSpasNumPellets      = StaticRef<int32, 0x8D6124>(); // 8
+    static auto& s_nMuzzleFlashCounter  = StaticRef<uint8, 0xC8A80C>(); // Function-local static in the original
 
     const auto wi = CWeaponInfo::GetWeaponInfo(
         m_Type,

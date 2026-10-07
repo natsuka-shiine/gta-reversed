@@ -63,7 +63,7 @@ private:
     BoneNode_c* GetBoneNodeFromTag(eBoneTag32 boneTag);
 
 private:
-    // static inline auto& ms_boneInfos = StaticRef<std::array<BoneInfo_t, MAX_BONE_NUM>>(0x0); // unused
+    // static inline auto& ms_boneInfos = StaticRef<std::array<BoneInfo_t, MAX_BONE_NUM>, 0x0>(); // unused
 
     CPed::Ref                    m_Ped{};
 

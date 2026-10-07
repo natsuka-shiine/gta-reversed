@@ -40,12 +40,12 @@ static constexpr auto MAX_POINT_LIGHTS = 32;
 
 class CPointLights {
 public:
-    static inline auto& NumLights = StaticRef<uint32>(0xC3F0D0); // num of registered lights in frame
-    static inline auto& aLights = StaticRef<std::array<CPointLight, MAX_POINT_LIGHTS>>(0xC3F0E0);
+    static inline auto& NumLights = StaticRef<uint32, 0xC3F0D0>(); // num of registered lights in frame
+    static inline auto& aLights = StaticRef<std::array<CPointLight, MAX_POINT_LIGHTS>, 0xC3F0E0>();
 
-    static inline auto& aCachedMapReadResults = StaticRef<std::array<float, MAX_POINT_LIGHTS>>(0xC3F050);
-    static inline auto& NextCachedValue = StaticRef<int32>(0xC3F0D4);
-    static inline auto& aCachedMapReads = StaticRef<std::array<CVector, MAX_POINT_LIGHTS>>(0xC3F6E0);
+    static inline auto& aCachedMapReadResults = StaticRef<std::array<float, MAX_POINT_LIGHTS>, 0xC3F050>();
+    static inline auto& NextCachedValue = StaticRef<int32, 0xC3F0D4>();
+    static inline auto& aCachedMapReads = StaticRef<std::array<CVector, MAX_POINT_LIGHTS>, 0xC3F6E0>();
 
 public:
     static void InjectHooks();

@@ -611,7 +611,7 @@ void CHud::DrawCrossHairs() {
     bool bDrawCustomCrossHair = false;
     bool bIgnoreCheckMeleeTypeWeapon = false;
     // OG reads byte at 0xB6F080 (looking-sideways-in-vehicle), not the camera transition flag.
-    static bool& gbLookingSidewaysInVehicle = StaticRef<bool>(0xB6F080);
+    static bool& gbLookingSidewaysInVehicle = StaticRef<bool, 0xB6F080>();
 
     if (camMode != eCamMode::MODE_SNIPER) {
         if (camMode == eCamMode::MODE_1STPERSON) {
@@ -1517,7 +1517,7 @@ void CHud::DrawScriptText(bool isBeforeFade) {
 }
 // 0x58C250
 void CHud::DrawSubtitles() {
-    static bool& s_WasWideScreenOn = StaticRef<bool>(0xBAB214);
+    static bool& s_WasWideScreenOn = StaticRef<bool, 0xBAB214>();
 
     if (!m_Message[0]) {
         return;
@@ -1584,8 +1584,8 @@ void CHud::DrawSubtitles() {
 
 // 0x58C6A0
 void CHud::DrawSuccessFailedMessage() {
-    static bool& bInitSuccessFailedMessage = StaticRef<bool>(0xBAB21C);
-    static float& SuccessFailedMessageY = StaticRef<float>(0xBAB218);
+    static bool& bInitSuccessFailedMessage = StaticRef<bool, 0xBAB21C>();
+    static float& SuccessFailedMessageY = StaticRef<float, 0xBAB218>();
 
     auto& message      = m_BigMessage[STYLE_MIDDLE];
     auto& messageX     = BigMessageX[STYLE_MIDDLE];
@@ -2242,7 +2242,7 @@ inline void CHud::DrawMoney(const CPlayerInfo& playerInfo, uint8 alpha) {
 
 // 0x58D9A0
 void CHud::DrawWanted() {
-    static bool& bDrawWantedStar = StaticRef<bool>(0xBAB228);
+    static bool& bDrawWantedStar = StaticRef<bool, 0xBAB228>();
 
     const auto wantedLevel             = (int32)FindPlayerWanted()->m_WantedLevel;
     const auto wantedLevelBeforeParole = (int32)FindPlayerWanted()->m_WantedLevelBeforeParole;

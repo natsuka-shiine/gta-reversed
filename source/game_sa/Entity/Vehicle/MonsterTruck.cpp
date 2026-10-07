@@ -2,7 +2,7 @@
 
 #include "MonsterTruck.h"
 
-auto& fWheelExtensionRate = StaticRef<float>(0x8D33AC);
+auto& fWheelExtensionRate = StaticRef<float, 0x8D33AC>();
 
 void CMonsterTruck::InjectHooks() {
     RH_ScopedVirtualClass(CMonsterTruck, 0x8717d8, 71);

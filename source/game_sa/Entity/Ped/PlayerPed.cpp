@@ -910,7 +910,7 @@ void CPlayerPed::HandlePlayerBreath(bool bDecreaseAir, float fMultiplier) {
 
 // 0x60A9C0
 void CPlayerPed::SetRealMoveAnim() {
-    static auto& PLAYER_TURN_ANIM_SPEED_MULT = StaticRef<float>(0x8D24EC); // 1.0f - NOTSA name
+    static auto& PLAYER_TURN_ANIM_SPEED_MULT = StaticRef<float, 0x8D24EC>(); // 1.0f - NOTSA name
 
     auto* const clump      = GetRpClump();
     auto* const playerData = GetPlayerData();
@@ -1425,8 +1425,8 @@ void CPlayerPed::KeepAreaAroundPlayerClear() {
             false,
             1000.0f,
             100'000,
-            StaticRef<int32>(0x86F678), // CTaskComplexSmartFleeEntity::ms_iEntityPosCheckPeriod (1000)
-            StaticRef<float>(0xC18CF0)  // CTaskComplexSmartFleeEntity::ms_fEntityPosChangeThreshold
+            StaticRef<int32, 0x86F678>(), // CTaskComplexSmartFleeEntity::ms_iEntityPosCheckPeriod (1000)
+            StaticRef<float, 0xC18CF0>()  // CTaskComplexSmartFleeEntity::ms_fEntityPosChangeThreshold
         };
         fleeTask->m_moveState = PEDMOVE_WALK;
 
@@ -1621,9 +1621,9 @@ void CPlayerPed::MakeThisPedJoinOurGroup(CPed* ped) {
 
     // Colour of the Grove (index 1 in the gang colour tables at 0x8D1344, 0x8D1350, 0x8D135C - see `CGangWars::GetGangColor`)
     const auto blipColor = (eBlipColour)(
-          (uint32)StaticRef<uint8>(0x8D1345) << 24
-        | (uint32)StaticRef<uint8>(0x8D1351) << 16
-        | (uint32)StaticRef<uint8>(0x8D135D) << 8
+          (uint32)StaticRef<uint8, 0x8D1345>() << 24
+        | (uint32)StaticRef<uint8, 0x8D1351>() << 16
+        | (uint32)StaticRef<uint8, 0x8D135D>() << 8
         | 0xFF
     );
     // NOTE: The original also passes the script name ("CODEPLR") as the 5th argument
@@ -1741,7 +1741,7 @@ void CPlayerPed::MakeChangesForNewWeapon(uint32 weaponSlot) {
         MakeChangesForNewWeapon(GetWeaponInSlot(weaponSlot).m_Type);
 }
 
-static auto& PLAYER_MAX_TARGET_VIEW_ANGLE = StaticRef<float>(0x8D243C); // 140.0f
+static auto& PLAYER_MAX_TARGET_VIEW_ANGLE = StaticRef<float, 0x8D243C>(); // 140.0f
 
 // 0x60D020
 void CPlayerPed::EvaluateTarget(CEntity* target, CEntity *& outTarget, float & outTargetPriority, float maxDistance, float compensationRotRad, bool arg5) {
@@ -2046,8 +2046,8 @@ void CPlayerPed::ProcessWeaponSwitch(CPad* pad) {
 
 // 0x60DC50
 bool CPlayerPed::FindWeaponLockOnTarget() {
-    static auto& PLAYER_MAX_TARGET_VIEW_ANGLE_BEHIND = StaticRef<float>(0x8D2438); // 90.0f - NOTSA name
-    static auto& PLAYER_TARGET_VIEW_BEHIND_DIST      = StaticRef<float>(0x8D2440); // 3.0f  - NOTSA name
+    static auto& PLAYER_MAX_TARGET_VIEW_ANGLE_BEHIND = StaticRef<float, 0x8D2438>(); // 90.0f - NOTSA name
+    static auto& PLAYER_TARGET_VIEW_BEHIND_DIST      = StaticRef<float, 0x8D2440>(); // 3.0f  - NOTSA name
 
     const auto* const weaponInfo = CWeaponInfo::GetWeaponInfo(GetActiveWeapon().m_Type, GetWeaponSkill());
 

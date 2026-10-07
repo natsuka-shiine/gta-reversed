@@ -52,7 +52,7 @@ void COcclusion::AddOne(float centerX, float centerY, float centerZ, float width
     if (!isInterior) {
         occl->m_DontStream = flags != 0;
         occl->m_NextIndex  = FarAwayList;
-        FarAwayList        = NumOccludersOnMap - 1;
+        FarAwayList        = static_cast<int16>(NumOccludersOnMap - 1);
     }
 }
 

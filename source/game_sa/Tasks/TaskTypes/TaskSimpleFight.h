@@ -115,11 +115,11 @@ public:
     uint8                  m_nNextCommand;
     uint8                  m_nLastCommand;
 
-    static inline auto& m_aComboData      = StaticRef<std::array<CMeleeInfo, 13>>(0xC170D0); // Indexed by `eMeleeCombo - MELEE_COMBO_UNARMED_1`
-    static inline auto& m_aHitOffset      = StaticRef<std::array<CVector, 7>>(0xC177D0);     // Indexed by `eMeleeHitLevel`
-    static inline auto& m_sStrikeColModel = StaticRef<CColModel>(0xC17824);
-    static inline auto& m_sStrikeColData  = StaticRef<CCollisionData>(0xC17854);
-    static inline auto& m_sStrikeSpheres  = StaticRef<std::array<CColSphere, 1>>(0xC17884);
+    static inline auto& m_aComboData      = StaticRef<std::array<CMeleeInfo, 13>, 0xC170D0>(); // Indexed by `eMeleeCombo - MELEE_COMBO_UNARMED_1`
+    static inline auto& m_aHitOffset      = StaticRef<std::array<CVector, 7>, 0xC177D0>();     // Indexed by `eMeleeHitLevel`
+    static inline auto& m_sStrikeColModel = StaticRef<CColModel, 0xC17824>();
+    static inline auto& m_sStrikeColData  = StaticRef<CCollisionData, 0xC17854>();
+    static inline auto& m_sStrikeSpheres  = StaticRef<std::array<CColSphere, 1>, 0xC17884>();
 
 public:
     static constexpr auto Type = eTaskType::TASK_SIMPLE_FIGHT;

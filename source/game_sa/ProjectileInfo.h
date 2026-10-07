@@ -26,8 +26,8 @@ public:
     FxSystem_c* m_pFxSystem;
 
 public:
-    static inline auto& ms_apProjectile     = StaticRef<std::array<CProjectile*, MAX_PROJECTILES>>(0xC89110);
-    static inline auto& ms_aProjectileInfo  = StaticRef<std::array<CProjectileInfo, MAX_PROJECTILES>>(0xC891A8);
+    static inline auto& ms_apProjectile     = StaticRef<std::array<CProjectile*, MAX_PROJECTILES>, 0xC89110>();
+    static inline auto& ms_aProjectileInfo  = StaticRef<std::array<CProjectileInfo, MAX_PROJECTILES>, 0xC891A8>();
 
     static void Initialise();
     static void Shutdown();
@@ -49,4 +49,4 @@ private:
 VALIDATE_SIZE(CProjectileInfo, 0x24);
 
 constexpr uint32 MAX_PROJECTILE_INFOS = 32;
-inline auto& gaProjectileInfo = StaticRef<std::array<CProjectileInfo, MAX_PROJECTILE_INFOS>>(0xC891A8);
+inline auto& gaProjectileInfo = StaticRef<std::array<CProjectileInfo, MAX_PROJECTILE_INFOS>, 0xC891A8>();

@@ -105,7 +105,7 @@ void CMissionCleanup::Process() {
     TheCamera.m_bCinemaCamera                               = false;
     TheCamera.InitialiseScriptableComponents();
     TheCamera.ResetDuckingSystem(nullptr);
-    StaticRef<float>(0x8CCB84)             = 1.0f; // gCurDistForCam
+    StaticRef<float, 0x8CCB84>()             = 1.0f; // gCurDistForCam
     gAllowScriptedFixedCameraCollision     = false;
     CGameLogic::bScriptCoopGameGoingOn     = false;
     CTheScripts::bDrawCrossHair            = eCrossHairType::NONE;

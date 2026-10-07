@@ -17,9 +17,9 @@ enum class eWeatherEvent {
 
 constexpr CVector DEFAULT_POS = { -0.906f, 0.f, 0.423f };
 
-auto& m_snLastRainDropSoundID = StaticRef<int32>(0x8CC310); // TODO: Use `eSoundID`
-auto& m_sRainSoundL = StaticRef<CAETwinLoopSoundEntity>(0xB6BB18);  // dunno about names
-auto& m_sRainSoundR = StaticRef<CAETwinLoopSoundEntity>(0xB6BBC0);
+auto& m_snLastRainDropSoundID = StaticRef<int32, 0x8CC310>(); // TODO: Use `eSoundID`
+auto& m_sRainSoundL = StaticRef<CAETwinLoopSoundEntity, 0xB6BB18>();  // dunno about names
+auto& m_sRainSoundR = StaticRef<CAETwinLoopSoundEntity, 0xB6BBC0>();
 
 // 0x72A620
 CAEWeatherAudioEntity::CAEWeatherAudioEntity() : CAEAudioEntity() {
@@ -178,12 +178,12 @@ void CAEWeatherAudioEntity::UpdateParameters(CAESound* sound, int16 curPlayPos) 
 
 
         if (sound->m_CurrPos == DEFAULT_POS) {
-            static auto& fCityNoiseVolumeBoostResidueRight = StaticRef<float>(0xB6BC70);
-            static auto& pLastEntityRight = StaticRef<CEntity*>(0xB6BC74);
+            static auto& fCityNoiseVolumeBoostResidueRight = StaticRef<float, 0xB6BC70>();
+            static auto& pLastEntityRight = StaticRef<CEntity*, 0xB6BC74>();
             Process(pov + camRight * 4.f, pov + camRight, fCityNoiseVolumeBoostResidueRight, pLastEntityRight);
         } else {
-            static auto& fCityNoiseVolumeBoostResidueLeft = StaticRef<float>(0xB6BC68);
-            static auto& pLastEntityLeft = StaticRef<CEntity*>(0xB6BC6C);
+            static auto& fCityNoiseVolumeBoostResidueLeft = StaticRef<float, 0xB6BC68>();
+            static auto& pLastEntityLeft = StaticRef<CEntity*, 0xB6BC6C>();
             Process(pov - camRight * 4.f, pov - camRight, fCityNoiseVolumeBoostResidueLeft, pLastEntityLeft);
         }
 
@@ -191,10 +191,10 @@ void CAEWeatherAudioEntity::UpdateParameters(CAESound* sound, int16 curPlayPos) 
     }
     case eWeatherEvent::UNK_4:
     case eWeatherEvent::UNK_5: { // 0x50652F
-        static auto& sbWindOffset = StaticRef<bool>(0x8CC2C0);
-        static auto& sfWindOffset = StaticRef<float>(0xB6BAFC);
-        static auto& sfWindFreq = StaticRef<float>(0xB6BAF8);
-        static auto& sfOldFreqLeft = StaticRef<float>(0x8CC2C4);
+        static auto& sbWindOffset = StaticRef<bool, 0x8CC2C0>();
+        static auto& sfWindOffset = StaticRef<float, 0xB6BAFC>();
+        static auto& sfWindFreq = StaticRef<float, 0xB6BAF8>();
+        static auto& sfOldFreqLeft = StaticRef<float, 0x8CC2C4>();
         
         const auto zPosFactor = std::clamp(TheCamera.GetPosition().z / 500.f, 0.f, 1.f);
         const auto windRatio = lerp(

@@ -15,7 +15,7 @@
 #include "FxPrimBP.h"
 #include "Particle.h"
 
-auto& g_fxMan = StaticRef<FxManager_c>(0xA9AE80);
+auto& g_fxMan = StaticRef<FxManager_c, 0xA9AE80>();
 
 void FxManager_c::InjectHooks() {
     RH_ScopedClass(FxManager_c);

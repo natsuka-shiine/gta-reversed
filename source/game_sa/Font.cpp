@@ -29,10 +29,10 @@ public:
 private:
     std::array<std::byte, 512> m_UnderlyingBuffer{}; // Not an array of CFontChars, refer to RenderFontBuffer
 };
-auto& s_RenderFontBuffer = StaticRef<RenderFontBuffer>(0xC716B0);
-auto& s_RenderEndPtr = StaticRef<void*>(0xC716A8); // Points to the end of queued font renders at s_RenderFontBuffer
+auto& s_RenderFontBuffer = StaticRef<RenderFontBuffer, 0xC716B0>();
+auto& s_RenderEndPtr = StaticRef<void*, 0xC716A8>(); // Points to the end of queued font renders at s_RenderFontBuffer
 
-auto& gFontData = StaticRef<std::array<tFontData, 2>>(0xC718B0);
+auto& gFontData = StaticRef<std::array<tFontData, 2>, 0xC718B0>();
 
 // 0x7187C0
 void CFont::LoadFontValues() {

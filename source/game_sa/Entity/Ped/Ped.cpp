@@ -2659,7 +2659,7 @@ void CPed::DoFootLanded(bool leftFoot, uint8 arg1) {
         return;
     }
 
-    static auto& s_bUsingAnimViewer = StaticRef<bool>(0xB72C70); // g_bUsingAnimViewer
+    static auto& s_bUsingAnimViewer = StaticRef<bool, 0xB72C70>(); // g_bUsingAnimViewer
 
     const auto IsCloseEnoughForFootFx = [this](const CVector& pos) {
         return GetIsOnScreen() && (CVector2D{ pos } - CVector2D{ TheCamera.GetPosition() }).SquaredMagnitude() <= sq(10.0f);
@@ -4746,7 +4746,7 @@ void CPed::ProcessControl()
     if (bKnockedOffBike && (bIsStanding || bIsDrowning) && !m_standingOnEntity && !bHeadStuckInCollision && field_588 == NO_HEAD_HIT_HEIGHT) {
         if (m_vecMoveSpeed.SquaredMagnitude() < 0.01f) {
             if (m_pVehicle) {
-                static auto& s_TempColPoints = StaticRef<std::array<CColPoint, 32>>(0xC092A8);
+                static auto& s_TempColPoints = StaticRef<std::array<CColPoint, 32>, 0xC092A8>();
                 if (!CCollision::ProcessColModels(
                     GetMatrix(), *GetModelInfo()->GetColModel(),
                     m_pVehicle->GetMatrix(), *m_pVehicle->GetModelInfo()->GetColModel(),
@@ -5456,7 +5456,7 @@ int32 CPed::ProcessEntityCollision(CEntity* entity, CColPoint* colPoint)
                 const auto  balance  = CCustomBuildingDNPipeline::m_fDNBalanceParam;
                 const auto  light    = (1.0f - balance) * ((float)(lighting.value & 0xF) * (0.5f / 15.0f)) + balance * ((float)(lighting.value >> 4) * (0.5f / 15.0f));
                 if (IsPlayer()) {
-                    const auto&  s_LightingBlendRate = StaticRef<float>(0x8D21E4); // 0.1f
+                    const auto&  s_LightingBlendRate = StaticRef<float, 0x8D21E4>(); // 0.1f
                     const auto   t                   = CTimer::GetTimeStep() * s_LightingBlendRate;
                     m_fContactSurfaceBrightness      = light * t + (1.0f - t) * m_fContactSurfaceBrightness;
                 } else {

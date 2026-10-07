@@ -17,9 +17,9 @@ class CPed;
 
 class CCover {
 public:
-    static inline auto& m_NumPoints = StaticRef<uint32>(0xC197A4);
-    static inline auto& m_Points = StaticRef<std::array<CCoverPoint, 100>>(0xC197C8);
-    inline static auto&                          m_ListOfProcessedBuildings = StaticRef<CPtrListDoubleLink<CBuilding*>>(0xC1A2B8);
+    static inline auto& m_NumPoints = StaticRef<uint32, 0xC197A4>();
+    static inline auto& m_Points = StaticRef<std::array<CCoverPoint, 100>, 0xC197C8>();
+    inline static auto&                          m_ListOfProcessedBuildings = StaticRef<CPtrListDoubleLink<CBuilding*>, 0xC1A2B8>();
 
 public:
     static void InjectHooks();

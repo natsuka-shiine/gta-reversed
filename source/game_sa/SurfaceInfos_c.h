@@ -76,4 +76,4 @@ public:
 };
 VALIDATE_SIZE(SurfaceInfos_c, 0x8F4);
 
-static inline auto& g_surfaceInfos = StaticRef<SurfaceInfos_c>(0xB79538);
+static inline auto& g_surfaceInfos = StaticRef<SurfaceInfos_c, 0xB79538>();

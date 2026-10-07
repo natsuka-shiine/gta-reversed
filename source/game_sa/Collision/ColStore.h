@@ -25,9 +25,9 @@ VALIDATE_SIZE(ColDef, 0x2C);
 using CColPool = CPool<ColDef>;
 class CColStore {
 public:
-    static inline auto& ms_vecCollisionNeeded = StaticRef<CVector>(0x965580);
-    static inline auto& ms_bCollisionNeeded = StaticRef<bool>(0x965558);
-    static inline auto& ms_EntityAreaCode = StaticRef<eAreaCodesS32>(0x965554);
+    static inline auto& ms_vecCollisionNeeded = StaticRef<CVector, 0x965580>();
+    static inline auto& ms_bCollisionNeeded = StaticRef<bool, 0x965558>();
+    static inline auto& ms_EntityAreaCode = StaticRef<eAreaCodesS32, 0x965554>();
 
 public:
     static void InjectHooks();

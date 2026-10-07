@@ -8,7 +8,7 @@
 #include "TaskSimpleIKLookAt.h"
 #include "TaskSimpleIKPointArm.h"
 
-auto& g_ikChainMan = StaticRef<IKChainManager_c>(0xC15448);
+auto& g_ikChainMan = StaticRef<IKChainManager_c, 0xC15448>();
 
 void IKChainManager_c::InjectHooks() {
     RH_ScopedClass(IKChainManager_c);
@@ -111,7 +111,7 @@ void IKChainManager_c::RemoveIKChain(IKChain_c* chain) {
 
 // 0x618800
 inline bool IKChainManager_c::CanAccept(CPed* ped, float range) const {
-    static auto& s_MaxRange = StaticRef<float>(0x866BEC); // 999.0f
+    static auto& s_MaxRange = StaticRef<float, 0x866BEC>(); // 999.0f
 
     if (!ped->GetRwMatrix()) {
         return false;

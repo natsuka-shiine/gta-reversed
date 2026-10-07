@@ -1,18 +1,18 @@
 #include "StdInc.h"
 
-auto& gStreamFileHandles = StaticRef<HANDLE[MAX_CD_STREAM_HANDLES]>(0x8E4010);
-auto& gCdImageNames = StaticRef<char[MAX_CD_STREAM_HANDLES][MAX_CD_STREAM_IMAGE_NAME_SIZE]>(0x8E4098);
-auto& gStreamFileCreateFlags = StaticRef<uint32>(0x8E3FE0);
-auto& gCdStreams = StaticRef<CdStream*>(0x8E3FFC);
-auto& gStreamCount = StaticRef<int32>(0x8E4090);
-auto& gOpenStreamCount = StaticRef<int32>(0x8E4094);
-auto& gStreamingInitialized = StaticRef<int32>(0x8E3FE4);
-auto& gOverlappedIO = StaticRef<int32>(0x8E3FE8);
-auto& gStreamQueue = StaticRef<Queue>(0x8E3FEC);
-auto& gStreamSemaphore = StaticRef<HANDLE>(0x8E4004);
-auto& gStreamingThread = StaticRef<HANDLE>(0x8E4008);
-auto& gStreamingThreadId = StaticRef<DWORD>(0x8E4000);
-auto& gLastCdStreamPosn = StaticRef<uint32>(0x8E4898);
+auto& gStreamFileHandles = StaticRef<HANDLE[MAX_CD_STREAM_HANDLES], 0x8E4010>();
+auto& gCdImageNames = StaticRef<char[MAX_CD_STREAM_HANDLES][MAX_CD_STREAM_IMAGE_NAME_SIZE], 0x8E4098>();
+auto& gStreamFileCreateFlags = StaticRef<uint32, 0x8E3FE0>();
+auto& gCdStreams = StaticRef<CdStream*, 0x8E3FFC>();
+auto& gStreamCount = StaticRef<int32, 0x8E4090>();
+auto& gOpenStreamCount = StaticRef<int32, 0x8E4094>();
+auto& gStreamingInitialized = StaticRef<int32, 0x8E3FE4>();
+auto& gOverlappedIO = StaticRef<int32, 0x8E3FE8>();
+auto& gStreamQueue = StaticRef<Queue, 0x8E3FEC>();
+auto& gStreamSemaphore = StaticRef<HANDLE, 0x8E4004>();
+auto& gStreamingThread = StaticRef<HANDLE, 0x8E4008>();
+auto& gStreamingThreadId = StaticRef<DWORD, 0x8E4000>();
+auto& gLastCdStreamPosn = StaticRef<uint32, 0x8E4898>();
 
 #define APPLY_CD_STREAM_DEADLOCK_FIX 1
 

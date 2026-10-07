@@ -3920,11 +3920,11 @@ void CAEVehicleAudioEntity::ProcessPlayerJet(tVehicleParams& vp) {
 #pragma region Hovercraft (Vortex)
 // 0x500F50
 void CAEVehicleAudioEntity::ProcessDummyHovercraft(tVehicleParams& params) {
-    static auto& s_VolPropSpeedFactor  = StaticRef<float>(0xB6BA90);
-    static auto& s_VolBase             = StaticRef<float>(0x8CBFAC);
-    static auto& s_FreqPropSpeedFactor = StaticRef<float>(0xB6BA94);
-    static auto& s_FreqThrustFactor    = StaticRef<float>(0x8CBFBC);
-    static auto& s_FreqBase            = StaticRef<float>(0x8CBFB4);
+    static auto& s_VolPropSpeedFactor  = StaticRef<float, 0xB6BA90>();
+    static auto& s_VolBase             = StaticRef<float, 0x8CBFAC>();
+    static auto& s_FreqPropSpeedFactor = StaticRef<float, 0xB6BA94>();
+    static auto& s_FreqThrustFactor    = StaticRef<float, 0x8CBFBC>();
+    static auto& s_FreqBase            = StaticRef<float, 0x8CBFB4>();
 
     const auto* const pad = CPad::GetPad(0);
 
@@ -4486,13 +4486,13 @@ float CAEVehicleAudioEntity::GetBaseVolumeForBicycleTyre(float ratio) const noex
 // notsa - Common code of `ProcessDummyBicycle` and `ProcessPlayerBicycle`
 // @param wasFreewheeling Whenever the bicycle was freewheeling the last time (This is a static variable in the original code, separate ones for the player and dummy version)
 void CAEVehicleAudioEntity::ProcessGenericBicycle(tVehicleParams& vp, bool& wasFreewheeling) {
-    static auto& s_TyreVolOffset       = StaticRef<float>(0x8CBEBC);
-    static auto& s_SprocketVolOffset   = StaticRef<float>(0x8CBEC0);
-    static auto& s_TyreFreqFactor      = StaticRef<float>(0xB6BA6C);
-    static auto& s_TyreFreqBase        = StaticRef<float>(0x8CBD5C);
-    static auto& s_TyreFreqLeanFactor  = StaticRef<float>(0x8CBD60);
-    static auto& s_SprocketFreqFactor  = StaticRef<float>(0xB6BA70);
-    static auto& s_SprocketFreqBase    = StaticRef<float>(0x8CBD64);
+    static auto& s_TyreVolOffset       = StaticRef<float, 0x8CBEBC>();
+    static auto& s_SprocketVolOffset   = StaticRef<float, 0x8CBEC0>();
+    static auto& s_TyreFreqFactor      = StaticRef<float, 0xB6BA6C>();
+    static auto& s_TyreFreqBase        = StaticRef<float, 0x8CBD5C>();
+    static auto& s_TyreFreqLeanFactor  = StaticRef<float, 0x8CBD60>();
+    static auto& s_SprocketFreqFactor  = StaticRef<float, 0xB6BA70>();
+    static auto& s_SprocketFreqBase    = StaticRef<float, 0x8CBD64>();
 
     const auto* const bmx = vp.Vehicle->AsBmx();
 
@@ -4519,7 +4519,7 @@ void CAEVehicleAudioEntity::ProcessGenericBicycle(tVehicleParams& vp, bool& wasF
 
 // 0x4FFDC0
 void CAEVehicleAudioEntity::ProcessDummyBicycle(tVehicleParams& params) {
-    static auto& s_WasFreewheeling = StaticRef<bool>(0xB6BAC8);
+    static auto& s_WasFreewheeling = StaticRef<bool, 0xB6BAC8>();
 
     if (!EnsureHasDummySlot() || !EnsureSoundBankIsLoaded(true)) {
         return;
@@ -4529,9 +4529,9 @@ void CAEVehicleAudioEntity::ProcessDummyBicycle(tVehicleParams& params) {
 
 // 0x500040
 void CAEVehicleAudioEntity::ProcessPlayerBicycle(tVehicleParams& params) {
-    static auto& s_WasFreewheeling = StaticRef<bool>(0xB6BAC9);
-    static auto& s_ChainClangTimer = StaticRef<float>(0xB6BACC); // Only written, never used for anything
-    static auto& s_PrevCrankAngle  = StaticRef<float>(0xB6BAD0);
+    static auto& s_WasFreewheeling = StaticRef<bool, 0xB6BAC9>();
+    static auto& s_ChainClangTimer = StaticRef<float, 0xB6BACC>(); // Only written, never used for anything
+    static auto& s_PrevCrankAngle  = StaticRef<float, 0xB6BAD0>();
 
     if (!AEAudioHardware.IsSoundBankLoaded(m_DummyEngineBank, m_DummySlot)) {
         return;

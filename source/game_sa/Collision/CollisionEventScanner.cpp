@@ -18,12 +18,12 @@
 #include "Events/EventGlobalGroup.h"
 
 // Tunables (All in `.data`, so they're referenced instead of copied)
-static inline auto& s_BumpSoundLoudIntensity          = StaticRef<float>(0x8D239C); // 3.0
-static inline auto& s_BumpSoundMinIntensity           = StaticRef<float>(0x8D23A0); // 1.0
-static inline auto& s_DoorSoundMinTurnSpeed           = StaticRef<float>(0x8D23A4); // 0.04
-static inline auto& s_ObjectCollisionDamageMult       = StaticRef<float>(0x8D23A8); // 10.0
-static inline auto& s_ObjectCollisionDamageThreshPlyr = StaticRef<float>(0x8D23AC); // 2.0
-static inline auto& s_ObjectCollisionDamageThresh     = StaticRef<float>(0x8D23B0); // 1.0
+static inline auto& s_BumpSoundLoudIntensity          = StaticRef<float, 0x8D239C>(); // 3.0
+static inline auto& s_BumpSoundMinIntensity           = StaticRef<float, 0x8D23A0>(); // 1.0
+static inline auto& s_DoorSoundMinTurnSpeed           = StaticRef<float, 0x8D23A4>(); // 0.04
+static inline auto& s_ObjectCollisionDamageMult       = StaticRef<float, 0x8D23A8>(); // 10.0
+static inline auto& s_ObjectCollisionDamageThreshPlyr = StaticRef<float, 0x8D23AC>(); // 2.0
+static inline auto& s_ObjectCollisionDamageThresh     = StaticRef<float, 0x8D23B0>(); // 1.0
 
 void CCollisionEventScanner::InjectHooks() {
     RH_ScopedClass(CCollisionEventScanner);
@@ -34,8 +34,8 @@ void CCollisionEventScanner::InjectHooks() {
 
 // 0x604500
 void CCollisionEventScanner::ScanForCollisionEvents(CPed* victim, CEventGroup* eventGroup) {
-    static auto& s_LastBumpSoundEvent = StaticRef<uint32>(0xC0B1B0);
-    static auto& s_LastDoorSoundEvent = StaticRef<uint32>(0xC0B1B4);
+    static auto& s_LastBumpSoundEvent = StaticRef<uint32, 0xC0B1B0>();
+    static auto& s_LastDoorSoundEvent = StaticRef<uint32, 0xC0B1B4>();
 
     auto* const ped = victim;
 

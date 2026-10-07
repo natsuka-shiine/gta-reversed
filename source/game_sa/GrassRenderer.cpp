@@ -3,8 +3,8 @@
 #include "GrassRenderer.h"
 #include "PPTriPlantBuffer.h"
 
-auto& gTriPlantBuf = StaticRef<CPPTriPlantBuffer>(0xC02DE8);
-auto& g_GrassCurrentScanCode = StaticRef<uint16>(0x8D1330); // -1
+auto& gTriPlantBuf = StaticRef<CPPTriPlantBuffer, 0xC02DE8>();
+auto& g_GrassCurrentScanCode = StaticRef<uint16, 0x8D1330>(); // -1
 
 void CGrassRenderer::InjectHooks() {
     RH_ScopedClass(CGrassRenderer);

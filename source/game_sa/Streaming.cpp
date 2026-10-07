@@ -8,9 +8,9 @@
 #include "LoadingScreen.h"
 #include "VehicleRecording.h"
 
-static auto& CurrentGangMemberToLoad = StaticRef<int32>(0x9654D4);
+static auto& CurrentGangMemberToLoad = StaticRef<int32, 0x9654D4>();
 
-auto& gRwStream = StaticRef<RwStream>(0x8E48AC);
+auto& gRwStream = StaticRef<RwStream, 0x8E48AC>();
 
 void CStreaming::InjectHooks() {
     RH_ScopedClass(CStreaming);
@@ -2621,7 +2621,7 @@ void CStreaming::RetryLoadFile(int32 chIdx) {
 
 // 0x40E3A0
 void CStreaming::LoadRequestedModels() {
-    static auto& currentChannel = StaticRef<int32>(0x965534); // 0
+    static auto& currentChannel = StaticRef<int32, 0x965534>(); // 0
     if (ms_bLoadingBigModel)
         currentChannel = 0;
 
@@ -2717,7 +2717,7 @@ int32 CStreaming::GetDefaultCabDriverModel() {
     });
 
     // Last index into the above array used to choose model for cab driver
-    static auto& s_LastRandomIndex = StaticRef<int32>(0x965524); // Default: 0
+    static auto& s_LastRandomIndex = StaticRef<int32, 0x965524>(); // Default: 0
 
     // If previously choosen model is still loaded, then use that
     if (const auto model = s_DefaultCabDriverModels[s_LastRandomIndex]; GetInfo(model).m_LoadState != eStreamingLoadState::LOADSTATE_NOT_LOADED) {
@@ -3234,7 +3234,7 @@ void CStreaming::StreamOneNewCar() {
     if (!GetInfo(MODEL_TAXI).IsLoaded() &&
         !GetInfo(MODEL_CABBIE).IsLoaded()
     ) {
-        static auto& lastCarModelStreamedIn = StaticRef<int32>(0x965528); // 0
+        static auto& lastCarModelStreamedIn = StaticRef<int32, 0x965528>(); // 0
         if (lastCarModelStreamedIn == MODEL_TAXI) {
             if (!IsCarModelNeededInCurrentZone(MODEL_CABBIE) && IsCarModelNeededInCurrentZone(MODEL_TAXI)) {
                 carModelId = MODEL_TAXI;
@@ -3424,7 +3424,7 @@ void CStreaming::StreamVehiclesAndPeds() {
         dealerGroupId = CPopulation::GetPedGroupId(POPCYCLE_GROUP_DEALERS, 0);
     }
 
-    static auto& framesBeforeStreamingNextNewCar = StaticRef<int32>(0x965530); // 0
+    static auto& framesBeforeStreamingNextNewCar = StaticRef<int32, 0x965530>(); // 0
     if (framesBeforeStreamingNextNewCar >= 0) {
         --framesBeforeStreamingNextNewCar;
     }
@@ -3472,7 +3472,7 @@ void CStreaming::StreamVehiclesAndPeds_Always(const CVector& unused) {
     StreamZoneModels_Gangs({});
 
     if (CPopCycle::m_pCurrZoneInfo) {
-        static auto& lastZonePopulationType = StaticRef<int32>(0x96552C); // 0
+        static auto& lastZonePopulationType = StaticRef<int32, 0x96552C>(); // 0
         if (CPopCycle::m_pCurrZoneInfo->PopType != lastZonePopulationType) {
             ReclassifyLoadedCars();
             lastZonePopulationType = CPopCycle::m_pCurrZoneInfo->PopType;
@@ -3485,7 +3485,7 @@ void CStreaming::StreamZoneModels(const CVector& unused) {
     if (!CPopCycle::m_pCurrZoneInfo || CCheat::IsZoneStreamingAllowed())
         return;
 
-    static auto& timeBeforeNextLoad = StaticRef<int32>(0x9654CC); // 0
+    static auto& timeBeforeNextLoad = StaticRef<int32, 0x9654CC>(); // 0
     if (CPopCycle::m_pCurrZoneInfo->PopType == ms_currentZoneType) {
         if (timeBeforeNextLoad >= 0) {
             timeBeforeNextLoad--;
@@ -3544,7 +3544,7 @@ void CStreaming::StreamZoneModels(const CVector& unused) {
         timeBeforeNextLoad = 300;
     }
 
-    static auto& timeBeforeNextGangLoad = StaticRef<int32>(0x9654D0); // 0
+    static auto& timeBeforeNextGangLoad = StaticRef<int32, 0x9654D0>(); // 0
     if (timeBeforeNextGangLoad >= 0) {
         timeBeforeNextGangLoad--;
     } else /*if (timeBeforeNextGangLoad < 0) - unnecessary*/ {

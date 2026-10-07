@@ -34,7 +34,7 @@ public:
     static constexpr float ms_fMaxWaterCreaturesDrawDistanceSquared = sq(ms_fMaxWaterCreaturesDrawDistance);
 
 private:
-    static inline auto& ms_waterCreatureInfos = StaticRef<tWaterCreatureInfo[NUM_WATER_CREATURE_INFOS]>(0x8D3698); // Access using GetCreatureInfo()
+    static inline auto& ms_waterCreatureInfos = StaticRef<tWaterCreatureInfo[NUM_WATER_CREATURE_INFOS], 0x8D3698>(); // Access using GetCreatureInfo()
 
     WaterCreature_c m_waterCreatureItems[NUM_WATER_CREATURES];
     TList_c<WaterCreature_c> m_waterCreaturePool;

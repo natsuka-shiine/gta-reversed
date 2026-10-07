@@ -51,37 +51,37 @@ constexpr float MAP_Z_LOW_LIMIT = -100.0f;
 
 class CWorld {
 public:
-    inline static auto& Players = StaticRef<CPlayerInfo[MAX_PLAYERS]>(0xB7CD98);
+    inline static auto& Players = StaticRef<CPlayerInfo[MAX_PLAYERS], 0xB7CD98>();
     // Current player
-    inline static auto& PlayerInFocus = StaticRef<uint8>(0xB7CD74);
-    inline static auto& bDoingCarCollisions = StaticRef<bool>(0xB7CD73);
-    inline static auto& bNoMoreCollisionTorque = StaticRef<bool>(0xB7CD72);
-    inline static auto& bForceProcessControl = StaticRef<bool>(0xB7CD6E);
-    inline static auto& bProcessCutsceneOnly = StaticRef<bool>(0xB7CD6D);
-    inline static auto& bSecondShift = StaticRef<bool>(0xB7CD6C);
+    inline static auto& PlayerInFocus = StaticRef<uint8, 0xB7CD74>();
+    inline static auto& bDoingCarCollisions = StaticRef<bool, 0xB7CD73>();
+    inline static auto& bNoMoreCollisionTorque = StaticRef<bool, 0xB7CD72>();
+    inline static auto& bForceProcessControl = StaticRef<bool, 0xB7CD6E>();
+    inline static auto& bProcessCutsceneOnly = StaticRef<bool, 0xB7CD6D>();
+    inline static auto& bSecondShift = StaticRef<bool, 0xB7CD6C>();
 
-    inline static auto& bIncludeDeadPeds = StaticRef<bool>(0xB7CD71);
-    inline static auto& bIncludeCarTyres = StaticRef<bool>(0xB7CD70);
-    inline static auto& bIncludeBikers = StaticRef<bool>(0xB7CD6F);
+    inline static auto& bIncludeDeadPeds = StaticRef<bool, 0xB7CD71>();
+    inline static auto& bIncludeCarTyres = StaticRef<bool, 0xB7CD70>();
+    inline static auto& bIncludeBikers = StaticRef<bool, 0xB7CD6F>();
     // entity to ignore
-    inline static auto& pIgnoreEntity = StaticRef<CEntity*>(0xB7CD68);
-    inline static auto& fWeaponSpreadRate = StaticRef<float>(0xB7CD64);
-    inline static auto& ms_iProcessLineNumCrossings = StaticRef<int32>(0xB7CD60);
+    inline static auto& pIgnoreEntity = StaticRef<CEntity*, 0xB7CD68>();
+    inline static auto& fWeaponSpreadRate = StaticRef<float, 0xB7CD64>();
+    inline static auto& ms_iProcessLineNumCrossings = StaticRef<int32, 0xB7CD60>();
 
-    inline static auto& SnookerTableMax = StaticRef<CVector>(0x8CDEF4);
-    inline static auto& SnookerTableMin = StaticRef<CVector>(0x8CDF00);
+    inline static auto& SnookerTableMax = StaticRef<CVector, 0x8CDEF4>();
+    inline static auto& SnookerTableMin = StaticRef<CVector, 0x8CDF00>();
 
     // Use GetSector() to access this array
-    inline static auto& ms_aSectors = StaticRef<notsa::mdarray<CSector, MAX_SECTORS_Y, MAX_SECTORS_X>>(0xB7D0B8);
+    inline static auto& ms_aSectors = StaticRef<notsa::mdarray<CSector, MAX_SECTORS_Y, MAX_SECTORS_X>, 0xB7D0B8>();
     // Use GetRepeatSector() to access this array
-    inline static auto& ms_aRepeatSectors = StaticRef<notsa::mdarray<CRepeatSector, MAX_REPEAT_SECTORS_Y, MAX_REPEAT_SECTORS_X>>(0xB992B8);
+    inline static auto& ms_aRepeatSectors = StaticRef<notsa::mdarray<CRepeatSector, MAX_REPEAT_SECTORS_Y, MAX_REPEAT_SECTORS_X>, 0xB992B8>();
     // Use GetLodPtrList() to access this array
-    inline static auto& ms_aLodPtrLists = StaticRef<notsa::mdarray<CPtrListSingleLink<CEntity*>, MAX_LOD_PTR_LISTS_Y, MAX_LOD_PTR_LISTS_X>>(0xB99EB8);
-    inline static auto& ms_listMovingEntityPtrs = StaticRef<CPtrListDoubleLink<CPhysical*>>(0xB9ACC8);
-    inline static auto& ms_listObjectsWithControlCode = StaticRef<CPtrListDoubleLink<CObject*>>(0xB9ACCC);
-    inline static auto& ms_nCurrentScanCode = StaticRef<uint16>(0xB7CD78);
+    inline static auto& ms_aLodPtrLists = StaticRef<notsa::mdarray<CPtrListSingleLink<CEntity*>, MAX_LOD_PTR_LISTS_Y, MAX_LOD_PTR_LISTS_X>, 0xB99EB8>();
+    inline static auto& ms_listMovingEntityPtrs = StaticRef<CPtrListDoubleLink<CPhysical*>, 0xB9ACC8>();
+    inline static auto& ms_listObjectsWithControlCode = StaticRef<CPtrListDoubleLink<CObject*>, 0xB9ACCC>();
+    inline static auto& ms_nCurrentScanCode = StaticRef<uint16, 0xB7CD78>();
 
-    inline static auto& m_aTempColPts = StaticRef<std::array<CColPoint, 32>>(0xB9ACD0);
+    inline static auto& m_aTempColPts = StaticRef<std::array<CColPoint, 32>, 0xB9ACD0>();
 
     static void ResetLineTestOptions();
 

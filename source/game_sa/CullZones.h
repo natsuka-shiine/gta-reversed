@@ -148,20 +148,20 @@ VALIDATE_SIZE(CAttributeZone, 0x12);
 // when the player is within the zone.
 class CCullZones {
 public:
-    static inline auto& NumAttributeZones = StaticRef<int32>(0xC87AC8);
-    static inline auto& NumMirrorAttributeZones = StaticRef<int32>(0xC87AC4);
-    static inline auto& NumTunnelAttributeZones = StaticRef<int32>(0xC87AC0);
+    static inline auto& NumAttributeZones = StaticRef<int32, 0xC87AC8>();
+    static inline auto& NumMirrorAttributeZones = StaticRef<int32, 0xC87AC4>();
+    static inline auto& NumTunnelAttributeZones = StaticRef<int32, 0xC87AC0>();
 
-    static inline auto& CurrentFlags_Camera = StaticRef<int32>(0xC87ABC);
-    static inline auto& CurrentFlags_Player = StaticRef<int32>(0xC87AB8);
+    static inline auto& CurrentFlags_Camera = StaticRef<int32, 0xC87ABC>();
+    static inline auto& CurrentFlags_Player = StaticRef<int32, 0xC87AB8>();
 
-    static inline auto& bMilitaryZonesDisabled = StaticRef<bool>(0xC87ACD);
+    static inline auto& bMilitaryZonesDisabled = StaticRef<bool, 0xC87ACD>();
 
-    static inline auto& aAttributeZones = StaticRef<CAttributeZone[1'300]>(0xC81F50);
-    static inline auto& aTunnelAttributeZones = StaticRef<std::array<CAttributeZone, 40>>(0xC81C80);
-    static inline auto& aMirrorAttributeZones = StaticRef<std::array<CMirrorAttributeZone, 72>>(0xC815C0);
+    static inline auto& aAttributeZones = StaticRef<CAttributeZone[1'300], 0xC81F50>();
+    static inline auto& aTunnelAttributeZones = StaticRef<std::array<CAttributeZone, 40>, 0xC81C80>();
+    static inline auto& aMirrorAttributeZones = StaticRef<std::array<CMirrorAttributeZone, 72>, 0xC815C0>();
 
-    static inline auto& bRenderCullzones = StaticRef<bool>(0xC87ACC); // unused
+    static inline auto& bRenderCullzones = StaticRef<bool, 0xC87ACC>(); // unused
 
 public:
     static void InjectHooks();

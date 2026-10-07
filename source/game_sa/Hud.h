@@ -19,90 +19,90 @@ class CHud {
 public:
     static constexpr auto BIG_MESSAGE_SIZE = 128;
 
-    static inline auto& bScriptDontDisplayAreaName = StaticRef<bool>(0xBAA3F8);
-    static inline auto& bScriptDontDisplayVehicleName = StaticRef<bool>(0xBAA3F9);
-    static inline auto& bScriptForceDisplayWithCounters = StaticRef<bool>(0xBAA3FA);
-    static inline auto& bScriptDontDisplayRadar = StaticRef<bool>(0xBAA3FB);
+    static inline auto& bScriptDontDisplayAreaName = StaticRef<bool, 0xBAA3F8>();
+    static inline auto& bScriptDontDisplayVehicleName = StaticRef<bool, 0xBAA3F9>();
+    static inline auto& bScriptForceDisplayWithCounters = StaticRef<bool, 0xBAA3FA>();
+    static inline auto& bScriptDontDisplayRadar = StaticRef<bool, 0xBAA3FB>();
 
-    static inline auto& bDrawClock = StaticRef<bool>(0xBAA400);
+    static inline auto& bDrawClock = StaticRef<bool, 0xBAA400>();
 
-    static inline auto& m_pVehicleNameToPrint = StaticRef<const GxtChar*>(0xBAA444);
-    static inline auto& m_VehicleState = StaticRef<eNameState>(0xBAA448);
-    static inline auto& m_VehicleFadeTimer = StaticRef<int32>(0xBAA44C);
-    static inline auto& m_VehicleNameTimer = StaticRef<int32>(0xBAA450);
-    static inline auto& m_pLastVehicleName = StaticRef<const GxtChar*>(0xBAA454);
-    static inline auto& m_pVehicleName = StaticRef<const GxtChar*>(0xBAA458);
+    static inline auto& m_pVehicleNameToPrint = StaticRef<const GxtChar*, 0xBAA444>();
+    static inline auto& m_VehicleState = StaticRef<eNameState, 0xBAA448>();
+    static inline auto& m_VehicleFadeTimer = StaticRef<int32, 0xBAA44C>();
+    static inline auto& m_VehicleNameTimer = StaticRef<int32, 0xBAA450>();
+    static inline auto& m_pLastVehicleName = StaticRef<const GxtChar*, 0xBAA454>();
+    static inline auto& m_pVehicleName = StaticRef<const GxtChar*, 0xBAA458>();
 
-    static inline auto& m_bDraw3dMarkers = StaticRef<bool>(0xBAA45C);
-    static inline auto& m_Wants_To_Draw_Hud = StaticRef<bool>(0xBAA45D);
+    static inline auto& m_bDraw3dMarkers = StaticRef<bool, 0xBAA45C>();
+    static inline auto& m_Wants_To_Draw_Hud = StaticRef<bool, 0xBAA45D>();
 
-    static inline auto& m_fHelpMessageTime = StaticRef<float>(0xBAA460); // in seconds
-    static inline auto& m_fHelpMessageBoxWidth = StaticRef<float>(0x8D0934); // default 200.0
-    static inline auto& m_bHelpMessagePermanent = StaticRef<bool>(0xBAA464);
-    static inline auto& m_fHelpMessageStatUpdateValue = StaticRef<float>(0xBAA468);
-    static inline auto& m_nHelpMessageMaxStatValue = StaticRef<uint16>(0xBAA46C);
-    static inline auto& m_nHelpMessageStatId = StaticRef<uint16>(0xBAA470);
-    static inline auto& m_bHelpMessageQuick = StaticRef<bool>(0xBAA472);
-    static inline auto& m_nHelpMessageState = StaticRef<int32>(0xBAA474);
-    static inline auto& m_nHelpMessageFadeTimer = StaticRef<uint32>(0xBAA478);
-    static inline auto& m_nHelpMessageTimer = StaticRef<uint32>(0xBAA47C);
-    static inline auto& m_pHelpMessageToPrint = StaticRef<GxtChar[400]>(0xBAA480);
-    static inline auto& m_pLastHelpMessage = StaticRef<GxtChar[400]>(0xBAA610);
-    static inline auto& m_pHelpMessage = StaticRef<GxtChar[400]>(0xBAA7A0);
+    static inline auto& m_fHelpMessageTime = StaticRef<float, 0xBAA460>(); // in seconds
+    static inline auto& m_fHelpMessageBoxWidth = StaticRef<float, 0x8D0934>(); // default 200.0
+    static inline auto& m_bHelpMessagePermanent = StaticRef<bool, 0xBAA464>();
+    static inline auto& m_fHelpMessageStatUpdateValue = StaticRef<float, 0xBAA468>();
+    static inline auto& m_nHelpMessageMaxStatValue = StaticRef<uint16, 0xBAA46C>();
+    static inline auto& m_nHelpMessageStatId = StaticRef<uint16, 0xBAA470>();
+    static inline auto& m_bHelpMessageQuick = StaticRef<bool, 0xBAA472>();
+    static inline auto& m_nHelpMessageState = StaticRef<int32, 0xBAA474>();
+    static inline auto& m_nHelpMessageFadeTimer = StaticRef<uint32, 0xBAA478>();
+    static inline auto& m_nHelpMessageTimer = StaticRef<uint32, 0xBAA47C>();
+    static inline auto& m_pHelpMessageToPrint = StaticRef<GxtChar[400], 0xBAA480>();
+    static inline auto& m_pLastHelpMessage = StaticRef<GxtChar[400], 0xBAA610>();
+    static inline auto& m_pHelpMessage = StaticRef<GxtChar[400], 0xBAA7A0>();
 
-    static inline auto& m_ZoneState = StaticRef<eNameState>(0xBAA930);
-    static inline auto& m_ZoneFadeTimer = StaticRef<int32>(0xBAA934);
-    static inline auto& m_ZoneNameTimer = StaticRef<uint32>(0xBAA938);
-    static inline auto& m_ZoneToPrint = StaticRef<const GxtChar*>(0xBAB1D0);
-    static inline auto& m_pLastZoneName = StaticRef<const GxtChar*>(0xBAB1D4);
-    static inline auto& m_pZoneName = StaticRef<const GxtChar*>(0xBAB1D8);
+    static inline auto& m_ZoneState = StaticRef<eNameState, 0xBAA930>();
+    static inline auto& m_ZoneFadeTimer = StaticRef<int32, 0xBAA934>();
+    static inline auto& m_ZoneNameTimer = StaticRef<uint32, 0xBAA938>();
+    static inline auto& m_ZoneToPrint = StaticRef<const GxtChar*, 0xBAB1D0>();
+    static inline auto& m_pLastZoneName = StaticRef<const GxtChar*, 0xBAB1D4>();
+    static inline auto& m_pZoneName = StaticRef<const GxtChar*, 0xBAB1D8>();
 
-    static inline auto& m_ItemToFlash = StaticRef<eHudItem>(0xBAB1DC);
-    static inline auto& bDrawingVitalStats = StaticRef<bool>(0xBAB1DE);
+    static inline auto& m_ItemToFlash = StaticRef<eHudItem, 0xBAB1DC>();
+    static inline auto& bDrawingVitalStats = StaticRef<bool, 0xBAB1DE>();
 
-    static inline auto& m_LastBreathTime = StaticRef<int32>(0xBAA3FC);
+    static inline auto& m_LastBreathTime = StaticRef<int32, 0xBAA3FC>();
 
-    static inline auto& m_WeaponState = StaticRef<uint32>(0xBAA404);
-    static inline auto& m_WeaponFadeTimer = StaticRef<uint32>(0xBAA408);
-    static inline auto& m_WeaponTimer = StaticRef<uint32>(0xBAA40C);
-    static inline auto& m_LastWeapon = StaticRef<uint32>(0xBAA410);
+    static inline auto& m_WeaponState = StaticRef<uint32, 0xBAA404>();
+    static inline auto& m_WeaponFadeTimer = StaticRef<uint32, 0xBAA408>();
+    static inline auto& m_WeaponTimer = StaticRef<uint32, 0xBAA40C>();
+    static inline auto& m_LastWeapon = StaticRef<uint32, 0xBAA410>();
 
-    static inline auto& m_WantedState = StaticRef<uint32>(0xBAA414);
-    static inline auto& m_WantedFadeTimer = StaticRef<uint32>(0xBAA418);
-    static inline auto& m_WantedTimer = StaticRef<uint32>(0xBAA41C);
-    static inline auto& m_LastWanted = StaticRef<uint32>(0xBAA420);
+    static inline auto& m_WantedState = StaticRef<uint32, 0xBAA414>();
+    static inline auto& m_WantedFadeTimer = StaticRef<uint32, 0xBAA418>();
+    static inline auto& m_WantedTimer = StaticRef<uint32, 0xBAA41C>();
+    static inline auto& m_LastWanted = StaticRef<uint32, 0xBAA420>();
 
-    static inline auto& m_DisplayScoreState = StaticRef<uint32>(0xBAA424);
-    static inline auto& m_DisplayScoreFadeTimer = StaticRef<uint32>(0xBAA428);
-    static inline auto& m_DisplayScoreTimer = StaticRef<uint32>(0xBAA42C);
-    static inline auto& m_LastDisplayScore = StaticRef<uint32>(0xBAA430);
+    static inline auto& m_DisplayScoreState = StaticRef<uint32, 0xBAA424>();
+    static inline auto& m_DisplayScoreFadeTimer = StaticRef<uint32, 0xBAA428>();
+    static inline auto& m_DisplayScoreTimer = StaticRef<uint32, 0xBAA42C>();
+    static inline auto& m_LastDisplayScore = StaticRef<uint32, 0xBAA430>();
 
-    static inline auto& m_EnergyLostState = StaticRef<uint32>(0xBAA434);
-    static inline auto& m_EnergyLostFadeTimer = StaticRef<uint32>(0xBAA438);
-    static inline auto& m_EnergyLostTimer = StaticRef<uint32>(0xBAA43C);
-    static inline auto& m_LastTimeEnergyLost = StaticRef<uint32>(0xBAA440);
+    static inline auto& m_EnergyLostState = StaticRef<uint32, 0xBAA434>();
+    static inline auto& m_EnergyLostFadeTimer = StaticRef<uint32, 0xBAA438>();
+    static inline auto& m_EnergyLostTimer = StaticRef<uint32, 0xBAA43C>();
+    static inline auto& m_LastTimeEnergyLost = StaticRef<uint32, 0xBAA440>();
 
-    static inline auto& m_Message = StaticRef<GxtChar[400]>(0xBAB040);
-    static inline auto& m_BigMessage = StaticRef<GxtChar[NUM_MESSAGE_STYLES][BIG_MESSAGE_SIZE]>(0xBAACC0);
-    static inline auto& LastBigMessage = StaticRef<GxtChar[NUM_MESSAGE_STYLES][BIG_MESSAGE_SIZE]>(0xBAA940);
-    static inline auto& BigMessageAlpha = StaticRef<float[NUM_MESSAGE_STYLES]>(0xBAA3A4);
-    static inline auto& BigMessageInUse = StaticRef<float[NUM_MESSAGE_STYLES]>(0xBAA3C0);
-    static inline auto& BigMessageX = StaticRef<float[NUM_MESSAGE_STYLES]>(0xBAA3DC);
+    static inline auto& m_Message = StaticRef<GxtChar[400], 0xBAB040>();
+    static inline auto& m_BigMessage = StaticRef<GxtChar[NUM_MESSAGE_STYLES][BIG_MESSAGE_SIZE], 0xBAACC0>();
+    static inline auto& LastBigMessage = StaticRef<GxtChar[NUM_MESSAGE_STYLES][BIG_MESSAGE_SIZE], 0xBAA940>();
+    static inline auto& BigMessageAlpha = StaticRef<float[NUM_MESSAGE_STYLES], 0xBAA3A4>();
+    static inline auto& BigMessageInUse = StaticRef<float[NUM_MESSAGE_STYLES], 0xBAA3C0>();
+    static inline auto& BigMessageX = StaticRef<float[NUM_MESSAGE_STYLES], 0xBAA3DC>();
 
-    static inline auto& Sprites = StaticRef<std::array<CSprite2d, 6>>(0xBAB1FC);
+    static inline auto& Sprites = StaticRef<std::array<CSprite2d, 6>, 0xBAB1FC>();
 
-    static inline auto& TimerMainCounterHideState = StaticRef<int16>(0xBAA388);
-    static inline auto& TimerMainCounterWasDisplayed = StaticRef<bool>(0xBAA38A);
-    static inline auto& TimerCounterHideState = StaticRef<std::array<int16, 4>>(0xBAA38C);
-    static inline auto& TimerCounterWasDisplayed = StaticRef<std::array<bool, 4>>(0xBAA394);
+    static inline auto& TimerMainCounterHideState = StaticRef<int16, 0xBAA388>();
+    static inline auto& TimerMainCounterWasDisplayed = StaticRef<bool, 0xBAA38A>();
+    static inline auto& TimerCounterHideState = StaticRef<std::array<int16, 4>, 0xBAA38C>();
+    static inline auto& TimerCounterWasDisplayed = StaticRef<std::array<bool, 4>, 0xBAA394>();
 
-    static inline auto& OddJob2OffTimer = StaticRef<float>(0xBAA398);
-    static inline auto& OddJob2XOffset = StaticRef<float>(0xBAA39C);
-    static inline auto& OddJob2Timer = StaticRef<uint16>(0xBAA3A0);
-    static inline auto& OddJob2On = StaticRef<uint16>(0xBAB1E0);
+    static inline auto& OddJob2OffTimer = StaticRef<float, 0xBAA398>();
+    static inline auto& OddJob2XOffset = StaticRef<float, 0xBAA39C>();
+    static inline auto& OddJob2Timer = StaticRef<uint16, 0xBAA3A0>();
+    static inline auto& OddJob2On = StaticRef<uint16, 0xBAB1E0>();
 
-    static inline auto& PagerXOffset = StaticRef<float>(0x8D0938); // 150.0f
-    static inline auto& HelpTripSkipShown = StaticRef<bool>(0xBAB229);
+    static inline auto& PagerXOffset = StaticRef<float, 0x8D0938>(); // 150.0f
+    static inline auto& HelpTripSkipShown = StaticRef<bool, 0xBAB229>();
 
 public:
     static void InjectHooks();

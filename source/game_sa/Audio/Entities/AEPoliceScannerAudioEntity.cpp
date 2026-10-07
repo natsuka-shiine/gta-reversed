@@ -37,14 +37,14 @@ void CAEPoliceScannerAudioEntity::AddAudioEvent(eAudioEvents event, eCrimeType c
     constexpr auto NUM_CRIME_AREAS = 194u;
 
     // Lookup tables (const data in the original binary)
-    static auto& s_CrimeInstructions           = StaticRef<int16[4]>(0x8C8160);
-    static auto& s_CrimeNumberLookup           = StaticRef<int16[MAX_CRIMES]>(0x8C8168);
-    static auto& s_CrimeAreaNames              = StaticRef<char[NUM_CRIME_AREAS][8]>(0x8C8198);
-    static auto& s_CrimeAreaSoundLookup        = StaticRef<int16[NUM_CRIME_AREAS]>(0x8C87A8);
-    static auto& s_CrimeAreaWithDirections     = StaticRef<bool[NUM_CRIME_AREAS]>(0x8C8930);
-    static auto& s_PlayerVehicleTypeLookup     = StaticRef<int16[AE_VAT_END]>(0x8C89F8);
-    static auto& s_PlayerVehicleTypeUsesColour = StaticRef<bool[AE_VAT_END]>(0x8C8A54);
-    static auto& s_PlayerVehicleColourLookup   = StaticRef<int16[127]>(0x8C8A88);
+    static auto& s_CrimeInstructions           = StaticRef<int16[4], 0x8C8160>();
+    static auto& s_CrimeNumberLookup           = StaticRef<int16[MAX_CRIMES], 0x8C8168>();
+    static auto& s_CrimeAreaNames              = StaticRef<char[NUM_CRIME_AREAS][8], 0x8C8198>();
+    static auto& s_CrimeAreaSoundLookup        = StaticRef<int16[NUM_CRIME_AREAS], 0x8C87A8>();
+    static auto& s_CrimeAreaWithDirections     = StaticRef<bool[NUM_CRIME_AREAS], 0x8C8930>();
+    static auto& s_PlayerVehicleTypeLookup     = StaticRef<int16[AE_VAT_END], 0x8C89F8>();
+    static auto& s_PlayerVehicleTypeUsesColour = StaticRef<bool[AE_VAT_END], 0x8C8A54>();
+    static auto& s_PlayerVehicleColourLookup   = StaticRef<int16[127], 0x8C8A88>();
 
     enum eDirection : eSoundID {
         DIR_CENTRAL = 0,

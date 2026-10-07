@@ -9,12 +9,12 @@
 #include "WeaponEffects.h"
 
 // Statics of this file (addresses are from the original executable)
-static inline auto& s_afCrossHairScale  = StaticRef<std::array<float, MAX_NUM_WEAPON_CROSSHAIRS>>(0xC8A8A0);      // Per crosshair animated size offset
-static inline auto& s_abPulseOutwards   = StaticRef<std::array<bool, MAX_NUM_WEAPON_CROSSHAIRS>>(0x8D6144);       // { true, true } - Whether the target's radius grows or shrinks
-static inline auto& s_fFlightOffsetX    = StaticRef<float>(0xC8A89C);                                            // Flight (lock-on) crosshair offset from it's position
-static inline auto& s_fFlightOffsetY    = StaticRef<float>(0xC8A898);
-static inline auto& s_nTargetChangeTime = StaticRef<int32>(0xC8A890);                                            // Time (in ms) the lock-on target was last changed
-static inline auto& s_pLastTarget       = StaticRef<CEntity*>(0xC8A894);                                         // The last lock-on target
+static inline auto& s_afCrossHairScale  = StaticRef<std::array<float, MAX_NUM_WEAPON_CROSSHAIRS>, 0xC8A8A0>();      // Per crosshair animated size offset
+static inline auto& s_abPulseOutwards   = StaticRef<std::array<bool, MAX_NUM_WEAPON_CROSSHAIRS>, 0x8D6144>();       // { true, true } - Whether the target's radius grows or shrinks
+static inline auto& s_fFlightOffsetX    = StaticRef<float, 0xC8A89C>();                                            // Flight (lock-on) crosshair offset from it's position
+static inline auto& s_fFlightOffsetY    = StaticRef<float, 0xC8A898>();
+static inline auto& s_nTargetChangeTime = StaticRef<int32, 0xC8A890>();                                            // Time (in ms) the lock-on target was last changed
+static inline auto& s_pLastTarget       = StaticRef<CEntity*, 0xC8A894>();                                         // The last lock-on target
 
 void CWeaponEffects::InjectHooks() {
     RH_ScopedClass(CWeaponEffects);
@@ -107,8 +107,8 @@ void CPlayerCrossHair::Render(int32 playerId) {
         float  y[2][NUM_HISTORY];    // 0xB9B920
         float  x[2][NUM_HISTORY];    // 0xB9B948
     };
-    static auto& s_History             = StaticRef<History>(0xB9B8F8);
-    static auto& s_nCrossHairCoronaTex = StaticRef<int32>(0x8CDF1C); // 8
+    static auto& s_History             = StaticRef<History, 0xB9B8F8>();
+    static auto& s_nCrossHairCoronaTex = StaticRef<int32, 0x8CDF1C>(); // 8
 
     if (!m_bActivated) {
         return;
@@ -253,8 +253,8 @@ void CWeaponEffects::ClearCrossHairsImmediately() {
 
 // 0x742CF0
 void CWeaponEffects::Render() {
-    static auto& s_fOffScreenArrowSize    = StaticRef<float>(0x8D6140); // = 15.f
-    static auto& s_fWeaponRadiusToScreen  = StaticRef<float>(0x8D6148); // = 30.f
+    static auto& s_fOffScreenArrowSize    = StaticRef<float, 0x8D6140>(); // = 15.f
+    static auto& s_fWeaponRadiusToScreen  = StaticRef<float, 0x8D6148>(); // = 30.f
 
     constexpr auto TIME_TO_ANGLE = 6.2831855f / 1024.0f; // 0.0061359233f
 

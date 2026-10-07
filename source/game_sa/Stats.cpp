@@ -15,7 +15,7 @@
 
 // 0x69F7E0 - Converts GXT text into ASCII, result is stored in a static buffer (0xC1BDD0)
 static const char* GxtCharToAscii(const GxtChar* text, uint8 start) {
-    static auto& s_Buffer = StaticRef<char[256]>(0xC1BDD0);
+    static auto& s_Buffer = StaticRef<char[256], 0xC1BDD0>();
 
     if (start > 0) {
         text += start;
@@ -558,7 +558,7 @@ int32 CStats::FindMaxNumberOfGroupMembers() {
 // 0x559AF0
 float CStats::GetFatAndMuscleModifier(eStatModAbilities statMod) {
     // Tuning values, table at 0x8CDE58 - 0x8CDEC0 (Indexed by address here, so it's easy to cross-check with the original code)
-    static auto& s_Tuning = StaticRef<std::array<float, 27>>(0x8CDE58);
+    static auto& s_Tuning = StaticRef<std::array<float, 27>, 0x8CDE58>();
     const auto T = [](uint32 addr) { return s_Tuning[(addr - 0x8CDE58) / sizeof(float)]; };
 
     const auto fat          = StatTypesFloat[STAT_FAT];
@@ -1372,8 +1372,8 @@ void CStats::DisplayScriptStatUpdateMessage(eStatUpdateState state, eStats stat,
 
 // 0x55BC50
 void CStats::UpdateRespectStat(uint8 arg0) {
-    static auto& s_LastThresholdValue = StaticRef<float>(0x8CDEC4); // = -99.f
-    static auto& s_LastValue          = StaticRef<float>(0x8CDEC8); // = -99.f
+    static auto& s_LastThresholdValue = StaticRef<float, 0x8CDEC4>(); // = -99.f
+    static auto& s_LastValue          = StaticRef<float, 0x8CDEC8>(); // = -99.f
 
     if (arg0) { // Reset
         s_LastValue          = -99.0f;
@@ -1433,7 +1433,7 @@ void CStats::UpdateRespectStat(uint8 arg0) {
 
 // 0x55BF20
 void CStats::UpdateSexAppealStat() {
-    static auto& s_LastPlayerVehicle = StaticRef<CVehicle*>(0xB79530);
+    static auto& s_LastPlayerVehicle = StaticRef<CVehicle*, 0xB79530>();
 
     const auto appearance = StatTypesFloat[STAT_APPEARANCE] * 0.5f;
 
@@ -1558,7 +1558,7 @@ void CStats::IncrementStat(eStats stat, float value)
 
 // 0x55C470
 void CStats::UpdateFatAndMuscleStats(uint32 value) {
-    static auto& s_LastMessageShown = StaticRef<int32>(0xB79534);
+    static auto& s_LastMessageShown = StaticRef<int32, 0xB79534>();
 
     if (StatReactionValue[STAT_TIMELIMIT_FAT_ADJUST] * 1000.0f >= static_cast<float>(m_FatCounter)) {
         m_FatCounter += static_cast<uint32>(CTimer::GetTimeStepInMS()) * value / 10;

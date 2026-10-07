@@ -8,9 +8,9 @@
 
 class CLocalisation {
 public:
-    static inline auto& nastyGame = StaticRef<bool>(0xB9B7EC);
-    static inline auto& germanGame = StaticRef<bool>(0xB9B7ED);
-    static inline auto& frenchGame = StaticRef<bool>(0xB9B7EE);
+    static inline auto& nastyGame = StaticRef<bool, 0xB9B7EC>();
+    static inline auto& germanGame = StaticRef<bool, 0xB9B7ED>();
+    static inline auto& frenchGame = StaticRef<bool, 0xB9B7EE>();
 
 public:
     static void InjectHooks();

@@ -7,9 +7,9 @@
 const float SECOND_LOD_DISTANCE = 150.0f; // 0x872188
 
 static const constexpr auto uiNumIndices{ 6u };
-auto& KeepWaterOutIndices = StaticRef<RwImVertexIndex[uiNumIndices]>(0xC27988);
+auto& KeepWaterOutIndices = StaticRef<RwImVertexIndex[uiNumIndices], 0xC27988>();
 static const constexpr auto uiNumVertices{ 4u };
-auto& KeepWaterOutVertices = StaticRef<RwIm3DVertex[uiNumVertices]>(0xC278F8);
+auto& KeepWaterOutVertices = StaticRef<RwIm3DVertex[uiNumVertices], 0xC278F8>();
 
 const float BOAT_STEER_SMOOTH_RATE = 0.2f; // 0x87218C
 
@@ -20,8 +20,8 @@ const float BOAT_STEER_DAMP_BASE = 0.985f; // 0x872198
 const float fShapeLength = 0.4f; // 0x8D3944
 const float fShapeTime = 0.05f; // 0x8D3948
 
-auto& fRangeMult = StaticRef<float>(0x8D394C); // 0.6f
-auto& fTimeMult = StaticRef<float>(0xC279CC); // 1.2f / CBoat::WAKE_LIFETIME
+auto& fRangeMult = StaticRef<float, 0x8D394C>(); // 0.6f
+auto& fTimeMult = StaticRef<float, 0xC279CC>(); // 1.2f / CBoat::WAKE_LIFETIME
 
 int16 nWakeSkipCounters[4]; // 0xC279A4
 int16 nWakeSkipCounterVertex[4]; // 0xC279AC

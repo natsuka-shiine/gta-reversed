@@ -88,31 +88,31 @@ public:
     };
 
 private:
-    static inline auto& ms_atomicPluginOffset = StaticRef<RwInt32>(0x8D608C); // -1
-    static inline auto& ms_framePluginOffset = StaticRef<RwInt32>(0x8D6090); // -1
-    static inline auto& ms_clumpPluginOffset = StaticRef<RwInt32>(0x8D6094); // -1
-    static inline auto& ms_defaultRenderer = StaticRef<RpAtomicCallBackRender>(0xC88048); // nullptr, unused
-    static inline auto& ms_pCamera = StaticRef<RwCamera*>(0xC8804C); // nullptr
-    static inline auto& ms_pCameraPosn = StaticRef<RwV3d*>(0xC88050); // nullptr
+    static inline auto& ms_atomicPluginOffset = StaticRef<RwInt32, 0x8D608C>(); // -1
+    static inline auto& ms_framePluginOffset = StaticRef<RwInt32, 0x8D6090>(); // -1
+    static inline auto& ms_clumpPluginOffset = StaticRef<RwInt32, 0x8D6094>(); // -1
+    static inline auto& ms_defaultRenderer = StaticRef<RpAtomicCallBackRender, 0xC88048>(); // nullptr, unused
+    static inline auto& ms_pCamera = StaticRef<RwCamera*, 0xC8804C>(); // nullptr
+    static inline auto& ms_pCameraPosn = StaticRef<RwV3d*, 0xC88050>(); // nullptr
 
-    static inline auto& ms_vehicleLod0RenderMultiPassDist = StaticRef<float>(0xC88044);
-    static inline auto& ms_vehicleLod0Dist = StaticRef<float>(0xC88040);
-    static inline auto& ms_vehicleLod1Dist = StaticRef<float>(0xC8803C);
+    static inline auto& ms_vehicleLod0RenderMultiPassDist = StaticRef<float, 0xC88044>();
+    static inline auto& ms_vehicleLod0Dist = StaticRef<float, 0xC88040>();
+    static inline auto& ms_vehicleLod1Dist = StaticRef<float, 0xC8803C>();
     // static float ms_vehicleFadeDist; // unused
-    static inline auto& ms_bigVehicleLod0Dist = StaticRef<float>(0xC88038);
+    static inline auto& ms_bigVehicleLod0Dist = StaticRef<float, 0xC88038>();
     // static float ms_bigVehicleLod1Dist; // unused
-    static inline auto& ms_pedLodDist = StaticRef<float>(0xC88034);
-    static inline auto& ms_pedFadeDist = StaticRef<float>(0xC88030);
-    static inline auto& ms_cullCompsDist = StaticRef<float>(0xC8802C);
-    static inline auto& ms_cullBigCompsDist = StaticRef<float>(0xC88028);
+    static inline auto& ms_pedLodDist = StaticRef<float, 0xC88034>();
+    static inline auto& ms_pedFadeDist = StaticRef<float, 0xC88030>();
+    static inline auto& ms_cullCompsDist = StaticRef<float, 0xC8802C>();
+    static inline auto& ms_cullBigCompsDist = StaticRef<float, 0xC88028>();
 
-    static inline auto& m_alphaList = StaticRef<CLinkList<AlphaObjectInfo>>(0xC88070);
-    static inline auto& m_alphaEntityList = StaticRef<CLinkList<AlphaObjectInfo>>(0xC88120);
-    static inline auto& m_alphaUnderwaterEntityList = StaticRef<CLinkList<AlphaObjectInfo>>(0xC88178);
-    static inline auto& m_alphaBoatAtomicList = StaticRef<CLinkList<AlphaObjectInfo>>(0xC880C8);
-    static inline auto& m_alphaReallyDrawLastList = StaticRef<CLinkList<AlphaObjectInfo>>(0xC881D0);
+    static inline auto& m_alphaList = StaticRef<CLinkList<AlphaObjectInfo>, 0xC88070>();
+    static inline auto& m_alphaEntityList = StaticRef<CLinkList<AlphaObjectInfo>, 0xC88120>();
+    static inline auto& m_alphaUnderwaterEntityList = StaticRef<CLinkList<AlphaObjectInfo>, 0xC88178>();
+    static inline auto& m_alphaBoatAtomicList = StaticRef<CLinkList<AlphaObjectInfo>, 0xC880C8>();
+    static inline auto& m_alphaReallyDrawLastList = StaticRef<CLinkList<AlphaObjectInfo>, 0xC881D0>();
 
-    static inline auto& ms_weaponPedsForPC = StaticRef<CLinkList<CPed*>>(0xC88224);
+    static inline auto& ms_weaponPedsForPC = StaticRef<CLinkList<CPed*>, 0xC88224>();
 
 public:
     static bool PluginAttach();

@@ -14,8 +14,8 @@
 #include "CarFXRenderer.h"
 
 #include "toolsmenu/UIRenderer.h"
-auto& gnRendererModelRequestFlags = StaticRef<uint32>(0xB745C4);
-auto& gpOutEntitiesForGetObjectsInFrustum = StaticRef<CEntity**>(0xB76854);
+auto& gnRendererModelRequestFlags = StaticRef<uint32, 0xB745C4>();
+auto& gpOutEntitiesForGetObjectsInFrustum = StaticRef<CEntity**, 0xB76854>();
 
 void CRenderer::InjectHooks()
 {
@@ -62,9 +62,9 @@ void CRenderer::InjectHooks()
 }
 
 // Extra blocks (sectors) to scan, see `CWorldScan::SetExtraRectangleToScan`
-static inline auto& s_ExtraBlocksY   = StaticRef<int32[4]>(0xC81598);
-static inline auto& s_ExtraBlocksX   = StaticRef<int32[4]>(0xC815A8);
-static inline auto& s_NumExtraBlocks = StaticRef<int32>(0xC815B8);
+static inline auto& s_ExtraBlocksY   = StaticRef<int32[4], 0xC81598>();
+static inline auto& s_ExtraBlocksX   = StaticRef<int32[4], 0xC815A8>();
+static inline auto& s_NumExtraBlocks = StaticRef<int32, 0xC815B8>();
 
 // 0x72CAE0
 void CWorldScan::ScanWorld(CVector2D *points, int32 pointsCount, tScanFunction scanFunction)
@@ -1265,8 +1265,8 @@ void CRenderer::ScanWorld() {
 
     CWorld::AdvanceCurrentScanCode();
 
-    static auto& lastCameraPosition = StaticRef<CVector>(0xB76888);
-    static auto& lastCameraForward = StaticRef<CVector>(0xB7687C);
+    static auto& lastCameraPosition = StaticRef<CVector, 0xB76888>();
+    static auto& lastCameraForward = StaticRef<CVector, 0xB7687C>();
 
     CVector distance = TheCamera.GetPosition() - lastCameraPosition;
     static bool bUnusedBool = false;

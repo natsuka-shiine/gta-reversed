@@ -4,8 +4,8 @@
 
 #include "AEAudioUtility.h"
 
-auto& Frequency = StaticRef<LARGE_INTEGER>(0xB610F0);
-auto& startTimeMs = StaticRef<uint64>(0xb610f8);
+auto& Frequency = StaticRef<LARGE_INTEGER, 0xB610F0>();
+auto& startTimeMs = StaticRef<uint64, 0xb610f8>();
 
 // NOTE: For me all values were 0... The below values should be the correct ones:
 static constexpr std::array<eSoundBank, AE_SCRIPT_BANK_LAST - AE_SCRIPT_BANK_FIRST> gScriptBanksLookup = {

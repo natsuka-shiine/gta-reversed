@@ -10,22 +10,22 @@
 #include <reversiblebugfixes/Bugs.hpp>
 
 // TODO: Move into the class itself
-auto& s_pathsNeededPosn = StaticRef<CVector>(0x977B70);
-auto& s_bLoadPathsNeeded = StaticRef<bool>(0x96F030);
+auto& s_pathsNeededPosn = StaticRef<CVector, 0x977B70>();
+auto& s_bLoadPathsNeeded = StaticRef<bool, 0x96F030>();
 
 // TODO: Remove this and use a stack array or smth..
-auto& ToBeStreamed = StaticRef<std::array<bool, NUM_PATH_MAP_AREAS>>(0x96EFD0);
+auto& ToBeStreamed = StaticRef<std::array<bool, NUM_PATH_MAP_AREAS>, 0x96EFD0>();
 
-auto& XCoorGiven = StaticRef<std::array<float, 64>>(0x96EE80);
-auto& YCoorGiven = StaticRef<std::array<float, 64>>(0x96ED80);
-auto& ZCoorGiven = StaticRef<std::array<float, 64>>(0x96EC80);
-auto& ConnectsToGiven = StaticRef<std::array<std::array<int8, 6>, 64>>(0x96EAC0);
-auto& DontWanderGiven = StaticRef<std::array<bool, 64>>(0x96EC40);
+auto& XCoorGiven = StaticRef<std::array<float, 64>, 0x96EE80>();
+auto& YCoorGiven = StaticRef<std::array<float, 64>, 0x96ED80>();
+auto& ZCoorGiven = StaticRef<std::array<float, 64>, 0x96EC80>();
+auto& ConnectsToGiven = StaticRef<std::array<std::array<int8, 6>, 64>, 0x96EAC0>();
+auto& DontWanderGiven = StaticRef<std::array<bool, 64>, 0x96EC40>();
 
-auto& aInteriorNodeLinkedToExterior = StaticRef<std::array<int32, NUM_PATH_INTERIOR_AREAS>>(0x96EA98);
-auto& aExteriorNodeLinkedTo = StaticRef<std::array<CNodeAddress, NUM_PATH_INTERIOR_AREAS>>(0x977B7C);
+auto& aInteriorNodeLinkedToExterior = StaticRef<std::array<int32, NUM_PATH_INTERIOR_AREAS>, 0x96EA98>();
+auto& aExteriorNodeLinkedTo = StaticRef<std::array<CNodeAddress, NUM_PATH_INTERIOR_AREAS>, 0x977B7C>();
 
-auto& aNodesToBeCleared = StaticRef<std::array<CNodeAddress, 5000>>(0x972CD0);
+auto& aNodesToBeCleared = StaticRef<std::array<CNodeAddress, 5000>, 0x972CD0>();
 
 void CPathFind::InjectHooks() {
     RH_ScopedClass(CPathFind);
@@ -796,7 +796,7 @@ void CPathFind::DoPathSearch(
 void CPathFind::ComputeRoute(uint8 nodeType, const CVector& vecStart, const CVector& vecEnd, const CNodeAddress& startAddress, CNodeRoute* route) {
     CNodeAddress outNodes[8]{};
     int16 outCount = 0;
-    static auto& forbiddenAddr = StaticRef<CNodeAddress>(0x8A5F44); // Invalid node (area 0xFFFF) = no forbidden node
+    static auto& forbiddenAddr = StaticRef<CNodeAddress, 0x8A5F44>(); // Invalid node (area 0xFFFF) = no forbidden node
     DoPathSearch(
         static_cast<ePathType>(nodeType),
         vecStart,

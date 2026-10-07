@@ -1,6 +1,6 @@
 #include "StdInc.h"
 
-auto& gpPlayerClump = StaticRef<RpClump*>(0xC3F040);
+auto& gpPlayerClump = StaticRef<RpClump*, 0xC3F040>();
 
 void CPlayerSkin::InjectHooks() {
     RH_ScopedClass(CPlayerSkin);

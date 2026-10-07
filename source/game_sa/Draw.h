@@ -6,21 +6,21 @@
 */
 #pragma once
 
-static inline auto& JustLoadedDontFadeInYet = StaticRef<bool>(0xC16EDC);
-static inline auto& StillToFadeOut = StaticRef<bool>(0xC16EDD);
+static inline auto& JustLoadedDontFadeInYet = StaticRef<bool, 0xC16EDC>();
+static inline auto& StillToFadeOut = StaticRef<bool, 0xC16EDD>();
 
 class CDraw {
 public:
-    static inline auto& ms_fFOV = StaticRef<float>(0x8D5038); // 45.0
-    static inline auto& ms_fLODDistance = StaticRef<float>(0xC3EF98);
-    static inline auto& ms_fNearClipZ = StaticRef<float>(0xC3EFA0);
-    static inline auto& ms_fFarClipZ = StaticRef<float>(0xC3EF9C);
-    static inline auto& ms_fAspectRatio = StaticRef<float>(0xC3EFA4);
+    static inline auto& ms_fFOV = StaticRef<float, 0x8D5038>(); // 45.0
+    static inline auto& ms_fLODDistance = StaticRef<float, 0xC3EF98>();
+    static inline auto& ms_fNearClipZ = StaticRef<float, 0xC3EFA0>();
+    static inline auto& ms_fFarClipZ = StaticRef<float, 0xC3EF9C>();
+    static inline auto& ms_fAspectRatio = StaticRef<float, 0xC3EFA4>();
 
-    static inline auto& FadeRed = StaticRef<uint8>(0xC3EFA8);
-    static inline auto& FadeGreen = StaticRef<uint8>(0xC3EFA9);
-    static inline auto& FadeBlue = StaticRef<uint8>(0xC3EFAA);
-    static inline auto& FadeValue = StaticRef<uint8>(0xC3EFAB);
+    static inline auto& FadeRed = StaticRef<uint8, 0xC3EFA8>();
+    static inline auto& FadeGreen = StaticRef<uint8, 0xC3EFA9>();
+    static inline auto& FadeBlue = StaticRef<uint8, 0xC3EFAA>();
+    static inline auto& FadeValue = StaticRef<uint8, 0xC3EFAB>();
 
 public:
     static void InjectHooks();

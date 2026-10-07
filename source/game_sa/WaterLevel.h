@@ -102,47 +102,47 @@ class CWaterLevel {
     m_nNumOfWaterQuads
     m_nNumOfWaterTriangles
     */
-    static inline auto& m_nWaterConfiguration = StaticRef<uint32>(0xC228A0);
-    static inline auto& m_nWaterTimeOffset = StaticRef<uint32>(0xC228A4);
-    static inline auto& m_bWaterFog = StaticRef<bool>(0x8D37D4);
-    static inline auto& m_bWaterFogScript = StaticRef<bool>(0x8D37D5);
-    static inline auto& m_WaterFogDensity = StaticRef<int32>(0x8D37E0);
+    static inline auto& m_nWaterConfiguration = StaticRef<uint32, 0xC228A0>();
+    static inline auto& m_nWaterTimeOffset = StaticRef<uint32, 0xC228A4>();
+    static inline auto& m_bWaterFog = StaticRef<bool, 0x8D37D4>();
+    static inline auto& m_bWaterFogScript = StaticRef<bool, 0x8D37D5>();
+    static inline auto& m_WaterFogDensity = StaticRef<int32, 0x8D37E0>();
 
-    static inline auto& faWaveMultipliersX = StaticRef<std::array<float, 8>>(0x8D38C8);
-    static inline auto& faWaveMultipliersY = StaticRef<std::array<float, 8>>(0x8D38E8);
-    static inline auto& ms_WakePointAlphaMults = StaticRef<std::array<float, 4>>(0x8D390C);
+    static inline auto& faWaveMultipliersX = StaticRef<std::array<float, 8>, 0x8D38C8>();
+    static inline auto& faWaveMultipliersY = StaticRef<std::array<float, 8>, 0x8D38E8>();
+    static inline auto& ms_WakePointAlphaMults = StaticRef<std::array<float, 4>, 0x8D390C>();
 
-    static inline auto& waterclear256Raster = StaticRef<RwRaster*>(0xC228A8);
-    static inline auto& texWaterclear256 = StaticRef<RwTexture*>(0xC228AC);
+    static inline auto& waterclear256Raster = StaticRef<RwRaster*, 0xC228A8>();
+    static inline auto& texWaterclear256 = StaticRef<RwTexture*, 0xC228AC>();
 
-    static inline auto& seabd32Raster = StaticRef<RwRaster*>(0xC228B0);
-    static inline auto& texSeabd32 = StaticRef<RwTexture*>(0xC228B4);
+    static inline auto& seabd32Raster = StaticRef<RwRaster*, 0xC228B0>();
+    static inline auto& texSeabd32 = StaticRef<RwTexture*, 0xC228B4>();
 
-    static inline auto& waterwakeRaster = StaticRef<RwRaster*>(0xC228B8);
-    static inline auto& texWaterwake = StaticRef<RwTexture*>(0xC228BC);
+    static inline auto& waterwakeRaster = StaticRef<RwRaster*, 0xC228B8>();
+    static inline auto& texWaterwake = StaticRef<RwTexture*, 0xC228BC>();
 
-    static inline auto& NumWaterTriangles = StaticRef<uint32>(0xC22884);
-    static inline auto& NumWaterQuads = StaticRef<uint32>(0xC22888);
-    static inline auto& NumWaterVertices = StaticRef<uint32>(0xC2288C);
-    static inline auto& m_ElementsOnQuadsAndTrianglesList = StaticRef<uint32>(0xC215F0);
+    static inline auto& NumWaterTriangles = StaticRef<uint32, 0xC22884>();
+    static inline auto& NumWaterQuads = StaticRef<uint32, 0xC22888>();
+    static inline auto& NumWaterVertices = StaticRef<uint32, 0xC2288C>();
+    static inline auto& m_ElementsOnQuadsAndTrianglesList = StaticRef<uint32, 0xC215F0>();
 
-    static inline auto& m_aVertices = StaticRef<std::array<CWaterVertex, 1021>>(0xC22910);
+    static inline auto& m_aVertices = StaticRef<std::array<CWaterVertex, 1021>, 0xC22910>();
 
-    static inline auto& CameraRangeMaxY = StaticRef<int32>(0xC1F950);
-    static inline auto& CameraRangeMinY = StaticRef<int32>(0xC1F954);
+    static inline auto& CameraRangeMaxY = StaticRef<int32, 0xC1F950>();
+    static inline auto& CameraRangeMinY = StaticRef<int32, 0xC1F954>();
 
-    static inline auto& CameraRangeMaxX = StaticRef<int32>(0xC1F958);
-    static inline auto& CameraRangeMinX = StaticRef<int32>(0xC1F95C);
+    static inline auto& CameraRangeMaxX = StaticRef<int32, 0xC1F958>();
+    static inline auto& CameraRangeMinX = StaticRef<int32, 0xC1F95C>();
 
-    static inline auto& DETAILEDWATERDIST = StaticRef<int32>(0x8D37D0); // Default: 48
-    static inline auto& bSplitBigPolys = StaticRef<bool>(0x8D37F4);     // Default: true
+    static inline auto& DETAILEDWATERDIST = StaticRef<int32, 0x8D37D0>(); // Default: 48
+    static inline auto& bSplitBigPolys = StaticRef<bool, 0x8D37F4>();     // Default: true
     static inline auto  BigPolySize = 168; // NOTSA variable, but value is OG.
 
-    static inline auto& TextureShiftFirstV = StaticRef<float>(0xC21178);
-    static inline auto& TextureShiftFirstU = StaticRef<float>(0xC2117C);
+    static inline auto& TextureShiftFirstV = StaticRef<float, 0xC21178>();
+    static inline auto& TextureShiftFirstU = StaticRef<float, 0xC2117C>();
 
-    static inline auto& TextureShiftSecondV = StaticRef<float>(0xC21180);
-    static inline auto& TextureShiftSecondU = StaticRef<float>(0xC21184);
+    static inline auto& TextureShiftSecondV = StaticRef<float, 0xC21180>();
+    static inline auto& TextureShiftSecondU = StaticRef<float, 0xC21184>();
 
     struct WaterFog {
         std::array<int16, 70> minX;
@@ -151,55 +151,55 @@ class CWaterLevel {
         std::array<int16, 70> maxY;
         std::array<float, 70> z;
     };
-    static inline auto& ms_WaterFog = StaticRef<WaterFog>(0xC21188);
-    static inline auto& gWaterFogIndex = StaticRef<uint32>(0xC228E4);
-    static inline auto& m_fWaterFogHeight = StaticRef<float>(0x8D37E4);
-    static inline auto& gbPlayerIsInsideWaterFog = StaticRef<bool>(0xC228E8);
-    static inline auto& m_WaterFogCol = StaticRef<CRGBA>(0x8D37E8);
-    static inline auto& m_WaterFogInsideCol = StaticRef<CRGBA>(0x8D37EC);
-    static inline auto& m_fWaterFogInsideFadeSpeed = StaticRef<float>(0x8D37F0);
-    static inline auto& m_fWaterFogInsideFade = StaticRef<float>(0xC228EC); // 0..1
-    static inline auto& m_fWaterFogTimer = StaticRef<float>(0xC228F0);
+    static inline auto& ms_WaterFog = StaticRef<WaterFog, 0xC21188>();
+    static inline auto& gWaterFogIndex = StaticRef<uint32, 0xC228E4>();
+    static inline auto& m_fWaterFogHeight = StaticRef<float, 0x8D37E4>();
+    static inline auto& gbPlayerIsInsideWaterFog = StaticRef<bool, 0xC228E8>();
+    static inline auto& m_WaterFogCol = StaticRef<CRGBA, 0x8D37E8>();
+    static inline auto& m_WaterFogInsideCol = StaticRef<CRGBA, 0x8D37EC>();
+    static inline auto& m_fWaterFogInsideFadeSpeed = StaticRef<float, 0x8D37F0>();
+    static inline auto& m_fWaterFogInsideFade = StaticRef<float, 0xC228EC>(); // 0..1
+    static inline auto& m_fWaterFogTimer = StaticRef<float, 0xC228F0>();
 
 
     // In reality the alpha component isn't used and instead `WaterLayerAlpha` is used
-    static inline auto& WaterColorTriangle = StaticRef<CRGBA>(0xC21168);
-    static inline auto& WaterColor = StaticRef<CRGBA>(0xC2116C);
+    static inline auto& WaterColorTriangle = StaticRef<CRGBA, 0xC21168>();
+    static inline auto& WaterColor = StaticRef<CRGBA, 0xC2116C>();
 
-    static inline auto& WaterLayerAlpha = StaticRef<std::array<uint32, 2>>(0x8D3808);
+    static inline auto& WaterLayerAlpha = StaticRef<std::array<uint32, 2>, 0x8D3808>();
 
     //! NOTSA (Originally unnamed) - Water texture scroll accumulators (Kept in range 0..1)
-    static inline auto& m_fWaterScrollSecondU = StaticRef<float>(0x8D3824);
-    static inline auto& m_fWaterScrollSecondV = StaticRef<float>(0x8D3828);
-    static inline auto& m_fWaterScrollFirstU  = StaticRef<float>(0x8D382C);
-    static inline auto& m_fWaterScrollFirstV  = StaticRef<float>(0x8D3830);
+    static inline auto& m_fWaterScrollSecondU = StaticRef<float, 0x8D3824>();
+    static inline auto& m_fWaterScrollSecondV = StaticRef<float, 0x8D3828>();
+    static inline auto& m_fWaterScrollFirstU  = StaticRef<float, 0x8D382C>();
+    static inline auto& m_fWaterScrollFirstV  = StaticRef<float, 0x8D3830>();
     //! NOTSA (Originally unnamed) - Amplitude of the high detail texture shift
-    static inline auto& m_fHighDetailTextureShiftAmp = StaticRef<float>(0x8D3834); // 0.1f
+    static inline auto& m_fHighDetailTextureShiftAmp = StaticRef<float, 0x8D3834>(); // 0.1f
     //! NOTSA (Originally unnamed) - Jitter scale of the water texture shift
-    static inline auto& m_fWaterTextureShiftJitter = StaticRef<float>(0x8D3928); // 0.01f
+    static inline auto& m_fWaterTextureShiftJitter = StaticRef<float, 0x8D3928>(); // 0.01f
     //! NOTSA (Originally unnamed) - Scale converting the water flow speed to a texture shift
-    static inline auto& m_fWaterFlowShiftScale = StaticRef<float>(0x8D392C); // 0.04f
+    static inline auto& m_fWaterFlowShiftScale = StaticRef<float, 0x8D392C>(); // 0.04f
     //! NOTSA (Originally unnamed) - Texture address mode used while rendering water (1 => rwTEXTUREADDRESSWRAP)
-    static inline auto& m_WaterTextureAddressMode = StaticRef<uint32>(0x8D3930);
+    static inline auto& m_WaterTextureAddressMode = StaticRef<uint32, 0x8D3930>();
     //! NOTSA (Originally unnamed) - Distance from the camera's block at which the sea bed is no longer rendered in detail
-    static inline auto& m_fSeaBedDetailedDist = StaticRef<float>(0x8D3934); // 600.0f
+    static inline auto& m_fSeaBedDetailedDist = StaticRef<float, 0x8D3934>(); // 600.0f
 
     //! NOTSA (Originally unnamed) - Only used by the high detail water renderers
-    static inline auto& m_fHighDetailTextureShiftV = StaticRef<float>(0xC21170);
-    static inline auto& m_fHighDetailTextureShiftU = StaticRef<float>(0xC21174);
+    static inline auto& m_fHighDetailTextureShiftV = StaticRef<float, 0xC21170>();
+    static inline auto& m_fHighDetailTextureShiftU = StaticRef<float, 0xC21174>();
 
     //! NOTSA (Originally unnamed) - If set, the water color is randomized (Debug)
-    static inline auto& m_bRandomizeWaterColor = StaticRef<bool>(0xC228DC);
+    static inline auto& m_bRandomizeWaterColor = StaticRef<bool, 0xC228DC>();
 
-    static inline auto& m_CurrentFlow = StaticRef<CVector2D>(0xC22890);
-    static inline auto& m_CurrentDesiredFlow = StaticRef<CVector2D>(0xC22898);
+    static inline auto& m_CurrentFlow = StaticRef<CVector2D, 0xC22890>();
+    static inline auto& m_CurrentDesiredFlow = StaticRef<CVector2D, 0xC22898>();
 
     static constexpr int32 WATER_BLOCK_SIZE                       = 500;
     static constexpr int32 NUM_WATER_BLOCKS_ROWCOL                = 6000 / WATER_BLOCK_SIZE; // 6000 => map size
     static inline    int32  m_MaxNumBlocksOutsideWorldToBeRendered = 70; // NOTSA: We just want a variable for the debug tool. Value may never be higher than the below array's size.
-    static inline    auto& m_NumBlocksOutsideWorldToBeRendered = StaticRef<uint32>(0xC215EC);
-    static inline    auto& m_BlocksToBeRenderedOutsideWorldX = StaticRef<std::array<int16, 70>>(0xC21560);
-    static inline    auto& m_BlocksToBeRenderedOutsideWorldY = StaticRef<std::array<int16, 70>>(0xC214D0);
+    static inline    auto& m_NumBlocksOutsideWorldToBeRendered = StaticRef<uint32, 0xC215EC>();
+    static inline    auto& m_BlocksToBeRenderedOutsideWorldX = StaticRef<std::array<int16, 70>, 0xC21560>();
+    static inline    auto& m_BlocksToBeRenderedOutsideWorldY = StaticRef<std::array<int16, 70>, 0xC214D0>();
 
     // NOTSA: Color of wake segment parts (So we can make rainbows)
     static inline struct {
@@ -230,17 +230,17 @@ class CWaterLevel {
 
     //! A block might have a simple shape (tri/quad) or a combo (That is just a combination of quads and triangles)
     //! AKA `m_QuadsAndTrianglesInEachBlock`
-    static inline auto& m_BlockPolyInfo = StaticRef<notsa::mdarray<PolyInfo, NUM_WATER_BLOCKS_ROWCOL, NUM_WATER_BLOCKS_ROWCOL>>(0xC21B70);
+    static inline auto& m_BlockPolyInfo = StaticRef<notsa::mdarray<PolyInfo, NUM_WATER_BLOCKS_ROWCOL, NUM_WATER_BLOCKS_ROWCOL>, 0xC21B70>();
 
     //! Triangles used for blocks (Or poly combos)
-    static inline auto& WaterTriangles = StaticRef<std::array<CWaterTriangle, 6>>(0xC22854);
+    static inline auto& WaterTriangles = StaticRef<std::array<CWaterTriangle, 6>, 0xC22854>();
 
     //! Quads used for blocks (Or poly combos)
-    static inline auto& WaterQuads = StaticRef<std::array<CWaterQuad, 301>>(0xC21C90);
+    static inline auto& WaterQuads = StaticRef<std::array<CWaterQuad, 301>, 0xC21C90>();
 
     //! Contains sequences of poly's, each seq. is used for a block. The end of a sequence is indicated by a `PolyInfo` with it's type set to `NONE`.
     //! AKA `m_QuadsAndTrianglesList`
-    static inline auto& m_PolyCombos = StaticRef<std::array<PolyInfo, 700>>(0xC215F8);
+    static inline auto& m_PolyCombos = StaticRef<std::array<PolyInfo, 700>, 0xC215F8>();
 
     // NOTSA Section - Used for debugging //
     

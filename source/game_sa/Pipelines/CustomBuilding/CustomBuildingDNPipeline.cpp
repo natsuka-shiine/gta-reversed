@@ -4,8 +4,8 @@
 #include "CustomCarEnvMapPipeline.h"
 #include <PipelinesCommon.hpp>
 
-auto& s_Magic1 = StaticRef<uint32>(0xC02C14);
-auto& s_Magic2 = StaticRef<uint32>(0xC02C18);
+auto& s_Magic1 = StaticRef<uint32, 0xC02C14>();
+auto& s_Magic2 = StaticRef<uint32, 0xC02C18>();
 
 // 0x5D72E0
 bool CCustomBuildingDNPipeline::ExtraVertColourPluginAttach() {
@@ -261,7 +261,7 @@ RpMaterial* CCustomBuildingDNPipeline::CustomPipeMaterialSetup(RpMaterial* mater
 // 0x5D6480
 void CCustomBuildingDNPipeline::CustomPipeRenderCB(RwResEntry* entry, void* object, uint8 type, uint32 flags) {
     // Texture transform matrix for the env map - only written to, never actually set as a transform (on Windows)
-    static auto& s_EnvMapTexMatrix = StaticRef<D3DMATRIX>(0xC02C28);
+    static auto& s_EnvMapTexMatrix = StaticRef<D3DMATRIX, 0xC02C28>();
 
     _rwD3D9EnableClippingIfNeeded(object, type);
 

@@ -77,10 +77,10 @@ public:
     static void FinishAnimGangDriveByCB(CAnimBlendAssociation* anim, void* data);
 
 public:
-    static inline auto& ANIM_LOOP_START   = StaticRef<float>(0x8D2E7C);  // 0.2667
-    static inline auto& ANIM_LOOP_END     = StaticRef<float>(0x8D2E80);  // 0.4333
-    static inline auto& ANIM_LOOP_FIRE    = StaticRef<float>(0x8D2E84);  // 0.3
-    static inline auto& GUN_FLASH_TIME_MS = StaticRef<uint16>(0x8D2E90); // 250
+    static inline auto& ANIM_LOOP_START   = StaticRef<float, 0x8D2E7C>();  // 0.2667
+    static inline auto& ANIM_LOOP_END     = StaticRef<float, 0x8D2E80>();  // 0.4333
+    static inline auto& ANIM_LOOP_FIRE    = StaticRef<float, 0x8D2E84>();  // 0.3
+    static inline auto& GUN_FLASH_TIME_MS = StaticRef<uint16, 0x8D2E90>(); // 250
 };
 VALIDATE_SIZE(CTaskSimpleGangDriveBy, 0x44);
 

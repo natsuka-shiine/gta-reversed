@@ -29,31 +29,31 @@
 #include "Skidmarks.h"
 #include "PedClothesDesc.h"
 
-auto& planeRotorDmgTimeMS = StaticRef<uint32>(0xC1CC1C);
+auto& planeRotorDmgTimeMS = StaticRef<uint32, 0xC1CC1C>();
 
-auto& fBurstTyreMod = StaticRef<float>(0x8D34B4);                // 0.13f
-auto& fBurstSpeedMax = StaticRef<float>(0x8D34B8);               // 0.3f
-auto& CAR_NOS_EXTRA_SKID_LOSS = StaticRef<float>(0x8D34BC);      // 0.9f
-auto& WS_TRAC_FRAC_LIMIT = StaticRef<float>(0x8D34C0);           // 0.3f
-auto& WS_ALREADY_SPINNING_LOSS = StaticRef<float>(0x8D34C4);     // 0.2f
-auto& fBurstBikeTyreMod = StaticRef<float>(0x8D34C8);            // 0.05f
-auto& fBurstBikeSpeedMax = StaticRef<float>(0x8D34CC);           // 0.12f
-auto& fTweakBikeWheelTurnForce = StaticRef<float>(0x8D34D0);     // 2.0f
-auto& AUTOGYRO_ROTORSPIN_MULT = StaticRef<float>(0x8D34D4);      // 0.006f
-auto& AUTOGYRO_ROTORSPIN_MULTLIMIT = StaticRef<float>(0x8D34D8); // 0.25f
-auto& AUTOGYRO_ROTORSPIN_DAMP = StaticRef<float>(0x8D34DC);      // 0.997f
-auto& AUTOGYRO_ROTORLIFT_MULT = StaticRef<float>(0x8D34E0);      // 4.5f
-auto& AUTOGYRO_ROTORLIFT_FALLOFF = StaticRef<float>(0x8D34E4);   // 0.75f
-auto& AUTOGYRO_ROTORTILT_ANGLE = StaticRef<float>(0x8D34E8);     // 0.25f
-auto& ROTOR_SEMI_THICKNESS = StaticRef<float>(0x8D34EC);         // 0.05f
+auto& fBurstTyreMod = StaticRef<float, 0x8D34B4>();                // 0.13f
+auto& fBurstSpeedMax = StaticRef<float, 0x8D34B8>();               // 0.3f
+auto& CAR_NOS_EXTRA_SKID_LOSS = StaticRef<float, 0x8D34BC>();      // 0.9f
+auto& WS_TRAC_FRAC_LIMIT = StaticRef<float, 0x8D34C0>();           // 0.3f
+auto& WS_ALREADY_SPINNING_LOSS = StaticRef<float, 0x8D34C4>();     // 0.2f
+auto& fBurstBikeTyreMod = StaticRef<float, 0x8D34C8>();            // 0.05f
+auto& fBurstBikeSpeedMax = StaticRef<float, 0x8D34CC>();           // 0.12f
+auto& fTweakBikeWheelTurnForce = StaticRef<float, 0x8D34D0>();     // 2.0f
+auto& AUTOGYRO_ROTORSPIN_MULT = StaticRef<float, 0x8D34D4>();      // 0.006f
+auto& AUTOGYRO_ROTORSPIN_MULTLIMIT = StaticRef<float, 0x8D34D8>(); // 0.25f
+auto& AUTOGYRO_ROTORSPIN_DAMP = StaticRef<float, 0x8D34DC>();      // 0.997f
+auto& AUTOGYRO_ROTORLIFT_MULT = StaticRef<float, 0x8D34E0>();      // 4.5f
+auto& AUTOGYRO_ROTORLIFT_FALLOFF = StaticRef<float, 0x8D34E4>();   // 0.75f
+auto& AUTOGYRO_ROTORTILT_ANGLE = StaticRef<float, 0x8D34E8>();     // 0.25f
+auto& ROTOR_SEMI_THICKNESS = StaticRef<float, 0x8D34EC>();         // 0.05f
 float* gfSpeedMult = (float*)0x8D34F8;                   // float fSpeedMult[5] = { 0.8f, 0.75f, 0.85f, 0.9f, 0.85f, 0.85f }
-auto& fDamagePosSpeedShift = StaticRef<float>(0x8D3510);         // 0.4f
-auto& DIFF_LIMIT = StaticRef<float>(0x8D35B4);                   // 0.8f
-auto& DIFF_SPRING_MULT_X = StaticRef<float>(0x8D35B8);           // 0.05f
-auto& DIFF_SPRING_MULT_Y = StaticRef<float>(0x8D35BC);           // 0.05f
-auto& DIFF_SPRING_MULT_Z = StaticRef<float>(0x8D35C0);           // 0.1f
-auto& DIFF_SPRING_COMPRESS_MULT = StaticRef<float>(0x8D35C4);    // 2.0f
-auto& VehicleGunOffset = StaticRef<std::array<CVector, 14>>(0x8D35D4); // maybe [12]
+auto& fDamagePosSpeedShift = StaticRef<float, 0x8D3510>();         // 0.4f
+auto& DIFF_LIMIT = StaticRef<float, 0x8D35B4>();                   // 0.8f
+auto& DIFF_SPRING_MULT_X = StaticRef<float, 0x8D35B8>();           // 0.05f
+auto& DIFF_SPRING_MULT_Y = StaticRef<float, 0x8D35BC>();           // 0.05f
+auto& DIFF_SPRING_MULT_Z = StaticRef<float, 0x8D35C0>();           // 0.1f
+auto& DIFF_SPRING_COMPRESS_MULT = StaticRef<float, 0x8D35C4>();    // 2.0f
+auto& VehicleGunOffset = StaticRef<std::array<CVector, 14>, 0x8D35D4>(); // maybe [12]
 
 void CVehicle::InjectHooks() {
     RH_ScopedVirtualClass(CVehicle, 0x871e80, 66);
@@ -2346,7 +2346,7 @@ RwFrame* RemoveObjectsCB(RwFrame* frame, void* data) {
 }
 
 // 0x6D3450
-static auto& CopyObjectsCB_TargetClump = StaticRef<RpClump*>(0xC1CB58);
+static auto& CopyObjectsCB_TargetClump = StaticRef<RpClump*, 0xC1CB58>();
 RwObject* CopyObjectsCB(RwObject* object, void* data) {
     const auto frame = (RwFrame*)data;
 
@@ -3288,9 +3288,9 @@ void CVehicle::ProcessWheel(CVector& wheelFwd, CVector& wheelRight,
                             int8 wheelId, float* wheelSpeed,
                             tWheelState* wheelState, uint16 wheelStatus
 ) {
-    static auto& bBraking = StaticRef<bool>(0xC1CDAE); // false
-    static auto& bDriving = StaticRef<bool>(0xC1CDAD); // false
-    static auto& bAlreadySkidding = StaticRef<bool>(0xC1CDAC); // false
+    static auto& bBraking = StaticRef<bool, 0xC1CDAE>(); // false
+    static auto& bDriving = StaticRef<bool, 0xC1CDAD>(); // false
+    static auto& bAlreadySkidding = StaticRef<bool, 0xC1CDAC>(); // false
 
     float right = 0.0f;
     float fwd = 0.0f;
@@ -3413,10 +3413,10 @@ void CVehicle::ProcessWheel(CVector& wheelFwd, CVector& wheelRight,
 // 0x6D73B0
 void CVehicle::ProcessBikeWheel(CVector& wheelFwd, CVector& wheelRight, CVector& wheelContactSpeed, CVector& wheelContactPoint, int32 wheelsOnGround, float thrust, float brake,
                                 float adhesion, float destabTraction, int8 wheelId, float* wheelSpeed, tWheelState* wheelState, eBikeWheelSpecial special, uint16 wheelStatus) {
-    static auto& bBraking = StaticRef<bool>(0xC1CDB2); // false
-    static auto& bDriving = StaticRef<bool>(0xC1CDB1); // false
-    static auto& bReversing = StaticRef<bool>(0xC1CDB0); // false
-    static auto& bAlreadySkidding = StaticRef<bool>(0xC1CDAF); // false - NB: Never reset in the original code
+    static auto& bBraking = StaticRef<bool, 0xC1CDB2>(); // false
+    static auto& bDriving = StaticRef<bool, 0xC1CDB1>(); // false
+    static auto& bReversing = StaticRef<bool, 0xC1CDB0>(); // false
+    static auto& bAlreadySkidding = StaticRef<bool, 0xC1CDAF>(); // false - NB: Never reset in the original code
 
     float right = 0.0f;
     float fwd = 0.0f;
@@ -6001,9 +6001,9 @@ void CVehicle::FillVehicleWithPeds(bool setClothesToAfro) {
 
 // 0x6E2E50
 bool CVehicle::DoBladeCollision(CVector pos, CMatrix& matrix, int16 rotorType, float radius, float damageMult) {
-    static auto& s_TestBladeCol       = StaticRef<CColModel>(0xC1CD38);
-    static auto& s_TestBladeColData   = StaticRef<CCollisionData>(0xC1CD68);
-    static auto& s_TestBladeColSphere = StaticRef<CColSphere>(0xC1CD98);
+    static auto& s_TestBladeCol       = StaticRef<CColModel, 0xC1CD38>();
+    static auto& s_TestBladeColData   = StaticRef<CCollisionData, 0xC1CD68>();
+    static auto& s_TestBladeColSphere = StaticRef<CColSphere, 0xC1CD98>();
 
     // Set-up collision model for the blade
     {

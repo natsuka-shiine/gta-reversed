@@ -16,7 +16,7 @@ public:
     CAESound*   m_SoundRight;
     FxSystem_c* m_FxSystem;
 
-    static inline auto& m_snLastFireFrequencyIndex = StaticRef<uint8>(0xB612EC);
+    static inline auto& m_snLastFireFrequencyIndex = StaticRef<uint8, 0xB612EC>();
 
 public:
     static void InjectHooks();

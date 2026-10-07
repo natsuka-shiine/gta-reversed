@@ -25,5 +25,5 @@ VALIDATE_SIZE(CBuilding, 0x38);
 bool IsBuildingPointerValid(CBuilding* building);
 
 // in entity.cpp
-static auto& gBuildings = StaticRef<int32>(0xB71804);
+static auto& gBuildings = StaticRef<int32, 0xB71804>();
 

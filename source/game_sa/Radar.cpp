@@ -18,7 +18,7 @@ constexpr std::array<airstrip_info, NUM_AIRSTRIPS> airstrip_table = { // 0x8D06E
 
 // Array of TXD slot indices for each radar section's texture
 // Index using y, x (In that order)
-static auto& gRadarTextures = StaticRef<std::array<std::array<int32, MAX_RADAR_WIDTH_TILES>, MAX_RADAR_HEIGHT_TILES>>(0xBA8478);
+static auto& gRadarTextures = StaticRef<std::array<std::array<int32, MAX_RADAR_WIDTH_TILES>, MAX_RADAR_HEIGHT_TILES>, 0xBA8478>();
 
 // 0x8D0720
 SpriteFileName CRadar::RadarBlipFileNames[] = {
@@ -258,8 +258,8 @@ void CRadar::DrawLegend(int32 x, int32 y, eRadarSprite blipType) {
         return;
     }
 
-    static auto& legendTraceHeight = StaticRef<eRadarTraceHeight>(0xBAA350); // = eRadarTraceHeight::RADAR_TRACE_LOW;
-    static auto& legendTraceTimer  = StaticRef<uint32>(0xBAA354); // = CTimer::GetTimeInMS();
+    static auto& legendTraceHeight = StaticRef<eRadarTraceHeight, 0xBAA350>(); // = eRadarTraceHeight::RADAR_TRACE_LOW;
+    static auto& legendTraceTimer  = StaticRef<uint32, 0xBAA354>(); // = CTimer::GetTimeInMS();
 
     if (CTimer::GetTimeInMSPauseMode() - legendTraceTimer > 600) {
         legendTraceTimer = CTimer::GetTimeInMSPauseMode();
@@ -972,8 +972,8 @@ void CRadar::DrawRotatingRadarSprite(CSprite2d& sprite, float x, float y, float 
 
 // 0x584960
 void CRadar::DrawYouAreHereSprite(float x, float y) {
-    static auto& mapYouAreHereTimer = StaticRef<uint32>(0xBAA358);
-    static auto& mapYouAreHereDisplay = StaticRef<bool>(0x8D0930);
+    static auto& mapYouAreHereTimer = StaticRef<uint32, 0xBAA358>();
+    static auto& mapYouAreHereDisplay = StaticRef<bool, 0x8D0930>();
 
     if (CTimer::GetTimeInMSPauseMode() - mapYouAreHereTimer > 700) {
         mapYouAreHereTimer = CTimer::GetTimeInMSPauseMode();
@@ -1585,8 +1585,8 @@ void CRadar::DrawRadarSectionMap(int32 x, int32 y, CRect rect) {
 
 // 0x586650
 void CRadar::DrawRadarGangOverlay(bool inMenu) {
-    static auto& g_RadarGangResetOverlay = StaticRef<uint32>(0xBAA36C); // bool?
-    static auto& g_RadarGangOverlay = StaticRef<CRect>(0xBAA35C);
+    static auto& g_RadarGangResetOverlay = StaticRef<uint32, 0xBAA36C>(); // bool?
+    static auto& g_RadarGangOverlay = StaticRef<CRect, 0xBAA35C>();
 
     if ((g_RadarGangResetOverlay & 1) == 0) {
         g_RadarGangResetOverlay |= 1u;
@@ -1814,11 +1814,11 @@ void CRadar::DrawCoordBlip(int32 blipIndex, bool isSprite) {
 // 0x587000
 void CRadar::DrawEntityBlip(int32 blipIndex, uint8 arg1) {
     // Function-local statics of the original (For the "running" lights of the airstrip)
-    static auto& s_bDontDisplayRunway  = StaticRef<bool>(0xBAA370);   // `dont_display`
-    static auto& s_nRunwayLightCounter = StaticRef<uint32>(0xBAA374); // `RunwayLightCounter`
-    static auto& s_nOldOffsetPos       = StaticRef<int16>(0xBAA378);  // `old_offset_pos`
-    static auto& s_nOffsetPos          = StaticRef<int16>(0xBAA37C);  // `offset_pos`
-    static auto& s_nStaticInitFlags    = StaticRef<uint32>(0xBAA380); // Init guards of the 2 above
+    static auto& s_bDontDisplayRunway  = StaticRef<bool, 0xBAA370>();   // `dont_display`
+    static auto& s_nRunwayLightCounter = StaticRef<uint32, 0xBAA374>(); // `RunwayLightCounter`
+    static auto& s_nOldOffsetPos       = StaticRef<int16, 0xBAA378>();  // `old_offset_pos`
+    static auto& s_nOffsetPos          = StaticRef<int16, 0xBAA37C>();  // `offset_pos`
+    static auto& s_nStaticInitFlags    = StaticRef<uint32, 0xBAA380>(); // Init guards of the 2 above
 
     auto&      trace    = ms_RadarTrace[blipIndex];
     const bool isSprite = arg1 != 0;

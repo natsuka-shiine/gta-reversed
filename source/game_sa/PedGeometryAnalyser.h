@@ -475,5 +475,5 @@ private:
     static void ComputeEntityBoundingBoxSegmentPlanesUncachedAll(float zPos, CEntity& entity, std::array<CVector, 4>& outSegPlaneNormals, std::array<float, 4>& outPlaneDs);
 
 public:
-    static inline auto& ms_fPedNominalRadius = StaticRef<float>(0x8D22B0);
+    static inline auto& ms_fPedNominalRadius = StaticRef<float, 0x8D22B0>();
 };

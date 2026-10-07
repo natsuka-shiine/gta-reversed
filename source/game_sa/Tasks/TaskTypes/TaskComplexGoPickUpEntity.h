@@ -9,8 +9,8 @@ class NOTSA_EXPORT_VTABLE CTaskComplexGoPickUpEntity : public CTaskComplex {
 public:
     static constexpr auto Type = TASK_COMPLEX_GO_PICKUP_ENTITY;
 
-    static inline auto& MAX_GOTO_TIME   = StaticRef<uint32>(0x8D2FF8);
-    static inline auto& MAX_PICKUP_TIME = StaticRef<uint32>(0x8D2FFC);
+    static inline auto& MAX_GOTO_TIME   = StaticRef<uint32, 0x8D2FF8>();
+    static inline auto& MAX_PICKUP_TIME = StaticRef<uint32, 0x8D2FFC>();
 
     static void InjectHooks();
 

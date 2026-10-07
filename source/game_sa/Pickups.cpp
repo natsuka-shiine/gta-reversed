@@ -369,7 +369,7 @@ void CPickups::DoPickUpEffects(CEntity* entity) {
                 uint8 r, g, b;
                 uint8 pad[5];
             };
-            static const auto& s_PickupColors = StaticRef<tPickupColor[54]>(0x8A5FB0);
+            static const auto& s_PickupColors = StaticRef<tPickupColor[54], 0x8A5FB0>();
 
             const CVector textPos = entity->GetPosition() + CVector{ 0.0f, 0.0f, 0.7f };
             RwV3d         screenPos;

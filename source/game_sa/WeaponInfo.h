@@ -30,7 +30,7 @@ class CWeaponInfo {
     static_assert(NUM_WEAPON_INFOS == 80);
 
     //! Memory Layout(Assuming vanilla settings): [STD 0 - 47][POOR 47 - 57][PRO 58 - 68][COP 69 - 79]
-    static inline auto& aWeaponInfo = StaticRef<CWeaponInfo[NUM_WEAPON_INFOS]>(0xC8AAB8);
+    static inline auto& aWeaponInfo = StaticRef<CWeaponInfo[NUM_WEAPON_INFOS], 0xC8AAB8>();
 
     struct tAnimAimOffsets {
         float AimX;
@@ -42,7 +42,7 @@ class CWeaponInfo {
         uint16 CrouchRLoadA;
         uint16 CrouchRLoadB;
     };
-    static inline auto& ms_WeaponAimOffsets = StaticRef<std::array<tAnimAimOffsets, (+ANIM_GROUP_SPRAYCAN + 1) - (+ANIM_GROUP_PYTHON)>>(0xC8A8A8);
+    static inline auto& ms_WeaponAimOffsets = StaticRef<std::array<tAnimAimOffsets, (+ANIM_GROUP_SPRAYCAN + 1) - (+ANIM_GROUP_PYTHON)>, 0xC8A8A8>();
 
 public:
     eWeaponFire m_nWeaponFire;

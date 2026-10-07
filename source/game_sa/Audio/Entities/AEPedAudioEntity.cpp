@@ -1108,9 +1108,9 @@ void CAEPedAudioEntity::PlayShirtFlap(float volume, float speed) {
 // 0x4E2EE0
 void CAEPedAudioEntity::Service() {
     // These are initialized at runtime (static initializers) in the original binary
-    static auto& s_VehicleFreqRange = StaticRef<float>(0xB613BC); // Android: 0.4
-    static auto& s_FallFreqRange    = StaticRef<float>(0xB613C0); // Android: 0.8
-    static auto& s_FallSpeedRange   = StaticRef<float>(0xB613CC); // Android: 0.5
+    static auto& s_VehicleFreqRange = StaticRef<float, 0xB613BC>(); // Android: 0.4
+    static auto& s_FallFreqRange    = StaticRef<float, 0xB613C0>(); // Android: 0.8
+    static auto& s_FallSpeedRange   = StaticRef<float, 0xB613CC>(); // Android: 0.5
 
     if (!m_pPed->IsPlayer()) {
         return;

@@ -19,12 +19,12 @@
 #include "d3d9.h"
 #endif
 
-static inline auto& RwInitialized = StaticRef<bool>(0xC920E8);
-static inline auto& RwEngineInstance =  StaticRef<RwGlobals*>(0xC97B24);
-static inline auto& RsGlobal =  StaticRef<RsGlobalType>(0xC17040);
-static inline auto& geometryTKList =  StaticRef<RwPluginRegistry>(0x8D628C);
-static inline auto& RpUVAnimDictSchema =  StaticRef<RtDictSchema>(0x8DED50);
-static inline auto& AmbientSaturated = StaticRef<RwRGBAReal>(0x8E2418);
+static inline auto& RwInitialized = StaticRef<bool, 0xC920E8>();
+static inline auto& RwEngineInstance =  StaticRef<RwGlobals*, 0xC97B24>();
+static inline auto& RsGlobal =  StaticRef<RsGlobalType, 0xC17040>();
+static inline auto& geometryTKList =  StaticRef<RwPluginRegistry, 0x8D628C>();
+static inline auto& RpUVAnimDictSchema =  StaticRef<RtDictSchema, 0x8DED50>();
+static inline auto& AmbientSaturated = StaticRef<RwRGBAReal, 0x8E2418>();
 
 inline IDirect3DDevice9 *GetD3D9Device() {
     return *reinterpret_cast<IDirect3DDevice9 **>(0xC97C28);

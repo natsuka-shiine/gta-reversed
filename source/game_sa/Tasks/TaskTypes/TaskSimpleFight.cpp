@@ -8,8 +8,8 @@
 
 constexpr int32 AE_DOUBLE_HIT_DELAYS_MS[]{ 300, 400, 500 }; // 0x8D2E3C
 
-static auto& CHAIN_COUNT_LIMIT      = StaticRef<int32>(0x8D2E48); // = 2 (Name from Android)
-static auto& PLAYER_AUTO_FACE_RANGE = StaticRef<float>(0x8D2E8C); // = 2.f (NOTSA name) - See `CTaskSimpleFight::ChooseAttackPlayer`
+static auto& CHAIN_COUNT_LIMIT      = StaticRef<int32, 0x8D2E48>(); // = 2 (Name from Android)
+static auto& PLAYER_AUTO_FACE_RANGE = StaticRef<float, 0x8D2E8C>(); // = 2.f (NOTSA name) - See `CTaskSimpleFight::ChooseAttackPlayer`
 
 //! Flags of the moves the ped may use from the combo set (Low byte of `CMeleeInfo::m_wFlags`, see `eMeleeComboFlags`)
 static uint8 GetAvailableMoveFlags(int8 comboSet, CPed* ped) {

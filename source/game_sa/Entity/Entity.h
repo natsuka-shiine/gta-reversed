@@ -442,4 +442,4 @@ static RpMaterial* MaterialUpdateUVAnimCB(RpMaterial* material, void* data);
 
 bool IsEntityPointerValid(CEntity* entity);
 
-static inline auto& GAME_GRAVITY = StaticRef<float>(0x863984); // default 0.008f
+static inline auto& GAME_GRAVITY = StaticRef<float, 0x863984>(); // default 0.008f

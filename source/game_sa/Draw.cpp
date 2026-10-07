@@ -2,8 +2,8 @@
 
 #include "Draw.h"
 
-auto& FadeTimer = StaticRef<uint32>(0xC16EE0);
-auto& FadeOutTime = StaticRef<uint32>(0x8D2BD4);
+auto& FadeTimer = StaticRef<uint32, 0xC16EE0>();
+auto& FadeOutTime = StaticRef<uint32, 0x8D2BD4>();
 
 void CDraw::InjectHooks() {
     RH_ScopedClass(CDraw);

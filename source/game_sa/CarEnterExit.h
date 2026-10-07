@@ -14,16 +14,16 @@ class CTask;
 
 class CCarEnterExit {
 public:
-    static inline auto& ms_fMaxSpeed_CanDragPedOut = StaticRef<float>(0x86F104); // 0.1
-    static inline auto& ms_fMaxSpeed_PlayerCanDragPedOut = StaticRef<float>(0x86F108); // 0.2
+    static inline auto& ms_fMaxSpeed_CanDragPedOut = StaticRef<float, 0x86F104>(); // 0.1
+    static inline auto& ms_fMaxSpeed_PlayerCanDragPedOut = StaticRef<float, 0x86F108>(); // 0.2
 
-    static inline auto& ms_bPedOffsetsCalculated = StaticRef<bool>(0xC18C20);
-    static inline auto& ms_vecPedGetUpAnimOffset = StaticRef<CVector>(0xC18C3C);
-    static inline auto& ms_vecPedBedLAnimOffset = StaticRef<CVector>(0xC18C54);
-    static inline auto& ms_vecPedBedRAnimOffset = StaticRef<CVector>(0xC18C60);
-    static inline auto& ms_vecPedDeskAnimOffset = StaticRef<CVector>(0xC18C6C);
-    static inline auto& ms_vecPedChairAnimOffset = StaticRef<CVector>(0xC18C78);
-    static inline auto& ms_vecPedQuickDraggedOutCarAnimOffset = StaticRef<CVector>(0xC18C48);
+    static inline auto& ms_bPedOffsetsCalculated = StaticRef<bool, 0xC18C20>();
+    static inline auto& ms_vecPedGetUpAnimOffset = StaticRef<CVector, 0xC18C3C>();
+    static inline auto& ms_vecPedBedLAnimOffset = StaticRef<CVector, 0xC18C54>();
+    static inline auto& ms_vecPedBedRAnimOffset = StaticRef<CVector, 0xC18C60>();
+    static inline auto& ms_vecPedDeskAnimOffset = StaticRef<CVector, 0xC18C6C>();
+    static inline auto& ms_vecPedChairAnimOffset = StaticRef<CVector, 0xC18C78>();
+    static inline auto& ms_vecPedQuickDraggedOutCarAnimOffset = StaticRef<CVector, 0xC18C48>();
 
 public:
     static void InjectHooks();
