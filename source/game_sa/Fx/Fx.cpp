@@ -155,10 +155,12 @@ static bool ShouldAddWheelFxThisFrame(const CVehicle* vehicle, const CVector& po
 
 // 0x4A12D0
 void Fx_c::ExitEntitySystems() {
-    for (auto it = m_FxEntities.GetHead(); it; it = m_FxEntities.GetNext(it)) {
+    for (auto it = m_FxEntities.GetHead(); it;) {
+        const auto next = m_FxEntities.GetNext(it); // `it` gets deleted
         m_FxEntities.RemoveItem(it);
         g_fxMan.DestroyFxSystem(it->m_System);
         delete it;
+        it = next;
     }
 }
 
@@ -206,12 +208,14 @@ void Fx_c::CreateEntityFx(CEntity* entity, const char* fxName, const CVector& po
 void Fx_c::DestroyEntityFx(CEntity* entity) {
     // ((void(__thiscall*)(Fx_c*, CEntity*))0x4A1280)(this, entity);
 
-    for (auto it = m_FxEntities.GetHead(); it; it = m_FxEntities.GetNext(it)) {
+    for (auto it = m_FxEntities.GetHead(); it;) {
+        const auto next = m_FxEntities.GetNext(it); // `it` might get deleted
         if (it->m_Entity == entity) {
             m_FxEntities.RemoveItem(it);
             it->m_System->Kill();
             operator delete(it);
         }
+        it = next;
     }
 }
 

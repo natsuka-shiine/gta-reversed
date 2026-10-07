@@ -241,10 +241,12 @@ void FxManager_c::Update(RwCamera* camera, float timeDelta) {
         it->Update(timeDelta);
     }
 
-    for (FxSystem_c* it = m_FxSystems.GetHead(); it; it = m_FxSystems.GetNext(it)) {
+    for (FxSystem_c* it = m_FxSystems.GetHead(); it;) {
+        const auto next = m_FxSystems.GetNext(it); // `it` might get deleted
         if (it->Update(camera, timeDelta)) {
             DestroyFxSystem(it);
         }
+        it = next;
     }
 }
 
