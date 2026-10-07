@@ -79,11 +79,13 @@ void C3dMarkers::Shutdown() {
         marker.DeleteIfHasAtomic();
     }
 
-    // Original code is retarded, this does the same, but better.
     for (auto& v : m_pRpClumpArray) {
         if (auto* const clump = std::exchange(v, nullptr)) {
             RpClumpForAllAtomics(clump, RemoveRefsCB, nullptr);
             RpClumpDestroy(clump);
+
+            // The same clump is in more than one slot (see `Init`), it must only be destroyed once
+            rng::replace(m_pRpClumpArray, clump, static_cast<RpClump*>(nullptr));
         }
     }
 }
