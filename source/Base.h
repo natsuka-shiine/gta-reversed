@@ -180,24 +180,21 @@ T& StaticRef(uintptr addr) {
 /*!
 * @brief Used for static variable references - This is the form to use, the one above is being phased out.
 *
-* With the address known at compile time the variable can be moved into our own memory, see `StaticData.h`.
+* Variables declared this way can be moved into our own memory, see `StaticData.h`.
 *
 * @tparam T    The type of the variable
 * @tparam Addr The address of it
 */
 template<typename T, uintptr Addr>
 T& StaticRef() {
-#ifdef NOTSA_STANDALONE_DUMP_HOOKS_ONLY
+#if defined(NOTSA_STANDALONE_DUMP_HOOKS_ONLY)
     alignas(T) static uint8 buf[sizeof(T)]{};
     return *reinterpret_cast<T*>(buf);
+#elif defined(NOTSA_OWN_STATIC_DATA) && !defined(NOTSA_STANDALONE)
+    static T* const s_Ptr = static_cast<T*>(notsa::StaticData::Resolve(Addr, notsa::StaticData::detail::SizeOf<T>::Get()));
+    return *s_Ptr;
 #else
-    if constexpr (notsa::StaticData::IsOwned(Addr)) {
-        alignas(T) static uint8 storage[sizeof(T)];
-        [[maybe_unused]] static const bool s_IsAdopted = (notsa::StaticData::Adopt(Addr, storage, sizeof(T)), true);
-        return *reinterpret_cast<T*>(storage);
-    } else {
-        return *reinterpret_cast<T*>(Addr);
-    }
+    return *reinterpret_cast<T*>(Addr);
 #endif
 }
 

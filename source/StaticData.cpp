@@ -2,114 +2,290 @@
 
 #include "StaticData.h"
 
+/*
+* Format of the config file (`CONFIG_FILE_NAME`, next to the game executable):
+*
+*   # Comment
+*   own 0x8CD4F4 0x8CD782 ModelIndices    <- Own the range [begin, end) as well (copied from the original), the name is only used in messages
+*   clear                                  <- Forget all ranges so far (including the generated ones)
+*   nofill                                 <- Don't overwrite the original location of the owned ranges
+*   map                                    <- Write `static_data_map.txt`: the address and size of every global declared by `StaticRef`
+*/
+
 namespace notsa::StaticData {
 #if defined(NOTSA_OWN_STATIC_DATA) && !defined(NOTSA_STANDALONE)
 namespace {
 constexpr uint8 FILL_BYTE = 0xCD;
 
-struct Entry {
-    uintptr addr;
-    uint32  size;
-    void*   storage;
+struct Range {
+    uintptr      begin, end; //!< [begin, end) in the original executable
+    char         name[48];
+    uint8*       storage;    //!< Where it lives now
+    bool         isGenerated; //!< Has initial values of its own (`init`), otherwise it's copied from the original location
+    const uint8* init;        //!< Initial values, everything after `initSize` is zero
+    uint32       initSize;
 };
 
-// NOTE: Everything here must be constant-initialized (See `Adopt`)
-constexpr auto NUM_RANGES  = std::size(OWNED_RANGES);
-constexpr auto MAX_ENTRIES = 16'384u;
+//! Ranges that are always owned, with their initial values. See `tools/static-data/generate.py`
+struct GeneratedRange {
+    uintptr      begin, end;
+    const char*  name;
+    const uint8* init;
+    uint32       initSize;
+};
+#include "StaticDataInit.inc"
 
-Entry  s_Entries[MAX_ENTRIES]{};
-uint32 s_NumEntries{};
+// NOTE: Everything here must be constant-initialized (See `Resolve`), and nothing may allocate from the heap
+constexpr auto MAX_RANGES      = 1024u;
+constexpr auto MAX_MAP_ENTRIES = 16'384u;
 
-Entry  s_Conflicts[64][2]{}; //!< Globals whose range overlaps another's (but isn't the same storage)
-uint32 s_NumConflicts{};
-uint32 s_NumOutOfRange{};
+Range    s_Ranges[MAX_RANGES]{};
+uint32   s_NumRanges{};
+struct MapEntry {
+    uintptr addr;
+    uint32  size;
+};
+MapEntry s_Map[MAX_MAP_ENTRIES]{}; //!< Every global resolved so far
+uint32   s_NumMapEntries{};
+bool     s_IsConfigLoaded{};
+bool     s_DoFill{ true };
+bool     s_DoWriteMap{};
+bool     s_IsConfigFileFound{};
+uint32   s_NumInitMismatches{};
+char     s_ConfigPath[MAX_PATH]{};
+uint32   s_NumViolationsReported{};
 
-uint8* s_Snapshots[NUM_RANGES]{}; //!< The original bytes of each range, as they were before they got overwritten
-bool   s_IsInitialized{};
-uint32 s_NumViolationsReported{};
+//! Messages from before logging was available
+char   s_EarlyLog[8192]{};
+uint32 s_EarlyLogLen{};
 
-int32 FindRange(uintptr addr, size_t size) {
-    for (auto i = 0u; i < NUM_RANGES; i++) {
-        if (addr >= OWNED_RANGES[i].begin && addr + size <= OWNED_RANGES[i].end) {
-            return static_cast<int32>(i);
+void EarlyLog(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    const auto n = vsnprintf(s_EarlyLog + s_EarlyLogLen, sizeof(s_EarlyLog) - s_EarlyLogLen, fmt, args);
+    va_end(args);
+    if (n > 0) {
+        s_EarlyLogLen = std::min<uint32>(s_EarlyLogLen + n + 1, sizeof(s_EarlyLog) - 1); // Messages are separated by a `\0`
+    }
+}
+
+void AddRange(uintptr begin, uintptr end, const char* name, bool isGenerated = false, const uint8* init = nullptr, uint32 initSize = 0) {
+    if (begin >= end || begin < 0x401000 || end > 0xCB1000) {
+        EarlyLog("Invalid range [%#x, %#x) `%s`", begin, end, name);
+        return;
+    }
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        if (begin < s_Ranges[i].end && s_Ranges[i].begin < end) {
+            EarlyLog("Range [%#x, %#x) `%s` overlaps `%s`, ignored", begin, end, name, s_Ranges[i].name);
+            return;
         }
     }
-    return -1;
+    if (s_NumRanges == MAX_RANGES) {
+        EarlyLog("Too many ranges, `%s` ignored", name);
+        return;
+    }
+    auto& r = s_Ranges[s_NumRanges++];
+    r.begin       = begin;
+    r.end         = end;
+    r.isGenerated = isGenerated;
+    r.init        = init;
+    r.initSize    = initSize;
+    strncpy_s(r.name, name, _TRUNCATE);
+}
+
+//! Path of a file next to the game executable (The current directory can't be relied on: some ASI loaders change it while loading us)
+const char* GetPathNextToExecutable(const char* fileName, char (&out)[MAX_PATH]) {
+    const auto len = GetModuleFileNameA(nullptr, out, MAX_PATH);
+    auto       end = len && len < MAX_PATH ? out + len : out;
+    while (end != out && end[-1] != '\\' && end[-1] != '/') {
+        end--;
+    }
+    *end = '\0';
+    strcat_s(out, fileName);
+    return out;
+}
+
+void LoadConfigFile() {
+    GetPathNextToExecutable(CONFIG_FILE_NAME, s_ConfigPath);
+    const auto h = CreateFileA(s_ConfigPath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    s_IsConfigFileFound = true;
+    static char text[256 * 1024];
+    DWORD       len{};
+    ReadFile(h, text, sizeof(text) - 1, &len, nullptr);
+    CloseHandle(h);
+    text[len] = '\0';
+
+    char* ctx{};
+    for (auto* line = strtok_s(text, "\r\n", &ctx); line; line = strtok_s(nullptr, "\r\n", &ctx)) {
+        while (*line == ' ' || *line == '\t') {
+            line++;
+        }
+        unsigned begin{}, end{};
+        char     name[48]{ "?" };
+        if (!*line || *line == '#') {
+            continue;
+        } else if (sscanf_s(line, "own %x %x %47s", &begin, &end, name, static_cast<unsigned>(sizeof(name))) >= 2) {
+            AddRange(begin, end, name);
+        } else if (!strncmp(line, "clear", 5)) {
+            s_NumRanges = 0;
+        } else if (!strncmp(line, "nofill", 6)) {
+            s_DoFill = false;
+        } else if (!strncmp(line, "map", 3)) {
+            s_DoWriteMap = true;
+        } else {
+            EarlyLog("Config: Can't make sense of the line `%s`", line);
+        }
+    }
+}
+
+const Range* FindRange(uintptr addr) {
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        if (addr >= s_Ranges[i].begin && addr < s_Ranges[i].end) {
+            return &s_Ranges[i];
+        }
+    }
+    return nullptr;
+}
+
+//! Decide what's owned, and move it. Happens on the first use of any global, which is before any game code of ours runs.
+void LoadConfig() {
+    s_IsConfigLoaded = true;
+
+    for (const auto& r : GENERATED_RANGES) {
+        AddRange(r.begin, r.end, r.name, true, r.init, r.initSize);
+    }
+    LoadConfigFile();
+
+    // One block for everything. Each range keeps the alignment it had (relative to 16 bytes).
+    size_t total{};
+    const auto Place = [&total](const Range& r) {
+        const auto offset = ((total + 15) & ~size_t{ 15 }) + (r.begin & 15);
+        total = offset + (r.end - r.begin);
+        return offset;
+    };
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        Place(s_Ranges[i]);
+    }
+    auto* const block = static_cast<uint8*>(VirtualAlloc(nullptr, total ? total : 1, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)); // Zero-filled
+    total = 0;
+
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        auto&       r        = s_Ranges[i];
+        const auto  size     = r.end - r.begin;
+        auto* const original = reinterpret_cast<uint8*>(r.begin);
+
+        r.storage = block + Place(r);
+        if (r.isGenerated) {
+            if (r.init) {
+                memcpy(r.storage, r.init, std::min<size_t>(r.initSize, size));
+            }
+
+            // As long as the original is around, check that the generated values are what it has at this point.
+            // If not, something has changed them already (or the generator is wrong), go with what's there.
+            if (memcmp(r.storage, original, size) != 0) {
+                auto k = 0u;
+                while (r.storage[k] == original[k]) {
+                    k++;
+                }
+                EarlyLog("The initial values of range `%s` differ from the original at %#x (ours: %#04x, original: %#04x), using the original's", r.name, r.begin + k, r.storage[k], original[k]);
+                s_NumInitMismatches++;
+                memcpy(r.storage, original, size);
+            }
+        } else {
+            memcpy(r.storage, original, size);
+        }
+
+        if (s_DoFill) {
+            DWORD oldProtect{};
+            VirtualProtect(original, size, PAGE_READWRITE, &oldProtect);
+            memset(original, FILL_BYTE, size);
+        }
+    }
 }
 };
 
-void Adopt(uintptr addr, void* storage, size_t size) {
-    const auto range = FindRange(addr, size);
-    if (range == -1) { // Starts inside an owned range, but doesn't end in it
-        s_NumOutOfRange++;
-        memcpy(storage, reinterpret_cast<void*>(addr), size);
-        return;
+void* Resolve(uintptr addr, size_t size) {
+    if (!s_IsConfigLoaded) {
+        LoadConfig();
     }
 
-    // Two declarations for the same memory (e.g. with different types) would each get their own storage, and drift apart
-    for (auto i = 0u; i < s_NumEntries; i++) {
-        const auto& e = s_Entries[i];
-        if (addr < e.addr + e.size && e.addr < addr + size && s_NumConflicts < std::size(s_Conflicts)) {
-            s_Conflicts[s_NumConflicts][0] = e;
-            s_Conflicts[s_NumConflicts][1] = { addr, static_cast<uint32>(size), storage };
-            s_NumConflicts++;
-        }
+    if (s_NumMapEntries < MAX_MAP_ENTRIES) {
+        s_Map[s_NumMapEntries++] = { addr, static_cast<uint32>(size) };
     }
 
-    // Once the original location has been overwritten the bytes have to come from the snapshot
-    const auto* const src = s_IsInitialized
-        ? s_Snapshots[range] + (addr - OWNED_RANGES[range].begin)
-        : reinterpret_cast<const uint8*>(addr);
-    memcpy(storage, src, size);
-
-    if (s_NumEntries < MAX_ENTRIES) {
-        s_Entries[s_NumEntries++] = { addr, static_cast<uint32>(size), storage };
+    const auto* const r = FindRange(addr);
+    if (!r) {
+        return reinterpret_cast<void*>(addr);
     }
+    if (size == 0) {
+        EarlyLog("The global at %#x is in the owned range `%s`, but its size isn't known, so it can't be checked that the range covers it", addr, r->name);
+    } else if (addr + size > r->end) {
+        EarlyLog("The global at [%#x, %#x) starts in the owned range `%s`, but ends after it (at %#x). The range is wrong!", addr, addr + size, r->name, r->end);
+    }
+    return r->storage + (addr - r->begin);
 }
 
 void Init() {
-    assert(!s_IsInitialized);
+    if (!s_IsConfigLoaded) {
+        LoadConfig();
+    }
 
-    for (auto i = 0u; i < NUM_RANGES; i++) {
-        const auto& r    = OWNED_RANGES[i];
-        const auto  size = r.end - r.begin;
+    for (const auto* msg = s_EarlyLog; msg < s_EarlyLog + s_EarlyLogLen; msg += strlen(msg) + 1) {
+        NOTSA_LOG_ERR("StaticData: {}", msg);
+    }
 
-        s_Snapshots[i] = static_cast<uint8*>(VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-        memcpy(s_Snapshots[i], reinterpret_cast<void*>(r.begin), size);
+    NOTSA_LOG_INFO("StaticData: Config file `{}` {}", s_ConfigPath, s_IsConfigFileFound ? "loaded" : "not found (that's fine, it's optional)");
 
-        DWORD oldProtect{};
-        VirtualProtect(reinterpret_cast<void*>(r.begin), size, PAGE_READWRITE, &oldProtect);
-        memset(reinterpret_cast<void*>(r.begin), FILL_BYTE, size);
-
-        // How much of the range is covered by declarations
-        uint32 numGlobals{}, numBytes{};
-        for (auto k = 0u; k < s_NumEntries; k++) {
-            if (s_Entries[k].addr >= r.begin && s_Entries[k].addr < r.end) {
-                numGlobals++;
-                numBytes += s_Entries[k].size;
-            }
+    uint32 totalBytes{};
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        const auto& r = s_Ranges[i];
+        uint32 numGlobals{};
+        for (auto k = 0u; k < s_NumMapEntries; k++) {
+            numGlobals += s_Map[k].addr >= r.begin && s_Map[k].addr < r.end;
         }
-        NOTSA_LOG_INFO("StaticData: Range `{}` [{:#x}, {:#x}) is owned: {} globals, {} of {} bytes declared", r.name, r.begin, r.end, numGlobals, numBytes, size);
+        totalBytes += r.end - r.begin;
+        NOTSA_LOG_DEBUG("StaticData: Range `{}` [{:#x}, {:#x}) is owned ({} bytes, {} globals declared in it so far)", r.name, r.begin, r.end, r.end - r.begin, numGlobals);
     }
-    s_IsInitialized = true;
+    uint32 numGenerated{};
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        numGenerated += s_Ranges[i].isGenerated;
+    }
+    NOTSA_LOG_INFO(
+        "StaticData: {} ranges ({} bytes) of the original executable's data are owned{}. {} of them have generated initial values, {} of those didn't match the original",
+        s_NumRanges, totalBytes, s_DoFill ? "" : " (original location not overwritten)", numGenerated, s_NumInitMismatches
+    );
 
-    for (auto i = 0u; i < s_NumConflicts; i++) {
-        const auto& [a, b] = s_Conflicts[i];
-        NOTSA_LOG_ERR("StaticData: Overlapping declarations: [{:#x}, {:#x}) and [{:#x}, {:#x}). They don't share storage anymore!", a.addr, a.addr + a.size, b.addr, b.addr + b.size);
-    }
-    if (s_NumOutOfRange) {
-        NOTSA_LOG_ERR("StaticData: {} globals start inside an owned range but don't end in it, the ranges are wrong", s_NumOutOfRange);
-    }
-    if (s_NumEntries == MAX_ENTRIES) {
-        NOTSA_LOG_ERR("StaticData: Too many owned globals, increase `MAX_ENTRIES`");
+    if (s_DoWriteMap) {
+        // NOTE: Globals that are only declared inside functions show up once that function has run
+        std::sort(s_Map, s_Map + s_NumMapEntries, [](const MapEntry& a, const MapEntry& b) { return a.addr != b.addr ? a.addr < b.addr : a.size > b.size; });
+        char mapPath[MAX_PATH];
+        GetPathNextToExecutable("static_data_map.txt", mapPath);
+        if (FILE* f{}; fopen_s(&f, mapPath, "w") == 0 && f) {
+            fprintf(f, "# address size (0 = unknown) owned\n");
+            for (auto k = 0u; k < s_NumMapEntries; k++) {
+                if (k && s_Map[k].addr == s_Map[k - 1].addr && s_Map[k].size == s_Map[k - 1].size) {
+                    continue;
+                }
+                fprintf(f, "0x%06X %u %d\n", s_Map[k].addr, s_Map[k].size, FindRange(s_Map[k].addr) != nullptr);
+            }
+            fclose(f);
+            NOTSA_LOG_INFO("StaticData: Wrote `{}` ({} entries)", mapPath, s_NumMapEntries);
+        } else {
+            NOTSA_LOG_ERR("StaticData: Couldn't write `{}`", mapPath);
+        }
+        s_DoWriteMap = false;
     }
 }
 
 void Verify() {
-    if (!s_IsInitialized || s_NumViolationsReported >= 64) {
+    if (!s_DoFill || s_NumViolationsReported >= 64) {
         return;
     }
-    for (const auto& r : OWNED_RANGES) {
+    for (auto i = 0u; i < s_NumRanges; i++) {
+        const auto& r     = s_Ranges[i];
         auto* const begin = reinterpret_cast<uint8*>(r.begin);
         auto* const end   = reinterpret_cast<uint8*>(r.end);
         for (auto* p = begin; p != end; p++) {
@@ -122,8 +298,8 @@ void Verify() {
                 runEnd++;
             }
             NOTSA_LOG_ERR(
-                "StaticData: Something wrote to the original location of an owned global: [{:#x}, {:#x}) in range `{}` (first byte is now {:#04x})",
-                reinterpret_cast<uintptr>(p), reinterpret_cast<uintptr>(runEnd), r.name, *p
+                "StaticData: Something wrote to the original location of owned data: [{:#x}, {:#x}) in range `{}` (first byte is now {:#04x})",
+                reinterpret_cast<uintptr>(p), reinterpret_cast<uintptr>(runEnd), r.name, static_cast<uint32>(*p)
             );
             memset(p, FILL_BYTE, runEnd - p);
             p = runEnd - 1;
@@ -135,7 +311,7 @@ void Verify() {
     }
 }
 #else
-void Adopt(uintptr, void*, size_t) {}
+void* Resolve(uintptr addr, size_t) { return reinterpret_cast<void*>(addr); }
 void Init() {}
 void Verify() {}
 #endif
