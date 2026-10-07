@@ -59,6 +59,22 @@ constexpr const char* ASI_CANDIDATES[]{
 */
 constexpr auto ENV_TRAP_ORIGINAL_CODE = "GTA_REVERSED_TRAP_ORIGINAL_CODE";
 
+/*!
+* If this environment variable is set, none of the original's code is run at all: not its start-up code (C runtime, the constructors
+* of its global objects), and anything else that calls into it is stopped with a message. Only its data is used.
+* This is what the game is with the original executable there for nothing but its data.
+*/
+constexpr auto ENV_STANDALONE = "GTA_REVERSED_STANDALONE";
+
+/*!
+* If this environment variable is set, the data of the original is saved right before its `WinMain` would run: that is with
+* everything its start-up code has done to it (its 1667 initializers of global variables, and its C runtime's own).
+* The difference to the data in the executable's file is what a standalone game has to do itself, see `tools/startup-data`.
+* Set it to the name of the file to write. Use it with `GTA_REVERSED_ASI` set, so that the asi an ASI loader has loaded by
+* then has stayed out of the way.
+*/
+constexpr auto ENV_DUMP_STARTUP_DATA = "GTA_REVERSED_DUMP_STARTUP_DATA";
+
 //! Written next to the launcher, started over on each run. For when the game dies before (or without) its own logging
 constexpr auto TRACE_FILE_NAME = "gta_reversed_loader.log";
 
@@ -126,6 +142,7 @@ struct CodeRange {
 CodeRange         s_OriginalCode[8]{};
 uint32_t          s_NumOriginalCodeRanges{};
 bool              s_IsTrappingOriginalCode{};
+bool              s_IsStandalone{}; //!< No code of the original may run (`ENV_STANDALONE`)
 uintptr_t         s_TrappedEntries[2048]{};
 volatile LONG     s_NumTrappedEntries{};
 
@@ -187,6 +204,15 @@ bool OnOriginalCodeExecuted(EXCEPTION_POINTERS* info) {
     }
     if (viaHook) {
         return true; // (The page stays as it is)
+    }
+    if (s_IsStandalone) {
+        // Nothing of the original is set up to run (no C runtime, no constructed globals): this is the end
+        const auto msg = std::format(
+            "The game called a function of the original executable (at 0x{:08X}), which isn't available in standalone mode.\n\nSee `{}` for who called it.",
+            eip, TRACE_FILE_NAME
+        );
+        MessageBoxA(nullptr, msg.c_str(), "gta_reversed (standalone)", MB_ICONERROR | MB_OK);
+        ExitProcess(3);
     }
 
     DWORD old{};
@@ -445,13 +471,60 @@ void ResolveImports() {
 
 std::array<uint8_t, 5> s_WinMainOriginalBytes{};
 
+struct StartupDataRun {
+    uint32_t addr, size;
+};
+#include "StartupData.inc"
+
+/*!
+* Do to the original's data what its start-up code would have: the constructors of its global objects, and the initial values
+* that are computed. In a standalone game that code doesn't run, and plenty relies on what it leaves behind (For example
+* `gpCamColVars`, which it points at an entry of `gCamColVars`).
+* The game module then constructs, on top of this, the globals that have to be its own (The ones with a virtual table).
+*/
+void ApplyStartupData() {
+    const auto* src = STARTUP_DATA;
+    for (const auto& run : STARTUP_DATA_RUNS) {
+        memcpy(reinterpret_cast<void*>(run.addr), src, run.size);
+        src += run.size;
+    }
+    Trace(std::format("Standalone: applied what the original's start-up code does to its data ({} runs, {} bytes)", std::size(STARTUP_DATA_RUNS), std::size(STARTUP_DATA)));
+}
+
 /*!
 * The game's entry point calls this instead of its `WinMain`. By now the game's C runtime (and with that, its heap) is initialized,
 * which is the state an ASI loader would load the ASI in. So that's what's done here.
 */
 int WINAPI OnGameWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int cmdShow) {
-    memcpy(reinterpret_cast<void*>(GAME_WIN_MAIN), s_WinMainOriginalBytes.data(), s_WinMainOriginalBytes.size());
-    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void*>(GAME_WIN_MAIN), s_WinMainOriginalBytes.size());
+    if (!s_IsStandalone) { // (Otherwise it was never hooked: nothing was going to call it)
+        memcpy(reinterpret_cast<void*>(GAME_WIN_MAIN), s_WinMainOriginalBytes.data(), s_WinMainOriginalBytes.size());
+        FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void*>(GAME_WIN_MAIN), s_WinMainOriginalBytes.size());
+    }
+
+    if (char dumpPath[MAX_PATH]{}; GetEnvironmentVariableA(ENV_DUMP_STARTUP_DATA, dumpPath, sizeof(dumpPath))) {
+        // Everything of the image that isn't code, as one block (its address in the file's first 8 bytes)
+        const auto* const base     = reinterpret_cast<const uint8_t*>(GAME_IMAGE_BASE);
+        const auto* const nt       = reinterpret_cast<const IMAGE_NT_HEADERS32*>(base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
+        const auto* const sections = IMAGE_FIRST_SECTION(nt);
+        uint32_t          begin = GAME_IMAGE_BASE + GAME_IMAGE_SIZE, end = 0;
+        for (auto i = 0u; i < nt->FileHeader.NumberOfSections; i++) {
+            if (!(sections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+                begin = std::min<uint32_t>(begin, GAME_IMAGE_BASE + sections[i].VirtualAddress);
+                end   = std::max<uint32_t>(end, GAME_IMAGE_BASE + sections[i].VirtualAddress + std::max(sections[i].Misc.VirtualSize, sections[i].SizeOfRawData));
+            }
+        }
+        end = std::min<uint32_t>(end, GAME_IMAGE_BASE + GAME_IMAGE_SIZE);
+        if (const auto h = CreateFileA(dumpPath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr); h != INVALID_HANDLE_VALUE) {
+            const uint32_t header[2]{ begin, end };
+            DWORD          written{};
+            WriteFile(h, header, sizeof(header), &written, nullptr);
+            WriteFile(h, reinterpret_cast<const void*>(begin), end - begin, &written, nullptr);
+            CloseHandle(h);
+            Trace(std::format("Saved the original's data [0x{:08X}, 0x{:08X}) as its start-up code left it to `{}`", begin, end, dumpPath));
+        } else {
+            Trace(std::format("Couldn't write `{}` (error {})", dumpPath, GetLastError()));
+        }
+    }
 
     // Might have been loaded already (if there's an ASI loader among the game's DLLs), that's fine
     HMODULE     asi{};
@@ -482,12 +555,14 @@ int WINAPI OnGameWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLi
     // `WinMain` is hooked by the ASI now, so this ends up in ours
     auto winMain = reinterpret_cast<int(WINAPI*)(HINSTANCE, HINSTANCE, LPSTR, int)>(GAME_WIN_MAIN);
 
-    if (char buf[8]{}; GetEnvironmentVariableA(ENV_TRAP_ORIGINAL_CODE, buf, sizeof(buf))) {
+    if (char buf[8]{}; s_IsStandalone || GetEnvironmentVariableA(ENV_TRAP_ORIGINAL_CODE, buf, sizeof(buf))) {
         // Go to ours directly (It's a `jmp rel32` there now), the original is about to be off limits
         if (const auto* const fn = reinterpret_cast<const uint8_t*>(GAME_WIN_MAIN); fn[0] == 0xE9) {
             int32_t rel{};
             memcpy(&rel, fn + 1, sizeof(rel));
             winMain = reinterpret_cast<decltype(winMain)>(GAME_WIN_MAIN + 5 + rel);
+        } else if (s_IsStandalone) {
+            LoaderFail("The module didn't put its own `WinMain` in place of the original's, there's nothing to run");
         }
 
         const auto* const base     = reinterpret_cast<const uint8_t*>(GAME_IMAGE_BASE);
@@ -504,11 +579,18 @@ int WINAPI OnGameWinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLi
         // Data isn't executable only if this is on (The launcher isn't linked as compatible with it, the original game isn't)
         if (!SetProcessDEPPolicy(PROCESS_DEP_ENABLE)) {
             Trace(std::format("Couldn't turn on data execution prevention (error {}), calls into the original's code can't be trapped", GetLastError()));
+            if (s_IsStandalone) {
+                LoaderFail("Data execution prevention couldn't be turned on, which standalone mode needs to keep the original's code from running");
+            }
         } else {
             s_IsTrappingOriginalCode = true;
             ProtectOriginalCode(false);
-            CloseHandle(CreateThread(nullptr, 0, &RearmTrapPeriodically, nullptr, 0, nullptr));
-            Trace("Trapping calls into the original's code from here on (`ORIGINAL CODE` lines)");
+            if (s_IsStandalone) {
+                Trace("Standalone: the original's code is off limits from here on, a call into it ends the game (`ORIGINAL CODE` line)");
+            } else {
+                CloseHandle(CreateThread(nullptr, 0, &RearmTrapPeriodically, nullptr, 0, nullptr));
+                Trace("Trapping calls into the original's code from here on (`ORIGINAL CODE` lines)");
+            }
         }
     }
 
@@ -539,6 +621,14 @@ extern "C" __declspec(dllexport) void __cdecl NotsaInvertedLoaderRun() {
         const auto file = FindOriginalExecutable();
         MapImage(file, *GetValidatedHeaders(file));
         VirtualFree(const_cast<uint8_t*>(file.data()), 0, MEM_RELEASE);
+    }
+    if (char buf[8]{}; GetEnvironmentVariableA(ENV_STANDALONE, buf, sizeof(buf))) {
+        // Only the data of the original is going to be used. Its imports aren't resolved (so none of its DLLs, and no ASI loader,
+        // get loaded), and its entry point isn't run: no C runtime of its own, and its global objects aren't constructed.
+        s_IsStandalone = true;
+        Trace("Standalone: original executable mapped for its data only, starting our `WinMain` directly");
+        ApplyStartupData();
+        ExitProcess(OnGameWinMain(GetModuleHandleA(nullptr), nullptr, GetCommandLineA(), SW_SHOWDEFAULT));
     }
     Trace("Original executable mapped, resolving its imports (This loads the game's DLLs, and with them an ASI loader if there's one)");
     ResolveImports();
