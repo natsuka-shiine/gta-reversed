@@ -51,6 +51,9 @@ set(CMAKE_INSTALL_LIBDIR ${RE_PROJECT_LIB_NAME}/lib)
 set(CMAKE_INSTALL_INCLUDEDIR ${RE_PROJECT_LIB_NAME}/include)
 
 add_subdirectory(source)
+if (MSVC AND NOT ${RE_PROJECT}_STANDALONE)
+    add_subdirectory(launcher)
+endif()
 
 function(create_source_group target)
     get_property(sources TARGET ${target} PROPERTY SOURCES)
