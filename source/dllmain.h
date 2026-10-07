@@ -15,6 +15,7 @@ bool IsAnotherBuildWanted();
 /*!
 * Whether the code of the original executable can be called. Not if the inverted loader runs the game standalone
 * (the `GTA_REVERSED_STANDALONE` environment variable): the original is only there for its data then.
+* And not if this code is built as an executable of its own (`gta_reversed_exe`), which has no original at all.
 */
 bool IsOriginalCodeAvailable();
 };

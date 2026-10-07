@@ -69,3 +69,5 @@ compile_commands.json
 
 ## TODO: These files can be put into a better place?
 /source/libs/imgui/*
+# The original's data for the standalone executable (tools/startup-data/make_image.py)
+/standalone/gta_image.bin

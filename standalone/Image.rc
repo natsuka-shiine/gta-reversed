@@ -1,0 +1,2 @@
+// The data of the original executable, as its start-up code leaves it (tools/startup-data/make_image.py)
+NOTSA_IMAGE_DATA RCDATA "gta_image.bin"

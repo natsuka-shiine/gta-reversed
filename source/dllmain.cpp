@@ -29,6 +29,11 @@ void LoadConfigurations() {
 
 bool notsa::IsOriginalCodeAvailable() {
     static const bool s_IsAvailable = [] {
+        // Not if this code is the executable itself (see `standalone/`)
+        if (HMODULE mod{}; GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(&notsa::IsOriginalCodeAvailable), &mod)
+            && mod == GetModuleHandleA(nullptr)) {
+            return false;
+        }
         char buf[8]{};
         return GetEnvironmentVariableA("GTA_REVERSED_STANDALONE", buf, sizeof(buf)) == 0;
     }();

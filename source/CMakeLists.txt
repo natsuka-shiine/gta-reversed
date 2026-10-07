@@ -392,4 +392,53 @@ if (${RE_PROJECT}_WITH_LIBRW)
         xinput
     )
     target_link_options(${RE_PROJECT_LIBRW_LINK_NAME} PRIVATE "/SUBSYSTEM:WINDOWS" "/INCREMENTAL:NO")
+
+    #--------------------------------------------------------------------
+    # The game as an executable of its own
+    #
+    # The same objects again, linked into an executable that needs nothing of the original at run time: no launcher,
+    # no loader, no original executable. What it still has of the original is its data (as a resource), because the game's
+    # code refers to the original's global variables by address: see `standalone/ImageBlock.cpp`.
+    # That data isn't in the repository, make it from your own executable first:
+    #   python tools/startup-data/make_image.py <gta_sa.exe (1.0 US, compact)>
+    # Not part of the default build:
+    #   cmake --build build --target gta_reversed_exe
+    #--------------------------------------------------------------------
+    set(RE_PROJECT_STANDALONE_DIR "${PROJECT_SOURCE_DIR}/standalone")
+    if (MSVC AND EXISTS "${RE_PROJECT_STANDALONE_DIR}/gta_image.bin")
+        set(RE_PROJECT_EXE_NAME gta_reversed_exe)
+
+        # `ImageBlock.cpp` first: the block has to be what the image starts with
+        add_executable(${RE_PROJECT_EXE_NAME} WIN32 EXCLUDE_FROM_ALL
+            "${RE_PROJECT_STANDALONE_DIR}/ImageBlock.cpp"
+            "${RE_PROJECT_STANDALONE_DIR}/Entry.cpp"
+            "${RE_PROJECT_STANDALONE_DIR}/Image.rc"
+            $<TARGET_OBJECTS:${RE_PROJECT_LIBRW_CHECK_NAME}>
+        )
+        set_source_files_properties("${RE_PROJECT_STANDALONE_DIR}/Image.rc" PROPERTIES OBJECT_DEPENDS "${RE_PROJECT_STANDALONE_DIR}/gta_image.bin")
+        set_target_properties(${RE_PROJECT_EXE_NAME} PROPERTIES
+            LINKER_LANGUAGE CXX
+            OUTPUT_NAME "gta_reversed"
+            UNITY_BUILD OFF
+        )
+        target_link_libraries(${RE_PROJECT_EXE_NAME} PRIVATE
+            $<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},LINK_LIBRARIES>
+            librw
+            xinput
+        )
+        target_link_options(${RE_PROJECT_EXE_NAME} PRIVATE
+            /ENTRY:NotsaExeEntry   # Puts the data in place, then starts the C runtime
+            /BASE:0x400000         # Same as the original: the data is at its addresses
+            /FIXED
+            /DYNAMICBASE:NO
+            /SECTION:.text,ERW     # The block for the original's data is in it
+            /INCREMENTAL:NO        # (Would put its own things before the block)
+            /NXCOMPAT:NO           # Same as the original
+            /SAFESEH:NO
+            /SUBSYSTEM:WINDOWS,5.01 # Same as the launcher, see there
+            /STACK:0x200000,0x1000 # Same as the original
+        )
+    else()
+        message(STATUS "No `standalone/gta_image.bin`: target `gta_reversed_exe` isn't available (see tools/startup-data/make_image.py)")
+    endif()
 endif()
