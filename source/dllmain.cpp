@@ -47,6 +47,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         }
         LoadConfigurations();
 
+        notsa::StaticData::Init();
+
         ReversibleHooks::RHManager::CreateInstance();
         InjectHooksMain();
 

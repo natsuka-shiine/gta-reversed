@@ -6,6 +6,8 @@
 */
 #pragma once
 
+#include "StaticData.h"
+
 #include "app/app_debug.h"
 #include <rw/rwplcore.h>
 #include <nlohmann/json.hpp>
@@ -172,6 +174,30 @@ T& StaticRef(uintptr addr) {
     return *reinterpret_cast<T*>(buf);
 #else
     return *reinterpret_cast<T*>(addr);
+#endif
+}
+
+/*!
+* @brief Used for static variable references - This is the form to use, the one above is being phased out.
+*
+* With the address known at compile time the variable can be moved into our own memory, see `StaticData.h`.
+*
+* @tparam T    The type of the variable
+* @tparam Addr The address of it
+*/
+template<typename T, uintptr Addr>
+T& StaticRef() {
+#ifdef NOTSA_STANDALONE_DUMP_HOOKS_ONLY
+    alignas(T) static uint8 buf[sizeof(T)]{};
+    return *reinterpret_cast<T*>(buf);
+#else
+    if constexpr (notsa::StaticData::IsOwned(Addr)) {
+        alignas(T) static uint8 storage[sizeof(T)];
+        [[maybe_unused]] static const bool s_IsAdopted = (notsa::StaticData::Adopt(Addr, storage, sizeof(T)), true);
+        return *reinterpret_cast<T*>(storage);
+    } else {
+        return *reinterpret_cast<T*>(Addr);
+    }
 #endif
 }
 

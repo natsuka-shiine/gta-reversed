@@ -305,6 +305,7 @@ void Idle(void* param) {
     CFont::InitPerFrame();
     CPointLights::NumLights = 0;
     CGame::Process();
+    notsa::StaticData::Verify();
     AudioEngine.Service();
     SetLightsWithTimeOfDayColour(Scene.m_pRpWorld);
     if (!param) {
