@@ -233,8 +233,19 @@ void RsWarningMessage(const RwChar* msg) {
 
 // 0x745510
 const RwMemoryFunctions* psGetMemoryFunctions() {
+#ifdef NOTSA_NO_ORIGINAL_CODE
+    // The table of the original (below) has the addresses of the original's functions in it
+    static const RwMemoryFunctions s_MemoryFunctions{
+        .rwmalloc  = [](size_t size) -> void* { return CMemoryMgr::Malloc(size); },
+        .rwfree    = [](void* mem) { CMemoryMgr::Free(mem); },
+        .rwrealloc = [](void* mem, size_t newSize) -> void* { return CMemoryMgr::Realloc(mem, newSize); },
+        .rwcalloc  = [](size_t numObj, size_t sizeObj) -> void* { return CMemoryMgr::Calloc(numObj, sizeObj); },
+    };
+    return &s_MemoryFunctions;
+#else
     // Returns the RenderWare memory functions table pointer (static address for this version)
     return reinterpret_cast<const RwMemoryFunctions*>(0x8D6228);
+#endif
 }
 
 // 0x619C90

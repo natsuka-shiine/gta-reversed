@@ -1,5 +1,7 @@
 #include "StdInc.h"
 
+#include <bitset>
+
 #include "RunningScript.h"
 #include "TheScripts.h"
 #include "CarGenerator.h"
@@ -1624,6 +1626,14 @@ OpcodeResult CRunningScript::ProcessOneCommand() {
     if (const auto handler = CustomCommandHandlerOf((eScriptCommands)(op.Command))) {
         return std::invoke(handler, this);
     } else {
+#ifdef NOTSA_NO_ORIGINAL_CODE
+        // This is the original's code. Report each command that still ends up here (once): they're what's left to reverse.
+        static std::bitset<COMMAND_HIGHEST_VANILLA_ID + 1> s_Reported{};
+        if (op.Command <= COMMAND_HIGHEST_VANILLA_ID && !s_Reported.test(op.Command)) {
+            s_Reported.set(op.Command);
+            NOTSA_LOG_ERR("Script command {:#06x} ({}) has no handler of ours, running the original's ({} such commands so far)", (size_t)op.Command, notsa::script::GetScriptCommandName((eScriptCommands)op.Command), s_Reported.count());
+        }
+#endif
         return std::invoke(s_OriginalCommandHandlerTable[(size_t)op.Command / 100], this, (eScriptCommands)(op.Command));
     }
 }

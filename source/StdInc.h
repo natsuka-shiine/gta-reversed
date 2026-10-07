@@ -31,6 +31,11 @@
 
 #include <extensions/Casting.hpp>
 
+// The profiler's client records all the time and keeps it all until a profiler connects to take it. Without one that's memory that
+// only ever grows, until none is left. TODO: Build the client with `TRACY_ON_DEMAND` instead, and have it everywhere.
+#ifdef NOTSA_NO_ORIGINAL_CODE
+#undef TRACY_ENABLE
+#endif
 #include <Tracy.hpp>
 
 // DirectX

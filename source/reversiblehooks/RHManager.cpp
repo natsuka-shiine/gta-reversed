@@ -25,9 +25,10 @@ std::vector<VirtualHookTarget> s_VirtualHookTargets;
 void RedirectOriginalsOfVirtualHooks() {
     using namespace Constants;
 
-    uint32 numRedirected{}, numSkipped{};
+    uint32 numRedirected{}, numSkipped{}, numAlreadyJumps{};
     for (const auto& t : s_VirtualHookTargets) {
-        if (t.fnGTA[0] == JUMP_OPCODE) { // Has a hook on it (or is one of ours from an earlier entry: more classes can have the same function)
+        if (t.fnGTA[0] == JUMP_OPCODE) { // Has a hook on it already: the usual case, the hooks of virtual functions redirect the original function too
+            numAlreadyJumps++;
             continue;
         }
 
@@ -52,7 +53,10 @@ void RedirectOriginalsOfVirtualHooks() {
         Utility::VirtualCopy(t.fnGTA, jmp, sizeof(jmp));
         numRedirected++;
     }
-    NOTSA_LOG_INFO("Redirected the originals of {} virtual functions to ours ({} were too short for that)", numRedirected, numSkipped);
+    NOTSA_LOG_INFO(
+        "Redirected the originals of {} virtual functions to ours (of {} virtual hooks: {} start with a jump already, {} were too short for that)",
+        numRedirected, s_VirtualHookTargets.size(), numAlreadyJumps, numSkipped
+    );
     s_VirtualHookTargets.clear();
 }
 #endif

@@ -98,7 +98,9 @@ void CMemoryMgr::SetHint(void* memory, const char* hint) {
 
 // 0x72F480
 void CMemoryMgr::InitScratchPad() {
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::Call<0x72F480>();
+#endif
 
     g_Heaps[HEAP_SCRATCH].Init(PC_Scratch, sizeof(PC_Scratch), false);
 }
@@ -232,7 +234,9 @@ void* CMemoryMgr::Malloc(uint32 size, uint32 nHint) {
     _UNLOCK_MEMORYHEAP();
     return memory;
 #else
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::CallAndReturn<void*, 0x72F420, size_t>(size);
+#endif
     return ::malloc(size);
 #endif
 }
@@ -251,7 +255,9 @@ void CMemoryMgr::Free(void* memory) {
     }
     UNLOCK_MEMORYHEAP();
 #else
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::Call<0x72F430, void*>(memory);
+#endif
     return ::free(memory);
 #endif
 }
@@ -285,14 +291,18 @@ uint8* CMemoryMgr::Realloc(void* memory, uint32 size, uint32 nHint) {
     UNLOCK_MEMORYHEAP();
     return newMemory;
 #else
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::CallAndReturn<uint8*, 0x72F440, void*, size_t>(memory, size);
+#endif
     return static_cast<uint8*>(::realloc(memory, size));
 #endif
 }
 
 // 0x72F460
 uint8* CMemoryMgr::Calloc(uint32 numObj, uint32 sizeObj, uint32 hint) {
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::CallAndReturn<uint8*, 0x72F460, uint32, uint32>(numObj, sizeObj);
+#endif
 
 #ifdef MEMORY_MGR_USE_MEMORY_HEAP
     return Malloc(hint * size, hint);
@@ -311,7 +321,9 @@ uint8* CMemoryMgr::MallocAlign(uint32 size, uint32 align, uint32 nHint) {
 }
 
 void CMemoryMgr::FreeAlign(void* memory) {
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::Call<0x72F4F0, void*>(memory);
+#endif
     Free(*((void**)memory - 1));
 }
 
@@ -370,7 +382,9 @@ void* CMemoryMgr::Malloc(uint32 size) {
 }
 
 void* CMemoryMgr::MallocAlign(uint32 size, uint32 align) {
+#ifndef NOTSA_NO_ORIGINAL_CODE
     return plugin::CallAndReturn<void*, 0x72F4C0, uint32, uint32>(size, align);
+#endif
 
     void* memory = MallocAlign(size, align, 0);
 #if defined MEMORY_MGR_USE_HEAP_FLAGS
@@ -438,7 +452,7 @@ void operator delete(void* memory) {
 
 #endif
 
-#ifndef NOTSA_STANDALONE
+#if !defined(NOTSA_STANDALONE) && !defined(NOTSA_NO_ORIGINAL_CODE) // (Otherwise: the ones of our C runtime)
 void* operator new(size_t size) {
     return plugin::CallAndReturn<void*, 0x82119A, size_t>(size);
 }

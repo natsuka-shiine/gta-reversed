@@ -356,6 +356,7 @@ if (${RE_PROJECT}_WITH_LIBRW)
     target_compile_definitions(${RE_PROJECT_LIBRW_CHECK_NAME} PRIVATE
         $<TARGET_PROPERTY:${RE_PROJECT_LIB_NAME},COMPILE_DEFINITIONS>
         NOTSA_LIBRW
+        NOTSA_NO_ORIGINAL_CODE # Nothing may forward to code of the original executable on purpose (see `docs/roadmap_to_exe.md`)
     )
     # Exactly the options of the main target (Not the directory's: `add_dependency` above adds things to those that aren't options)
     set_target_properties(${RE_PROJECT_LIBRW_CHECK_NAME} PROPERTIES
